@@ -55,7 +55,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 20px;
+  gap: 16px;
   max-width: var(--hero-text-max);
   justify-self: end;
 }
@@ -80,7 +80,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px 24px;
   width: 100%;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .hero__button {
@@ -155,15 +155,14 @@
   white-space: nowrap;
   font-size: 0.9rem;
   font-weight: 400;
-  padding-inline: 24px;
 }
 
 .news-strip__item::after {
   content: '';
-  display: inline-block;
+  display: block;
   width: 8px;
   height: 8px;
-  margin-inline-start: 24px;
+  margin-inline: 24px;
   border-radius: 50%;
   background: var(--color-blue);
   flex-shrink: 0;

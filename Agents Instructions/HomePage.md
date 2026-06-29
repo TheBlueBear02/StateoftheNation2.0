@@ -70,7 +70,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`.
 - Blue background (`--color-blue: #4890FD`).
 - Taller section: `min-height: clamp(460px, 64vh, 600px)` with `48px` vertical padding.
 - `.hero__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, visual second — in RTL this places text on the right and bear on the left.
-- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center).
+- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center). Column `gap: 16px` between title, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
 - Bear column: `justify-content: flex-start` (faces toward center).
 - **Title:** מצב האומה
 - **Subtitle:** להבין מה באמת המצב של ישראל באמצעות טכנולוגיה
@@ -90,6 +90,7 @@ Buttons are placeholder links until dedicated routes/pages exist. Style: white p
 - Black background, white text, blue dot separators.
 - Full-bleed edge-to-edge (no `.container`) — intentional marquee effect.
 - Headlines from `NEWS_ITEMS` in `App.tsx` (static placeholder copy).
+- Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
 - CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
 
 ### 4. Government Dashboard project (`#government-dashboard`)
