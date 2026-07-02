@@ -12,6 +12,7 @@ type KnessetHemicycleProps = {
   placedMembers: PlacedMember[]
   coalitionCount: number
   oppositionCount: number
+  hasCoalitionData: boolean
   loading?: boolean
 }
 
@@ -19,6 +20,7 @@ export function KnessetHemicycle({
   placedMembers,
   coalitionCount,
   oppositionCount,
+  hasCoalitionData,
   loading = false,
 }: KnessetHemicycleProps) {
   const [hoveredMember, setHoveredMember] = useState<PlacedMember | null>(null)
@@ -27,6 +29,11 @@ export function KnessetHemicycle({
   const dots = useMemo(
     () => (loading ? buildSkeletonLayout() : placedMembers),
     [loading, placedMembers],
+  )
+
+  const totalCount = useMemo(
+    () => placedMembers.filter((member) => member.fullName).length,
+    [placedMembers],
   )
 
   function handleMove(event: MouseEvent<SVGGElement>) {
@@ -41,7 +48,7 @@ export function KnessetHemicycle({
         width="100%"
         height="auto"
         role="img"
-        aria-label="מפת חברי הכנסת הנוכחיים"
+        aria-label="מפת חברי הכנסת"
       >
         {dots.map((member) => (
           <MKDot
@@ -57,6 +64,8 @@ export function KnessetHemicycle({
         <CenterCounter
           coalitionCount={coalitionCount}
           oppositionCount={oppositionCount}
+          totalCount={totalCount}
+          hasCoalitionData={hasCoalitionData}
         />
       </svg>
 
@@ -65,6 +74,10 @@ export function KnessetHemicycle({
           fullName={hoveredMember.fullName}
           factionName={hoveredMember.factionName}
           factionColor={hoveredMember.factionColor}
+          imageUrl={hoveredMember.imageUrl}
+          firstElectedYear={hoveredMember.firstElectedYear}
+          totalDaysInKnesset={hoveredMember.totalDaysInKnesset}
+          totalYearsInKnesset={hoveredMember.totalYearsInKnesset}
           x={tooltipPosition.x}
           y={tooltipPosition.y}
         />

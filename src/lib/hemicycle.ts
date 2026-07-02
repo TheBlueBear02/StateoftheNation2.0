@@ -9,10 +9,11 @@ export const HEMICYCLE_VIEWBOX = {
 
 /** 'X' = seat, '.' = empty (center void or corner aisle) */
 export const SEAT_GRID: readonly string[] = [
-  'X...XXXXXXXXXXX...X',
-  'XX...XXXXXXXXX...XX',
-  'XXX...XXXXXXX...XXX',
-  'XXXX...XXXXX...XXXX',
+  '....XXXXXXXXXXX....',
+  'X....XXXXXXXXX....X',
+  'XX....XXXXXXX....XX',
+  'XXX....XXXXX....XXX',
+  'XXXX...........XXXX',
   'XXXX...........XXXX',
   'XXXX...........XXXX',
   'XXXX...........XXXX',
@@ -24,7 +25,6 @@ export const SEAT_GRID: readonly string[] = [
   'XX...............XX',
   'X.................X',
 ]
-
 export const TOTAL_SEATS = SEAT_GRID.reduce(
   (sum, row) => sum + [...row].filter((cell) => cell === 'X').length,
   0,
@@ -54,16 +54,25 @@ export type PlacedMember = {
   factionName: string | null
   factionColor: string | null
   isCoalition: boolean
+  knessetNumber: number | null
+  firstElectedYear: number | null
+  totalDaysInKnesset: number
+  totalYearsInKnesset: number
 }
 
 export type FactionGroup = {
   factionId: number | null
   factionName: string
   factionColor: string | null
+  factionLogoUrl: string | null
   isCoalition: boolean
   members: Array<{
     fullName: string
     imageUrl: string | null
+    knessetNumber: number | null
+    firstElectedYear: number | null
+    totalDaysInKnesset: number
+    totalYearsInKnesset: number
   }>
 }
 
@@ -101,14 +110,45 @@ function sortFactionGroups(groups: FactionGroup[]): FactionGroup[] {
   })
 }
 
+function sortFactionGroupsBySize(groups: FactionGroup[]): FactionGroup[] {
+  return [...groups].sort(
+    (left, right) => right.members.length - left.members.length,
+  )
+}
+
 function groupMembersByFaction(
   members: Array<{
     factionId: number | null
     factionName: string | null
     factionColor: string | null
+    factionLogoUrl: string | null
     isCoalition: boolean
     fullName: string
     imageUrl: string | null
+    knessetNumber: number | null
+    firstElectedYear: number | null
+    totalDaysInKnesset: number
+    totalYearsInKnesset: number
+  }>,
+  splitByBloc = true,
+): FactionGroup[] {
+  const groups = groupMembersByFactionUnsorted(members)
+  return splitByBloc ? sortFactionGroups(groups) : sortFactionGroupsBySize(groups)
+}
+
+function groupMembersByFactionUnsorted(
+  members: Array<{
+    factionId: number | null
+    factionName: string | null
+    factionColor: string | null
+    factionLogoUrl: string | null
+    isCoalition: boolean
+    fullName: string
+    imageUrl: string | null
+    knessetNumber: number | null
+    firstElectedYear: number | null
+    totalDaysInKnesset: number
+    totalYearsInKnesset: number
   }>,
 ): FactionGroup[] {
   const groups = new Map<number | null, FactionGroup>()
@@ -121,6 +161,10 @@ function groupMembersByFaction(
       existing.members.push({
         fullName: member.fullName,
         imageUrl: member.imageUrl,
+        knessetNumber: member.knessetNumber,
+        firstElectedYear: member.firstElectedYear,
+        totalDaysInKnesset: member.totalDaysInKnesset,
+        totalYearsInKnesset: member.totalYearsInKnesset,
       })
       continue
     }
@@ -129,17 +173,22 @@ function groupMembersByFaction(
       factionId: key,
       factionName: member.factionName ?? 'ללא סיעה',
       factionColor: member.factionColor,
+      factionLogoUrl: member.factionLogoUrl,
       isCoalition: member.isCoalition,
       members: [
         {
           fullName: member.fullName,
           imageUrl: member.imageUrl,
+          knessetNumber: member.knessetNumber,
+          firstElectedYear: member.firstElectedYear,
+          totalDaysInKnesset: member.totalDaysInKnesset,
+          totalYearsInKnesset: member.totalYearsInKnesset,
         },
       ],
     })
   }
 
-  return sortFactionGroups([...groups.values()])
+  return [...groups.values()]
 }
 
 function orderSeatsLeftToRight(seats: SeatPosition[]): SeatPosition[] {
@@ -242,6 +291,10 @@ function fillRegion(
         factionName: group.factionName,
         factionColor: group.factionColor,
         isCoalition: group.isCoalition,
+        knessetNumber: member.knessetNumber,
+        firstElectedYear: member.firstElectedYear,
+        totalDaysInKnesset: member.totalDaysInKnesset,
+        totalYearsInKnesset: member.totalYearsInKnesset,
       }
       pointer += 1
     }
@@ -291,8 +344,54 @@ function assignMembersToSeats(
       factionName: null,
       factionColor: null,
       isCoalition: false,
+      knessetNumber: null,
+      firstElectedYear: null,
+      totalDaysInKnesset: 0,
+      totalYearsInKnesset: 0,
     }
   })
+}
+
+function splitGroupsBySeatHalf(
+  groups: FactionGroup[],
+): [FactionGroup[], FactionGroup[]] {
+  const total = countMembers(groups)
+  const threshold = total / 2
+  const left: FactionGroup[] = []
+  const right: FactionGroup[] = []
+  let leftSeats = 0
+
+  for (const group of groups) {
+    if (leftSeats < threshold) {
+      left.push(group)
+      leftSeats += group.members.length
+    } else {
+      right.push(group)
+    }
+  }
+
+  if (right.length === 0 && left.length > 1) {
+    const last = left.pop()
+    if (last) {
+      right.push(last)
+    }
+  }
+
+  return [left, right]
+}
+
+function assignMembersToSeatsFactionOnly(
+  groups: FactionGroup[],
+  seatPositions: SeatPosition[],
+): PlacedMember[] {
+  const sorted = sortFactionGroupsBySize(groups)
+  const [leftGroups, rightGroups] = splitGroupsBySeatHalf(sorted)
+
+  return assignMembersToSeats(leftGroups, rightGroups, seatPositions)
+}
+
+export type HemicycleLayoutOptions = {
+  splitByBloc?: boolean
 }
 
 export function buildFactionGroups(
@@ -300,12 +399,18 @@ export function buildFactionGroups(
     factionId: number | null
     factionName: string | null
     factionColor: string | null
+    factionLogoUrl: string | null
     isCoalition: boolean
     fullName: string
     imageUrl: string | null
+    knessetNumber: number | null
+    firstElectedYear: number | null
+    totalDaysInKnesset: number
+    totalYearsInKnesset: number
   }>,
+  options?: HemicycleLayoutOptions,
 ): FactionGroup[] {
-  return groupMembersByFaction(members)
+  return groupMembersByFaction(members, options?.splitByBloc ?? true)
 }
 
 export function buildHemicycleLayout(
@@ -313,13 +418,25 @@ export function buildHemicycleLayout(
     factionId: number | null
     factionName: string | null
     factionColor: string | null
+    factionLogoUrl: string | null
     isCoalition: boolean
     fullName: string
     imageUrl: string | null
+    knessetNumber: number | null
+    firstElectedYear: number | null
+    totalDaysInKnesset: number
+    totalYearsInKnesset: number
   }>,
+  options?: HemicycleLayoutOptions,
 ): PlacedMember[] {
+  const splitByBloc = options?.splitByBloc ?? true
   const seatPositions = computeSeatPositions()
-  const groups = groupMembersByFaction(members)
+  const groups = groupMembersByFaction(members, splitByBloc)
+
+  if (!splitByBloc) {
+    return assignMembersToSeatsFactionOnly(groups, seatPositions)
+  }
+
   const coalitionGroups = groups.filter((group) => group.isCoalition)
   const oppositionGroups = groups.filter((group) => !group.isCoalition)
 
@@ -336,6 +453,10 @@ export function buildSkeletonLayout(): PlacedMember[] {
     factionName: null,
     factionColor: null,
     isCoalition: false,
+    knessetNumber: null,
+    firstElectedYear: null,
+    totalDaysInKnesset: 0,
+    totalYearsInKnesset: 0,
   }))
 }
 
@@ -356,15 +477,70 @@ export function getInitials(fullName: string): string {
 export function tintColor(hex: string, alpha = 0.2): string {
   const normalized = hex.replace('#', '')
 
-  if (normalized.length !== 6) {
-    return `rgba(180, 180, 180, ${alpha})`
+  if (normalized.length === 6) {
+    const red = Number.parseInt(normalized.slice(0, 2), 16)
+    const green = Number.parseInt(normalized.slice(2, 4), 16)
+    const blue = Number.parseInt(normalized.slice(4, 6), 16)
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`
   }
 
-  const red = Number.parseInt(normalized.slice(0, 2), 16)
-  const green = Number.parseInt(normalized.slice(2, 4), 16)
-  const blue = Number.parseInt(normalized.slice(4, 6), 16)
+  const hslMatch = hex.match(/^hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)$/)
 
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+  if (hslMatch) {
+    const [, hue, saturation, lightness] = hslMatch
+    return `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`
+  }
+
+  return `rgba(180, 180, 180, ${alpha})`
+}
+
+function hashString(value: string): number {
+  let hash = 0
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = Math.imul(31, hash) + value.charCodeAt(index)
+    hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b)
+    hash = hash ^ (hash >>> 16)
+  }
+
+  return Math.abs(hash)
+}
+
+export function factionColorFromId(
+  factionId: number | null,
+  factionName?: string | null,
+): string {
+  if (factionId !== null) {
+    let hash = factionId
+    hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b)
+    hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b)
+    hash = hash ^ (hash >>> 16)
+    const hue = Math.abs(hash) % 360
+
+    return `hsl(${hue}, 55%, 45%)`
+  }
+
+  if (factionName?.trim()) {
+    const hue = hashString(factionName.trim()) % 360
+    return `hsl(${hue}, 55%, 45%)`
+  }
+
+  return '#c8c8c8'
+}
+
+export function resolveFactionColor(
+  factionId: number | null,
+  color: string | null | undefined,
+  factionName?: string | null,
+): string {
+  const dbColor = color?.trim()
+
+  if (dbColor) {
+    return dbColor
+  }
+
+  return factionColorFromId(factionId, factionName)
 }
 
 export function donutDashArray(
