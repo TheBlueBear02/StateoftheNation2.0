@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { SiteHeader } from './components/SiteHeader'
 import './App.css'
 
 const HERO_BUTTONS = [
@@ -5,6 +7,7 @@ const HERO_BUTTONS = [
   { label: 'דשבורד ממשלה', href: '#government-dashboard' },
   { label: 'ציר זמן', href: '#timeline' },
   { label: 'מיפוי סוגיות פוליטיות', href: '#political-issues' },
+  { label: 'הכנסת', to: '/knesset' },
 ] as const
 
 const NEWS_ITEMS = [
@@ -24,17 +27,7 @@ const DASHBOARD_ICONS = [
 function App() {
   return (
     <div className="site" dir="rtl">
-      <header className="site-header">
-        <div className="site-header__inner container">
-          <img
-            src="/header-logo%203.svg"
-            alt="מצב האומה"
-            className="site-logo"
-            width={122}
-            height={40}
-          />
-        </div>
-      </header>
+      <SiteHeader />
 
       <main>
         <section className="hero" aria-labelledby="hero-title">
@@ -48,11 +41,17 @@ function App() {
               </p>
               <nav className="hero__nav" aria-label="פרויקטים עיקריים">
                 <ul className="hero__buttons">
-                  {HERO_BUTTONS.map(({ label, href }) => (
-                    <li key={href}>
-                      <a href={href} className="hero__button">
-                        {label}
-                      </a>
+                  {HERO_BUTTONS.map((button) => (
+                    <li key={'to' in button ? button.to : button.href}>
+                      {'to' in button ? (
+                        <Link to={button.to} className="hero__button">
+                          {button.label}
+                        </Link>
+                      ) : (
+                        <a href={button.href} className="hero__button">
+                          {button.label}
+                        </a>
+                      )}
                     </li>
                   ))}
                 </ul>

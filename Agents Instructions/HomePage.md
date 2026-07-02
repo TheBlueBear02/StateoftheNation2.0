@@ -24,6 +24,8 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | File | Role |
 |------|------|
 | `src/App.tsx` | Section markup and static content arrays |
+| `src/main.tsx` | React Router — `/` homepage, `/knesset` Knesset page |
+| `src/components/SiteHeader.tsx` | Shared header with logo link home |
 | `src/App.css` | `.container` primitive and section-specific styles |
 | `src/index.css` | Global reset, CSS variables, Heebo font |
 | `index.html` | `lang="he"`, `dir="rtl"`, page title |
@@ -82,8 +84,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`.
 | דשבורד ממשלה | `#government-dashboard` |
 | ציר זמן | `#timeline` |
 | מיפוי סוגיות פוליטיות | `#political-issues` |
+| הכנסת | `/knesset` (route) |
 
-Buttons are placeholder links until dedicated routes/pages exist. Style: white pills with 2px border and hard offset shadow (`box-shadow: 6px 6px 0 0 #000814`) — no blur.
+Buttons with `#` anchors are placeholders until dedicated routes exist. **הכנסת** links to the live Knesset hemicycle page.
 
 ### 3. News strip (`news-strip`)
 
@@ -107,8 +110,14 @@ Buttons are placeholder links until dedicated routes/pages exist. Style: white p
 
 ## State Management
 
-- None. All content is static arrays in `App.tsx`.
-- No routing library yet.
+- Homepage content is static arrays in `App.tsx`.
+- Knesset page uses `useKnessetMembers` hook with Supabase (see `Agents Instructions/KnessetPage.md`).
+
+## Routing
+
+- `react-router-dom` in `src/main.tsx`
+- `/` → homepage
+- `/knesset` → Knesset hemicycle page
 
 ## Responsive Behavior
 
@@ -117,7 +126,7 @@ Buttons are placeholder links until dedicated routes/pages exist. Style: white p
 
 ## Future Work
 
-- Wire hero buttons and dashboard CTA to real routes.
+- Wire remaining hero buttons and dashboard CTA to real routes.
 - Replace `NEWS_ITEMS` with live news feed API.
 - Replace dashboard CSS placeholder with final dashboard screenshot/asset.
 - Add remaining project sections below the first one.
