@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
-import { SiteHeader } from './components/SiteHeader'
-import './App.css'
+import { SiteLayout } from './components/SiteLayout'
 
 const HERO_BUTTONS = [
   { label: 'בחירות 2026', href: '#elections-2026' },
@@ -26,9 +25,7 @@ const DASHBOARD_ICONS = [
 
 function App() {
   return (
-    <div className="site" dir="rtl">
-      <SiteHeader />
-
+    <SiteLayout>
       <main>
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero__inner container">
@@ -122,7 +119,7 @@ function App() {
           </div>
         </section>
       </main>
-    </div>
+    </SiteLayout>
   )
 }
 

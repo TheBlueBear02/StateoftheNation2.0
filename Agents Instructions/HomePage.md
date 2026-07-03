@@ -1,5 +1,7 @@
 # HomePage
 
+> See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and shared conventions.
+
 Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with four visible sections.
 
 ## Page Structure
@@ -16,6 +18,9 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 ├─────────────────────────────────────────────────────────┤
 │  Project: דשבורד ממשלה (white, full-bleed)             │
 │    └─ .container — 2-col grid: text | dashboard preview │
+├─────────────────────────────────────────────────────────┤
+│  Footer (blue, full-bleed) — brand + copyright        │
+│    └─ .container — flex row, space-between            │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -26,6 +31,8 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/App.tsx` | Section markup and static content arrays |
 | `src/main.tsx` | React Router — `/` homepage, `/knesset` Knesset page |
 | `src/components/SiteHeader.tsx` | Shared header with logo link home |
+| `src/components/SiteFooter.tsx` | Shared footer (primary blue background) |
+| `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
 | `src/App.css` | `.container` primitive and section-specific styles |
 | `src/index.css` | Global reset, CSS variables, Heebo font |
 | `index.html` | `lang="he"`, `dir="rtl"`, page title |
@@ -49,7 +56,7 @@ All section content (except the news ticker) lives inside a shared centered cont
 - **Centered content** via `margin-inline: auto` guarantees the container is exactly centered.
 - **Fluid side padding** via `clamp()` scales gutters with viewport width.
 
-Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`.
+Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site-footer__inner`.
 
 ## Design tokens
 
@@ -102,9 +109,17 @@ Buttons with `#` anchors are placeholders until dedicated routes exist. **הכנ
 - `.project-section__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, preview second — text right, dashboard preview left in RTL.
 - CTA currently links to `#government-dashboard` until a dashboard route exists.
 
+### 5. Footer (`site-footer`)
+
+- Blue background (`--color-blue: #4890FD`), white text.
+- Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: brand (RTL start), centered social links, copyright (RTL end).
+- Social nav (`site-footer__social`): icon links to X, Instagram, and Facebook — icons from `public/icons.svg` (`x-icon`, `instagram-icon`, `facebook-icon`), opened in a new tab.
+- URLs are defined in `SOCIAL_LINKS` at the top of `SiteFooter.tsx`.
+- Rendered via `SiteLayout` on every page (homepage and Knesset).
+
 ## RTL & Typography
 
-- `dir="rtl"` on `.site` in `App.tsx` and on `<html>` in `index.html`.
+- `dir="rtl"` on `.site` via `SiteLayout` and on `<html>` in `index.html`.
 - Font: **Heebo** (Google Fonts) via `index.css`.
 - Grid columns flow right-to-left; first DOM child lands in the right column.
 

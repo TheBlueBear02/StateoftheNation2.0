@@ -5,6 +5,7 @@ import {
   type KnessetMembershipRow,
   type KnessetMembershipTenureRow,
   type KnessetOption,
+  type MinisterAppointmentRow,
 } from '../lib/supabase'
 import {
   buildFactionGroups,
@@ -17,6 +18,10 @@ import {
   computeMemberTenureStats,
   type MemberTenureStats,
 } from '../lib/knessetTenure'
+import {
+  buildMinisterRolesMap,
+  mergeAdditionalRoles,
+} from '../lib/memberRoles'
 
 export type KnessetMember = {
   id: number
@@ -31,6 +36,7 @@ export type KnessetMember = {
   firstElectedYear: number | null
   totalDaysInKnesset: number
   totalYearsInKnesset: number
+  additionalRoles: string[]
 }
 
 export type UseKnessetMembersResult = {
@@ -111,6 +117,7 @@ function buildTenureMap(
 function normalizeMembers(
   rows: KnessetMembershipRow[],
   tenureMap: Map<number, MemberTenureStats>,
+  ministerRolesMap: Map<number, string[]>,
 ): KnessetMember[] {
   return rows.map((row) => {
     const person = unwrapRelation(row.person)
@@ -141,6 +148,10 @@ function normalizeMembers(
       firstElectedYear: tenure.firstElectedYear,
       totalDaysInKnesset: tenure.totalDaysInKnesset,
       totalYearsInKnesset: tenure.totalYearsInKnesset,
+      additionalRoles: mergeAdditionalRoles(
+        row.duty_desc,
+        ministerRolesMap.get(row.person_id) ?? [],
+      ),
     }
   })
 }
@@ -178,7 +189,7 @@ export function useKnessetMembers(
       const { data, error: queryError } = await supabase
         .from('knesset_memberships')
         .select(
-          'id, person_id, faction_id, start_date, person:people(full_name, image_url), faction:knesset_factions(name, short_name, logo_url, color, is_coalition), knesset:knessets(knesset_number, start_date, end_date)',
+          'id, person_id, faction_id, start_date, duty_desc, person:people(full_name, image_url), faction:knesset_factions(name, short_name, logo_url, color, is_coalition), knesset:knessets(knesset_number, start_date, end_date)',
         )
         .eq('knesset_id', knessetId)
         .lte('start_date', refDate)
@@ -209,17 +220,34 @@ export function useKnessetMembers(
         return
       }
 
-      const { data: tenureData, error: tenureError } = await supabase
-        .from('knesset_memberships')
-        .select('person_id, start_date, end_date, knesset:knessets(knesset_number)')
-        .in('person_id', personIds)
+      const [tenureResult, rolesResult] = await Promise.all([
+        supabase
+          .from('knesset_memberships')
+          .select('person_id, start_date, end_date, knesset:knessets(knesset_number)')
+          .in('person_id', personIds),
+        supabase
+          .from('minister_appointments')
+          .select(
+            'person_id, duty_desc, is_acting, office:offices(name, knesset_category_name)',
+          )
+          .in('person_id', personIds)
+          .lte('start_date', refDate)
+          .or(`end_date.is.null,end_date.gte.${refDate}`),
+      ])
 
       if (cancelled) {
         return
       }
 
-      if (tenureError) {
-        setError(tenureError.message)
+      if (tenureResult.error) {
+        setError(tenureResult.error.message)
+        setMembers([])
+        setLoading(false)
+        return
+      }
+
+      if (rolesResult.error) {
+        setError(rolesResult.error.message)
         setMembers([])
         setLoading(false)
         return
@@ -233,11 +261,15 @@ export function useKnessetMembers(
       )
 
       const tenureMap = buildTenureMap(
-        (tenureData ?? []) as unknown as KnessetMembershipTenureRow[],
+        (tenureResult.data ?? []) as unknown as KnessetMembershipTenureRow[],
         currentKnessetByPerson,
       )
 
-      setMembers(normalizeMembers(snapshotRows, tenureMap))
+      const ministerRolesMap = buildMinisterRolesMap(
+        (rolesResult.data ?? []) as unknown as MinisterAppointmentRow[],
+      )
+
+      setMembers(normalizeMembers(snapshotRows, tenureMap, ministerRolesMap))
       setLoading(false)
     }
 
@@ -277,6 +309,7 @@ export function useKnessetMembers(
         firstElectedYear: member.firstElectedYear,
         totalDaysInKnesset: member.totalDaysInKnesset,
         totalYearsInKnesset: member.totalYearsInKnesset,
+        additionalRoles: member.additionalRoles,
       })),
     [members],
   )

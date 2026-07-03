@@ -1,5 +1,7 @@
 # KnessetPage
 
+> See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and data model.
+
 Hemicycle visualization of Knesset members for any selected term, arranged on a fixed **17×15 parliament grid**. When coalition data exists for the selected term, seats split coalition (left) vs opposition (right); otherwise factions fill the chamber left-to-right by size.
 
 Route: `/knesset`
@@ -17,6 +19,8 @@ Route: `/knesset`
 │  Error message (if fetch fails)                         │
 │  FactionList (party cards: name + seats + MK photos)    │
 │    └─ Sort selector (default: by party)                 │
+├─────────────────────────────────────────────────────────┤
+│  Footer (shared SiteFooter — primary blue background)   │
 └─────────────────────────────────────────────────────────┘
 │  Tooltip (desktop only, HTML overlay)                   │
 └─────────────────────────────────────────────────────────┘
@@ -36,6 +40,7 @@ Route: `/knesset`
 | `src/hooks/useKnessetList.ts` | Loads all Knesset terms for the picker |
 | `src/hooks/useKnessetMembers.ts` | Supabase fetch for selected term + derived counts + `factionGroups` |
 | `src/lib/hemicycle.ts` | Seat positions, bloc/faction layout, `factionColorFromId`, `SEAT_REVEAL_ORDER` entrance sequence |
+| `src/lib/memberRoles.ts` | Formats minister appointments and membership `duty_desc` into display roles |
 | `src/lib/memberSort.ts` | `MemberSortMode` type and Hebrew sort option labels |
 | `src/lib/supabase.ts` | Supabase client + types (`KnessetOption`, etc.) |
 | `src/components/SiteHeader.tsx` | Shared header (logo links home) |
@@ -54,9 +59,11 @@ Route: `/knesset`
 ### Tables
 
 - `knessets` — term metadata (`knesset_number`, `start_date`, `end_date`, `is_active`)
-- `knesset_memberships` — one row per MK per Knesset term (may include mid-term replacements)
+- `knesset_memberships` — one row per MK per Knesset term (may include mid-term replacements); optional `duty_desc` for non-generic roles (e.g. יו"ר הכנסת)
 - `knesset_factions` — party `name`, optional `short_name`, optional `logo_url`, `color`, `is_coalition`
 - `people` — `full_name`, `image_url`
+- `minister_appointments` — government roles active at the term snapshot date (ministers, PM, deputies, etc.)
+- `offices` — ministry/office names joined from minister appointments
 
 ### Queries
 
@@ -76,7 +83,7 @@ Reference date: `refDate = term.endDate ?? today` (ISO `YYYY-MM-DD`).
 ```ts
 supabase
   .from('knesset_memberships')
-  .select('id, person_id, faction_id, start_date, person:people(...), faction:knesset_factions(...), knesset:knessets(...)')
+  .select('id, person_id, faction_id, start_date, duty_desc, person:people(...), faction:knesset_factions(...), knesset:knessets(...)')
   .eq('knesset_id', term.id)
   .lte('start_date', refDate)
   .or(`end_date.is.null,end_date.gte.${refDate}`)
@@ -94,6 +101,17 @@ supabase
   .in('person_id', personIds)
 ```
 
+**4. Active government roles** (parallel with query 3, same `person_id`s, filtered to `refDate`)
+
+```ts
+supabase
+  .from('minister_appointments')
+  .select('person_id, duty_desc, is_acting, office:offices(name, knesset_category_name)')
+  .in('person_id', personIds)
+  .lte('start_date', refDate)
+  .or(`end_date.is.null,end_date.gte.${refDate}`)
+```
+
 ### Derived client-side
 
 - `factionName` — `short_name` when present, otherwise `name`
@@ -104,6 +122,10 @@ supabase
 - Faction sort — coalition-first when `splitByBloc`, else by seat count desc only
 - Per-MK tenure stats (`computeMemberTenureStats` in `src/lib/knessetTenure.ts`):
   - `knessetNumber`, `firstElectedYear`, `totalDaysInKnesset`, `totalYearsInKnesset`
+- Per-MK `additionalRoles` (`src/lib/memberRoles.ts`):
+  - Non-generic `duty_desc` from the membership snapshot (excludes plain "חבר כנסת" / "חברת כנסת")
+  - Active minister/government titles from `minister_appointments` at `refDate` (uses `duty_desc`, else office name; prefixes `מ"מ` when `is_acting`)
+  - Shown in the desktop tooltip below the faction name, joined with ` · ` when multiple
 
 ### Coalition data (future)
 
@@ -150,6 +172,13 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 15 rows × 17 columns. Each cell is
 - **Without coalition data:** single neutral grey ring, large total count, label **הכנסת**
 - **Hemicycle hover:** when the user hovers an MK dot and coalition data exists, a blurred halo behind the white disc glows in the hovered member's bloc color (coalition or opposition); fades out when hover ends
 - **Entrance animation:** scales/fades in when the top-arc reveal pass begins (`ARC_REVEAL_START_INDEX × SEAT_REVEAL_STAGGER_MS` delay)
+
+### Tooltip
+
+- Desktop only (HTML overlay, not shown on touch)
+- Header: photo/initials, name, faction
+- When `additionalRoles` is non-empty: role line below faction (e.g. שר האוצר, ראש הממשלה, יו"ר הכנסת)
+- Details: cumulative tenure summary, first elected year
 
 ### FactionList
 

@@ -21,6 +21,7 @@ type HoveredMember = {
   firstElectedYear: number | null
   totalDaysInKnesset: number
   totalYearsInKnesset: number
+  additionalRoles: string[]
 }
 
 type BlocGroup = {
@@ -297,6 +298,7 @@ export function FactionList({
       firstElectedYear: member.firstElectedYear,
       totalDaysInKnesset: member.totalDaysInKnesset,
       totalYearsInKnesset: member.totalYearsInKnesset,
+      additionalRoles: member.additionalRoles,
     })
   }
 
@@ -403,6 +405,7 @@ export function FactionList({
                         firstElectedYear: member.firstElectedYear,
                         totalDaysInKnesset: member.totalDaysInKnesset,
                         totalYearsInKnesset: member.totalYearsInKnesset,
+                        additionalRoles: member.additionalRoles,
                       }}
                       color={color}
                       onMouseEnter={() =>
@@ -414,6 +417,7 @@ export function FactionList({
                           firstElectedYear: member.firstElectedYear,
                           totalDaysInKnesset: member.totalDaysInKnesset,
                           totalYearsInKnesset: member.totalYearsInKnesset,
+                          additionalRoles: member.additionalRoles,
                         })
                       }
                       onMouseLeave={() => setHovered(null)}
@@ -468,6 +472,7 @@ export function FactionList({
           firstElectedYear={hovered.firstElectedYear}
           totalDaysInKnesset={hovered.totalDaysInKnesset}
           totalYearsInKnesset={hovered.totalYearsInKnesset}
+          additionalRoles={hovered.additionalRoles}
           x={tooltipPosition.x}
           y={tooltipPosition.y}
         />

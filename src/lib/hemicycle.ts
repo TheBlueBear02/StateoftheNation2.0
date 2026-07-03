@@ -60,6 +60,7 @@ export type PlacedMember = {
   firstElectedYear: number | null
   totalDaysInKnesset: number
   totalYearsInKnesset: number
+  additionalRoles: string[]
 }
 
 export type FactionGroup = {
@@ -75,6 +76,7 @@ export type FactionGroup = {
     firstElectedYear: number | null
     totalDaysInKnesset: number
     totalYearsInKnesset: number
+    additionalRoles: string[]
   }>
 }
 
@@ -131,6 +133,7 @@ function groupMembersByFaction(
     firstElectedYear: number | null
     totalDaysInKnesset: number
     totalYearsInKnesset: number
+    additionalRoles: string[]
   }>,
   splitByBloc = true,
 ): FactionGroup[] {
@@ -151,6 +154,7 @@ function groupMembersByFactionUnsorted(
     firstElectedYear: number | null
     totalDaysInKnesset: number
     totalYearsInKnesset: number
+    additionalRoles: string[]
   }>,
 ): FactionGroup[] {
   const groups = new Map<number | null, FactionGroup>()
@@ -167,6 +171,7 @@ function groupMembersByFactionUnsorted(
         firstElectedYear: member.firstElectedYear,
         totalDaysInKnesset: member.totalDaysInKnesset,
         totalYearsInKnesset: member.totalYearsInKnesset,
+        additionalRoles: member.additionalRoles,
       })
       continue
     }
@@ -185,6 +190,7 @@ function groupMembersByFactionUnsorted(
           firstElectedYear: member.firstElectedYear,
           totalDaysInKnesset: member.totalDaysInKnesset,
           totalYearsInKnesset: member.totalYearsInKnesset,
+          additionalRoles: member.additionalRoles,
         },
       ],
     })
@@ -372,6 +378,7 @@ function fillRegion(
         firstElectedYear: member.firstElectedYear,
         totalDaysInKnesset: member.totalDaysInKnesset,
         totalYearsInKnesset: member.totalYearsInKnesset,
+        additionalRoles: member.additionalRoles,
       }
       pointer += 1
     }
@@ -425,6 +432,7 @@ function assignMembersToSeats(
       firstElectedYear: null,
       totalDaysInKnesset: 0,
       totalYearsInKnesset: 0,
+      additionalRoles: [],
     }
   })
 }
@@ -484,6 +492,7 @@ export function buildFactionGroups(
     firstElectedYear: number | null
     totalDaysInKnesset: number
     totalYearsInKnesset: number
+    additionalRoles: string[]
   }>,
   options?: HemicycleLayoutOptions,
 ): FactionGroup[] {
@@ -503,6 +512,7 @@ export function buildHemicycleLayout(
     firstElectedYear: number | null
     totalDaysInKnesset: number
     totalYearsInKnesset: number
+    additionalRoles: string[]
   }>,
   options?: HemicycleLayoutOptions,
 ): PlacedMember[] {
@@ -534,6 +544,7 @@ export function buildSkeletonLayout(): PlacedMember[] {
     firstElectedYear: null,
     totalDaysInKnesset: 0,
     totalYearsInKnesset: 0,
+    additionalRoles: [],
   }))
 }
 

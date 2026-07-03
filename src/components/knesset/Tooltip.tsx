@@ -11,6 +11,7 @@ type TooltipProps = {
   firstElectedYear: number | null
   totalDaysInKnesset: number
   totalYearsInKnesset: number
+  additionalRoles: string[]
   x: number
   y: number
 }
@@ -23,6 +24,7 @@ export function Tooltip({
   firstElectedYear,
   totalDaysInKnesset,
   totalYearsInKnesset,
+  additionalRoles,
   x,
   y,
 }: TooltipProps) {
@@ -62,6 +64,11 @@ export function Tooltip({
           <div className="knesset-tooltip__identity">
             <div className="knesset-tooltip__name">{fullName}</div>
             <div className="knesset-tooltip__faction">{factionName}</div>
+            {additionalRoles.length > 0 ? (
+              <div className="knesset-tooltip__roles">
+                {additionalRoles.join(' · ')}
+              </div>
+            ) : null}
           </div>
         </div>
 

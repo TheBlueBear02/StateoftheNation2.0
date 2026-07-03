@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { SiteHeader } from '../components/SiteHeader'
+import { SiteLayout } from '../components/SiteLayout'
 import { KnessetHemicycle } from '../components/knesset/KnessetHemicycle'
 import { FactionList } from '../components/knesset/FactionList'
 import { MEMBER_SORT_OPTIONS, type MemberSortMode } from '../lib/memberSort'
@@ -64,9 +64,7 @@ export function KnessetPage() {
     : 'חברי הכנסת'
 
   return (
-    <div className="site knesset-page" dir="rtl">
-      <SiteHeader />
-
+    <SiteLayout className="knesset-page">
       <main className="knesset-page__main">
         <section className="knesset-page__section" aria-labelledby="knesset-title">
           <div className="knesset-page__inner container">
@@ -155,6 +153,6 @@ export function KnessetPage() {
           </div>
         </section>
       </main>
-    </div>
+    </SiteLayout>
   )
 }

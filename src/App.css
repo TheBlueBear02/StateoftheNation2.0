@@ -1,7 +1,13 @@
 .site {
+  display: flex;
+  flex-direction: column;
   width: 100%;
   min-height: 100svh;
   background: var(--color-white);
+}
+
+.site > main {
+  flex: 1;
 }
 
 /* ── Layout primitive ── */
@@ -30,6 +36,74 @@
 .site-logo {
   width: auto;
   height: 34px;
+}
+
+/* ── Footer ── */
+
+.site-footer {
+  background: var(--color-blue);
+  color: var(--color-white);
+}
+
+.site-footer__inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px 24px;
+  padding-block: 24px;
+}
+
+.site-footer__brand {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  justify-self: start;
+}
+
+.site-footer__social {
+  justify-self: center;
+}
+
+.site-footer__social-list {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.site-footer__social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-white);
+  text-decoration: none;
+  border-radius: 50%;
+  opacity: 0.92;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.site-footer__social-link:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.site-footer__social-link:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 2px;
+}
+
+.site-footer__social-icon {
+  display: block;
+}
+
+.site-footer__copy {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  opacity: 0.9;
+  justify-self: end;
+  text-align: end;
 }
 
 /* ── Hero ── */
@@ -370,6 +444,18 @@
 
   .site-logo {
     height: 28px;
+  }
+
+  .site-footer__inner {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .site-footer__brand,
+  .site-footer__copy {
+    justify-self: center;
+    text-align: center;
   }
 }
 

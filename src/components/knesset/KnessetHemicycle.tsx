@@ -100,6 +100,7 @@ export function KnessetHemicycle({
           firstElectedYear={hoveredMember.firstElectedYear}
           totalDaysInKnesset={hoveredMember.totalDaysInKnesset}
           totalYearsInKnesset={hoveredMember.totalYearsInKnesset}
+          additionalRoles={hoveredMember.additionalRoles}
           x={tooltipPosition.x}
           y={tooltipPosition.y}
         />

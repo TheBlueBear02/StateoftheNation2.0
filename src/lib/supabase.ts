@@ -56,9 +56,22 @@ export type KnessetMembershipRow = {
   person_id: number
   faction_id: number | null
   start_date: string | null
+  duty_desc: string | null
   person: KnessetPerson | KnessetPerson[] | null
   faction: KnessetFaction | KnessetFaction[] | null
   knesset: KnessetTerm | KnessetTerm[] | null
+}
+
+export type OfficeRow = {
+  name: string | null
+  knesset_category_name: string | null
+}
+
+export type MinisterAppointmentRow = {
+  person_id: number
+  duty_desc: string | null
+  is_acting: boolean
+  office: OfficeRow | OfficeRow[] | null
 }
 
 export type KnessetMembershipTenureRow = {
