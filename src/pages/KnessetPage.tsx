@@ -100,6 +100,7 @@ export function KnessetPage() {
             </header>
 
             <KnessetHemicycle
+              key={selectedKnesset?.id ?? 'loading'}
               placedMembers={placedMembers}
               coalitionCount={coalitionCount}
               oppositionCount={oppositionCount}

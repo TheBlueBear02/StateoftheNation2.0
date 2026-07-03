@@ -1,37 +1,39 @@
-export const GRID_COLS = 19
-export const GRID_ROWS = 14
+export const GRID_COLS = 17
+export const GRID_ROWS = 15
 export const CELL = 40
+/** Tighter than `CELL` so the hemicycle reads squarer on screen (wing columns need ≥32). */
+export const CELL_HEIGHT = 34
 
 export const HEMICYCLE_VIEWBOX = {
   width: GRID_COLS * CELL,
-  height: GRID_ROWS * CELL,
+  height: GRID_ROWS * CELL_HEIGHT,
 } as const
 
 /** 'X' = seat, '.' = empty (center void or corner aisle) */
 export const SEAT_GRID: readonly string[] = [
-  '....XXXXXXXXXXX....',
-  'X....XXXXXXXXX....X',
-  'XX....XXXXXXX....XX',
-  'XXX....XXXXX....XXX',
-  'XXXX...........XXXX',
-  'XXXX...........XXXX',
-  'XXXX...........XXXX',
-  'XXXX...........XXXX',
-  'XXXX...........XXXX',
-  'XXXX...........XXXX',
-  'XXXX...........XXXX',
-  'XXXX...........XXXX',
-  'XXX.............XXX',
-  'XX...............XX',
-  'X.................X',
+  '...XXXXXXXXXXX...',
+  'X...XXXXXXXXX...X',
+  'XX...XXXXXXX...XX',
+  'XXX...XXXXX...XXX',
+  'XXXX.........XXXX',
+  'XXXX.........XXXX',
+  'XXXX.........XXXX',
+  'XXXX.........XXXX',
+  'XXXX.........XXXX',
+  'XXXX.........XXXX',
+  'XXXX.........XXXX',
+  'XXXX.........XXXX',
+  'XXX...........XXX',
+  'XX.............XX',
+  'X...............X',
 ]
 export const TOTAL_SEATS = SEAT_GRID.reduce(
   (sum, row) => sum + [...row].filter((cell) => cell === 'X').length,
   0,
 )
 
-export const COALITION_COLOR = '#4890fd'
-export const OPPOSITION_COLOR = '#ff6200'
+export const COALITION_COLOR = '#5C63E3'
+export const OPPOSITION_COLOR = '#FFC25E'
 
 export const DOT_RADIUS = 16
 export const DOT_BORDER = 2.5
@@ -91,7 +93,7 @@ export function computeSeatPositions(): SeatPosition[] {
         row: rowIndex,
         col: colIndex,
         x: colIndex * CELL + CELL / 2,
-        y: rowIndex * CELL + CELL / 2,
+        y: rowIndex * CELL_HEIGHT + CELL_HEIGHT / 2,
       })
       globalIndex += 1
     })
@@ -245,6 +247,81 @@ function orderSeatsSideToMiddle(
  * The wing fills bottom-up in horizontal bands; the arc fills side-to-middle in
  * vertical columns (from its outer edge toward the center).
  */
+function isLeftWingSeat(seat: SeatPosition): boolean {
+  return seat.col <= LEFT_WING_MAX_COL
+}
+
+function isRightWingSeat(seat: SeatPosition): boolean {
+  return seat.col >= RIGHT_WING_MIN_COL
+}
+
+function isArcSeat(seat: SeatPosition): boolean {
+  return !isLeftWingSeat(seat) && !isRightWingSeat(seat)
+}
+
+/** Left-to-right across the arc; within a column, top-to-bottom. */
+function orderArcSeatsForReveal(seats: SeatPosition[]): SeatPosition[] {
+  return [...seats].sort((left, right) => {
+    if (left.x !== right.x) {
+      return left.x - right.x
+    }
+
+    return left.y - right.y
+  })
+}
+
+/** Top-to-bottom down the right wing; within a row, outer edge (right) first. */
+function orderRightWingSeatsForReveal(seats: SeatPosition[]): SeatPosition[] {
+  return [...seats].sort((left, right) => {
+    if (left.y !== right.y) {
+      return left.y - right.y
+    }
+
+    return right.x - left.x
+  })
+}
+
+/**
+ * Spatial reveal order for the entrance animation: left wing (bottom-left
+ * first), then the shared top arc (left-to-right), then the right wing (top-to-bottom).
+ */
+function computeSeatRevealSequence(seats: SeatPosition[]): SeatPosition[] {
+  const leftWing = seats.filter(isLeftWingSeat)
+  const arc = seats.filter(isArcSeat)
+  const rightWing = seats.filter(isRightWingSeat)
+
+  return [
+    ...orderSeatsBottomUp(leftWing, true),
+    ...orderArcSeatsForReveal(arc),
+    ...orderRightWingSeatsForReveal(rightWing),
+  ]
+}
+
+function buildSeatRevealOrderMap(
+  seats: SeatPosition[],
+): ReadonlyMap<number, number> {
+  const map = new Map<number, number>()
+
+  computeSeatRevealSequence(seats).forEach((seat, order) => {
+    map.set(seat.index, order)
+  })
+
+  return map
+}
+
+const _seatPositions = computeSeatPositions()
+
+export const SEAT_REVEAL_ORDER = buildSeatRevealOrderMap(_seatPositions)
+
+export const ARC_REVEAL_START_INDEX = Math.min(
+  ..._seatPositions
+    .filter(isArcSeat)
+    .map((seat) => SEAT_REVEAL_ORDER.get(seat.index) ?? 0),
+)
+
+export const SEAT_REVEAL_STAGGER_MS = 25
+export const SEAT_REVEAL_DURATION_MS = 350
+
 function orderRegionForFill(
   seats: SeatPosition[],
   side: 'left' | 'right',

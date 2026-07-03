@@ -4,6 +4,8 @@ import {
   DOT_BORDER,
   DOT_RADIUS,
   getInitials,
+  SEAT_REVEAL_DURATION_MS,
+  SEAT_REVEAL_STAGGER_MS,
   tintColor,
 } from '../../lib/hemicycle'
 
@@ -11,6 +13,8 @@ type MKDotProps = {
   member: PlacedMember
   isSkeleton?: boolean
   isHovered?: boolean
+  revealIndex?: number
+  animate?: boolean
   onHover?: (member: PlacedMember | null) => void
   onMove?: (event: MouseEvent<SVGGElement>) => void
 }
@@ -19,6 +23,8 @@ export function MKDot({
   member,
   isSkeleton = false,
   isHovered = false,
+  revealIndex = 0,
+  animate = false,
   onHover,
   onMove,
 }: MKDotProps) {
@@ -30,15 +36,44 @@ export function MKDot({
   const scale = isHovered ? 1.15 : 1
   const hasImage = Boolean(member.imageUrl) && !isSkeleton
   const clipId = `mk-clip-${member.seatIndex}`
+  const shouldAnimate = animate && !isSkeleton && Boolean(member.fullName)
+  const popStyle = shouldAnimate
+    ? {
+        animationDelay: `${revealIndex * SEAT_REVEAL_STAGGER_MS}ms`,
+        animationDuration: `${SEAT_REVEAL_DURATION_MS}ms`,
+      }
+    : undefined
+
+  function handleMouseLeave(event: MouseEvent<SVGGElement>) {
+    const related = event.relatedTarget
+
+    if (related instanceof Element) {
+      const targetFaction = related
+        .closest('[data-faction-name]')
+        ?.getAttribute('data-faction-name')
+
+      if (targetFaction && targetFaction === (member.factionName ?? '')) {
+        return
+      }
+    }
+
+    onHover?.(null)
+  }
 
   return (
     <g
-      className={`mk-dot${isSkeleton ? ' mk-dot--skeleton' : ''}${isHovered ? ' mk-dot--hovered' : ''}`}
-      transform={`translate(${member.x}, ${member.y}) scale(${scale})`}
+      className={`mk-dot${isSkeleton ? ' mk-dot--skeleton' : ''}`}
+      data-faction-name={member.factionName ?? ''}
+      transform={`translate(${member.x}, ${member.y})`}
       onMouseEnter={() => onHover?.(member)}
-      onMouseLeave={() => onHover?.(null)}
+      onMouseLeave={handleMouseLeave}
       onMouseMove={(event) => onMove?.(event)}
     >
+      <g
+        className={`mk-dot__body${isSkeleton ? ' mk-dot__body--skeleton' : ''}${shouldAnimate ? ' mk-dot__body--enter' : ''}`}
+        style={popStyle}
+      >
+        <g className="mk-dot__scale" transform={`scale(${scale})`}>
       {hasImage ? (
         <>
           <defs>
@@ -83,6 +118,8 @@ export function MKDot({
           ) : null}
         </>
       )}
+        </g>
+      </g>
     </g>
   )
 }

@@ -1,6 +1,6 @@
 # KnessetPage
 
-Hemicycle visualization of Knesset members for any selected term, arranged on a fixed **19×14 parliament grid**. When coalition data exists for the selected term, seats split coalition (left) vs opposition (right); otherwise factions fill the chamber left-to-right by size.
+Hemicycle visualization of Knesset members for any selected term, arranged on a fixed **17×15 parliament grid**. When coalition data exists for the selected term, seats split coalition (left) vs opposition (right); otherwise factions fill the chamber left-to-right by size.
 
 Route: `/knesset`
 
@@ -35,7 +35,7 @@ Route: `/knesset`
 | `src/components/knesset/FactionList.tsx` | Member list below the hemicycle with sort modes (party groups, flat sorted, bloc groups) |
 | `src/hooks/useKnessetList.ts` | Loads all Knesset terms for the picker |
 | `src/hooks/useKnessetMembers.ts` | Supabase fetch for selected term + derived counts + `factionGroups` |
-| `src/lib/hemicycle.ts` | Seat positions, bloc/faction layout, `factionColorFromId` |
+| `src/lib/hemicycle.ts` | Seat positions, bloc/faction layout, `factionColorFromId`, `SEAT_REVEAL_ORDER` entrance sequence |
 | `src/lib/memberSort.ts` | `MemberSortMode` type and Hebrew sort option labels |
 | `src/lib/supabase.ts` | Supabase client + types (`KnessetOption`, etc.) |
 | `src/components/SiteHeader.tsx` | Shared header (logo links home) |
@@ -116,9 +116,9 @@ When coalition flags are added per faction per term, the page auto-detects them 
 
 ## Parliament Grid Layout
 
-### Grid mask (19 × 14)
+### Grid mask (17 × 15)
 
-Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 14 rows × 19 columns. Each cell is `'X'` (seat) or `'.'` (empty).
+Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 15 rows × 17 columns. Each cell is `'X'` (seat) or `'.'` (empty). Seat pitch is **40×33** px (width × height) so the SVG silhouette is wider than tall. Wing vs arc regions use `LEFT_WING_MAX_COL = 3` and `RIGHT_WING_MIN_COL = GRID_COLS - 4` (outer four columns on each side).
 
 - **Total seats** — 120 (`'X'` cells)
 
@@ -141,11 +141,15 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 14 rows × 19 columns. Each cell is
 
 - Border: `2.5px solid factionColor` (DB color or hash-derived HSL)
 - Interior: clipped `<image>` when `image_url` exists; else initials on 20% tint
+- Hover: scales to 1.15× for every dot in the hovered member’s faction (`factionName` match); tooltip still shows the individual member under the cursor
+- **Entrance animation** (when member data finishes loading): each dot pops in sequentially via CSS (`mk-dot-pop`, 350ms, stagger 25ms). Reveal order from `SEAT_REVEAL_ORDER` in `hemicycle.ts` — left wing bottom-up (starting bottom-left), then the shared top arc left-to-right, then the right wing top-to-bottom. Skeleton grey dots show during fetch with no animation; animation replays when the Knesset picker changes term (`key` on `KnessetHemicycle`). Respects `prefers-reduced-motion`.
 
 ### CenterCounter
 
-- **With coalition data:** split donut (coalition `#4890fd`, opposition `#ff6200`), `{coalition} / {opposition}` over total
-- **Without coalition data:** single neutral grey ring, loaded member count only, label **הכנסת**
+- **With coalition data:** white disc with drop shadow; two-tone ring starting at 6 o'clock (coalition `#5C63E3` left arc, opposition `#FFC25E` right arc); fraction-style text — colored `{coalition}/{opposition}` on top (coalition num larger, italic black slash, opposition num slightly smaller), black divider line, large bold total below
+- **Without coalition data:** single neutral grey ring, large total count, label **הכנסת**
+- **Hemicycle hover:** when the user hovers an MK dot and coalition data exists, a blurred halo behind the white disc glows in the hovered member's bloc color (coalition or opposition); fades out when hover ends
+- **Entrance animation:** scales/fades in when the top-arc reveal pass begins (`ARC_REVEAL_START_INDEX × SEAT_REVEAL_STAGGER_MS` delay)
 
 ### FactionList
 
@@ -161,7 +165,7 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 14 rows × 19 columns. Each cell is
 | `selectedKnesset` | `KnessetPage` local state (defaults to active term) |
 | `members`, counts, `hasCoalitionData`, `factionGroups` | `useKnessetMembers(selectedKnesset)` |
 | `sortMode` | `KnessetPage` local state (`useState<MemberSortMode>('parties')`) |
-| `hoveredMember`, tooltip position | `KnessetHemicycle` / `FactionList` local state |
+| `hoveredMember`, tooltip position | `KnessetHemicycle` / `FactionList` local state; hemicycle hover highlights all MKs sharing `hoveredMember.factionName` |
 | Loading | skeleton dots + faction skeletons while list or members load |
 | Error | Hebrew message: `לא ניתן לטעון את נתוני הכנסת` |
 

@@ -90,7 +90,56 @@
 
 .mk-dot {
   cursor: default;
+}
+
+.mk-dot__scale {
   transition: transform 0.15s ease;
+}
+
+.mk-dot__body--enter {
+  opacity: 0;
+  transform: scale(0);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mk-dot-pop var(--mk-dot-pop-duration, 350ms)
+    cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.mk-dot__body--enter.mk-dot__body--hovered {
+  animation: mk-dot-pop var(--mk-dot-pop-duration, 350ms)
+    cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes mk-dot-pop {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.center-counter--enter {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: center-counter-pop var(--center-counter-pop-duration, 350ms)
+    cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes center-counter-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .mk-dot__initials {
@@ -104,6 +153,26 @@
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
 }
 
+.center-counter__glow {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.center-counter__glow--coalition {
+  opacity: 0.5;
+}
+
+.center-counter__glow--opposition {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .center-counter__glow {
+    transition: none;
+  }
+}
+
 .center-counter__split,
 .center-counter__total,
 .center-counter__label {
@@ -112,13 +181,32 @@
 }
 
 .center-counter__split {
-  font-size: 32px;
+  font-weight: 700;
+}
+
+.center-counter__coalition-num {
+  font-size: 34px;
+}
+
+.center-counter__slash {
+  font-size: 30px;
+  font-style: italic;
+  font-weight: 600;
+}
+
+.center-counter__opposition-num {
+  font-size: 28px;
+}
+
+.center-counter__divider {
+  stroke: #1a1a1a;
+  stroke-width: 2;
 }
 
 .center-counter__total {
-  font-size: 22px;
-  fill: #333333;
-  font-weight: 700;
+  font-size: 48px;
+  fill: #1a1a1a;
+  font-weight: 800;
 }
 
 .center-counter__label {
@@ -502,7 +590,7 @@
     display: none;
   }
 
-  .mk-dot--hovered {
+  .mk-dot__scale {
     transform: none;
   }
 }
@@ -529,9 +617,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mk-dot,
+  .mk-dot__scale,
   .faction-member__photo,
   .faction-member__initials {
     transition: none;
+  }
+
+  .mk-dot__body--enter,
+  .center-counter--enter {
+    opacity: 1;
+    transform: none;
+    animation: none;
   }
 }

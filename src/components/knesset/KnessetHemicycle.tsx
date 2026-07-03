@@ -2,6 +2,7 @@ import { useMemo, useState, type MouseEvent } from 'react'
 import {
   buildSkeletonLayout,
   HEMICYCLE_VIEWBOX,
+  SEAT_REVEAL_ORDER,
   type PlacedMember,
 } from '../../lib/hemicycle'
 import { CenterCounter } from './CenterCounter'
@@ -40,6 +41,23 @@ export function KnessetHemicycle({
     setTooltipPosition({ x: event.clientX, y: event.clientY })
   }
 
+  const hoveredFactionName = hoveredMember?.factionName ?? null
+
+  function isFactionHovered(member: PlacedMember): boolean {
+    if (!hoveredFactionName || !member.fullName) {
+      return false
+    }
+
+    return member.factionName === hoveredFactionName
+  }
+
+  const hoveredBloc =
+    hasCoalitionData && hoveredMember?.fullName
+      ? hoveredMember.isCoalition
+        ? 'coalition'
+        : 'opposition'
+      : null
+
   return (
     <div className="knesset-hemicycle">
       <svg
@@ -55,7 +73,9 @@ export function KnessetHemicycle({
             key={member.seatIndex}
             member={member}
             isSkeleton={loading}
-            isHovered={hoveredMember?.seatIndex === member.seatIndex}
+            isHovered={isFactionHovered(member)}
+            revealIndex={SEAT_REVEAL_ORDER.get(member.seatIndex) ?? 0}
+            animate={!loading}
             onHover={setHoveredMember}
             onMove={handleMove}
           />
@@ -66,6 +86,8 @@ export function KnessetHemicycle({
           oppositionCount={oppositionCount}
           totalCount={totalCount}
           hasCoalitionData={hasCoalitionData}
+          hoveredBloc={hoveredBloc}
+          animate={!loading}
         />
       </svg>
 
