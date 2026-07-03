@@ -41,9 +41,15 @@
 .knesset-page__picker-select {
   min-width: min(100%, 240px);
   padding: 8px 12px;
+  padding-inline-end: 40px;
   border: 1px solid var(--color-border, #ddd);
   border-radius: 0;
-  background: #fff;
+  appearance: none;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%231a1a1a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: left 14px center;
+  background-repeat: no-repeat;
+  background-size: 12px 8px;
   color: var(--color-text);
   font: inherit;
   cursor: pointer;
@@ -347,9 +353,15 @@
 .knesset-page__sort-select {
   min-width: 180px;
   padding: 8px 12px;
+  padding-inline-end: 40px;
   border: 1px solid #dddddd;
   border-radius: 0;
-  background: var(--color-white);
+  appearance: none;
+  background-color: var(--color-white);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%231a1a1a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: left 14px center;
+  background-repeat: no-repeat;
+  background-size: 12px 8px;
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: 0.95rem;

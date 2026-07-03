@@ -43,7 +43,7 @@ Route: `/knesset`
 | `src/lib/memberRoles.ts` | Formats minister appointments and membership `duty_desc` into display roles |
 | `src/lib/memberSort.ts` | `MemberSortMode` type and Hebrew sort option labels |
 | `src/lib/supabase.ts` | Supabase client + types (`KnessetOption`, etc.) |
-| `src/components/SiteHeader.tsx` | Shared header (logo links home) |
+| `src/components/SiteHeader.tsx` | Shared header (logo links home, Israel-time Hebrew-numeral/civil date labels, government/Knesset context line) |
 | `knesset-db-scripts/fix_faction_links.py` | One-time backfill for `faction_id` links (current Knesset) |
 
 ## Knesset Picker
@@ -53,6 +53,7 @@ Route: `/knesset`
 - Dropdown label: `הכנסת ה-{n} ({startYear}–{endYear})` via `formatKnessetLabel()`; active term uses `היום` when `end_date` is null.
 - Default selection: `is_active = true`, else highest `knesset_number`.
 - Changing the selection re-fetches members for that term.
+- Native select appearance is removed and replaced with a custom arrow positioned `14px` from the physical left edge; extra `padding-inline-end` keeps long labels clear of the arrow.
 
 ## Data Layer
 
@@ -184,6 +185,7 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 15 rows × 17 columns. Each cell is
 
 - Section title: **חברי הכנסת ה-{n}** via `formatKnessetMembersTitle()` (updates with header picker)
 - Sort options: `parties`, `tenure`, `name`, `firstElected`; `bloc` only when `hasCoalitionData`
+- Sort select uses the same custom inset arrow and RTL inline-end padding as the header picker.
 - If user had `bloc` selected and switches to a term without coalition data, sort resets to `parties`
 
 ## State Management

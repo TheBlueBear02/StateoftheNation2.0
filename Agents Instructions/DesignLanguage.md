@@ -67,6 +67,7 @@ Approved neutral tints:
 - Secondary actions should usually be text links or white buttons with a thin border.
 - Do not add shadows, gradients, or rounded corners to buttons by default.
 - Make clickable targets comfortable on touch screens.
+- For RTL native selects, remove native appearance and use a custom arrow inset from the physical left edge; reserve extra `padding-inline-end` so labels do not overlap the arrow.
 
 ## Cards And Panels
 

@@ -3,7 +3,7 @@ import { SiteLayout } from './components/SiteLayout'
 
 const HERO_BUTTONS = [
   { label: 'בחירות 2026', href: '#elections-2026' },
-  { label: 'דשבורד ממשלה', href: '#government-dashboard' },
+  { label: 'הממשלה', to: '/government' },
   { label: 'ציר זמן', href: '#timeline' },
   { label: 'מיפוי סוגיות פוליטיות', href: '#political-issues' },
   { label: 'הכנסת', to: '/knesset' },
@@ -91,9 +91,9 @@ function App() {
                 הדשבורד אוסף את המדדים המרכזיים ממשרדי הממשלה במקום אחד — כדי
                 לעזור להבין את מצב המדינה ואת ביצועי המשרדים השונים.
               </p>
-              <a href="#government-dashboard" className="project-section__cta">
+              <Link to="/government" className="project-section__cta">
                 לדשבורד &gt;&gt;
-              </a>
+              </Link>
             </div>
 
             <div className="dashboard-preview" aria-hidden="true">

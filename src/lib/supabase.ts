@@ -23,10 +23,28 @@ export type KnessetOption = {
   isActive: boolean
 }
 
+export type GovernmentOption = {
+  id: number
+  governmentNumber: number
+  knessetId: number | null
+  startDate: string | null
+  endDate: string | null
+  isActive: boolean
+}
+
 export type KnessetRow = {
   id: number
   knesset_number: number
   knesset_name: string | null
+  start_date: string | null
+  end_date: string | null
+  is_active: boolean
+}
+
+export type GovernmentRow = {
+  id: number
+  government_number: number
+  knesset_id: number | null
   start_date: string | null
   end_date: string | null
   is_active: boolean
@@ -72,6 +90,27 @@ export type MinisterAppointmentRow = {
   duty_desc: string | null
   is_acting: boolean
   office: OfficeRow | OfficeRow[] | null
+}
+
+export type GovernmentAppointmentRow = {
+  id: number
+  person_id: number
+  government_id: number
+  office_id: number | null
+  start_date: string | null
+  end_date: string | null
+  duty_desc: string | null
+  is_acting: boolean
+  person: KnessetPerson | KnessetPerson[] | null
+  office: OfficeRow | OfficeRow[] | null
+}
+
+export type GovernmentMembershipFactionRow = {
+  person_id: number
+  faction_id: number | null
+  start_date: string | null
+  end_date: string | null
+  faction: KnessetFaction | KnessetFaction[] | null
 }
 
 export type KnessetMembershipTenureRow = {

@@ -29,8 +29,39 @@
 .site-header__inner {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   height: var(--header-height);
+}
+
+.site-header__logo-link {
+  flex-shrink: 0;
+}
+
+.site-header__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.site-header__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.site-header__term {
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .site-logo {
@@ -440,6 +471,15 @@
 
   .site-header__inner {
     height: 48px;
+  }
+
+  .site-header__date {
+    gap: 5px;
+    font-size: 0.7rem;
+  }
+
+  .site-header__term {
+    font-size: 0.62rem;
   }
 
   .site-logo {

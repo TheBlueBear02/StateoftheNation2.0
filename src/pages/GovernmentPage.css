@@ -1,0 +1,633 @@
+.government-page__main {
+  padding-block: clamp(24px, 4vw, 48px);
+}
+
+.government-page__section {
+  width: 100%;
+}
+
+.government-page__inner {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 3vw, 28px);
+}
+
+.government-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.government-page__header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+
+.government-page__title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.government-page__subtitle {
+  margin: 4px 0 0;
+  font-size: clamp(1rem, 2.2vw, 1.125rem);
+  color: var(--color-text-muted);
+}
+
+.government-page__picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.government-page__picker-select {
+  min-width: min(100%, 250px);
+  padding: 8px 12px;
+  padding-inline-end: 40px;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: 0;
+  appearance: none;
+  background-color: var(--color-white);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%231a1a1a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: left 14px center;
+  background-repeat: no-repeat;
+  background-size: 12px 8px;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.government-page__picker-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.government-page__picker-select:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.government-pyramid {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: clamp(20px, 4vw, 36px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(72, 144, 253, 0.08), rgba(72, 144, 253, 0)),
+    var(--color-white);
+}
+
+.government-pyramid__meta {
+  position: relative;
+  width: 100%;
+  min-height: 46px;
+}
+
+.government-pyramid__meta-item {
+  position: absolute;
+  top: 0;
+  display: flex;
+  max-width: min(42%, 260px);
+  flex-direction: column;
+  gap: 2px;
+}
+
+.government-pyramid__meta-item--dates {
+  left: 0;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.government-pyramid__meta-item--count {
+  right: 0;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.government-pyramid__meta-value {
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.government-pyramid__tiers {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(16px, 3vw, 24px);
+}
+
+.government-pyramid__tier {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.government-pyramid__tier-label {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.government-pyramid__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(12px, 2vw, 18px);
+  max-width: 960px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.government-pyramid__leadership-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: end;
+  justify-content: center;
+  direction: ltr;
+}
+
+.government-pyramid__leadership-side,
+.government-pyramid__leadership-center {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(12px, 2vw, 18px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  direction: rtl;
+}
+
+.government-pyramid__leadership-side--left {
+  position: absolute;
+  bottom: 0;
+  left: calc(50% - clamp(60px, 7vw, 74px));
+  justify-content: flex-end;
+  transform: translateX(-100%);
+}
+
+.government-pyramid__leadership-center {
+  justify-content: center;
+}
+
+.government-pyramid__leadership-side--right {
+  display: none;
+}
+
+.government-pyramid__member {
+  display: flex;
+  width: clamp(92px, 10vw, 124px);
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  opacity: 0;
+  text-align: center;
+  animation: government-avatar-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1)
+    forwards;
+}
+
+.government-pyramid__avatar-wrap {
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+
+.government-pyramid__member:hover .government-pyramid__avatar-wrap {
+  transform: scale(1.12);
+}
+
+.government-pyramid__avatar,
+.government-pyramid__initials {
+  width: 72px;
+  height: 72px;
+  border: 2.5px solid #c8c8c8;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.government-pyramid__avatar {
+  display: block;
+  object-fit: cover;
+  background: #f0f0f0;
+}
+
+.government-pyramid__initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.government-pyramid__member--primeMinister .government-pyramid__avatar,
+.government-pyramid__member--primeMinister .government-pyramid__initials {
+  width: clamp(92px, 12vw, 112px);
+  height: clamp(92px, 12vw, 112px);
+  border-width: 3px;
+}
+
+.government-pyramid__member--alternatePrimeMinister .government-pyramid__avatar,
+.government-pyramid__member--alternatePrimeMinister .government-pyramid__initials {
+  width: clamp(78px, 10vw, 92px);
+  height: clamp(78px, 10vw, 92px);
+}
+
+.government-pyramid__name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--color-text);
+}
+
+.government-pyramid__role {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
+.government-pyramid__skeleton {
+  display: flex;
+  width: 100%;
+  min-height: 340px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
+.government-pyramid__skeleton-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.government-pyramid__skeleton-dot {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #f2f2f2, #f7f7f7, #f2f2f2);
+}
+
+@keyframes government-avatar-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.86);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.government-page__below {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 3vw, 28px);
+}
+
+.government-page__error {
+  margin: 0;
+  text-align: center;
+  color: var(--color-alert);
+  font-weight: 600;
+}
+
+.government-page__offices {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.5vw, 24px);
+  margin-top: clamp(16px, 3vw, 32px);
+}
+
+.government-page__offices-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+
+.government-page__offices-title {
+  margin: 0;
+  font-size: clamp(1.375rem, 3vw, 1.75rem);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.government-page__offices-meta {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.office-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: clamp(14px, 2.5vw, 22px);
+}
+
+.office-card {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  background: var(--color-white);
+}
+
+.office-card--skeleton {
+  min-height: 180px;
+  background: linear-gradient(90deg, #f2f2f2, #f7f7f7, #f2f2f2);
+}
+
+.office-card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ececec;
+}
+
+.office-card__title {
+  margin: 0;
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--color-text);
+}
+
+.office-card__count {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.office-card__people {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.office-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.office-person__photo,
+.office-person__initials {
+  width: 54px;
+  height: 54px;
+  border: 2px solid #c8c8c8;
+  border-radius: 50%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.office-person:hover .office-person__photo,
+.office-person:hover .office-person__initials {
+  transform: scale(1.1);
+}
+
+.office-person__photo {
+  display: block;
+  object-fit: cover;
+  background: #f0f0f0;
+}
+
+.office-person__initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.office-person__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.office-person__name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--color-text);
+}
+
+.office-person__role {
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.office-card__deputies {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #ececec;
+}
+
+.office-card__deputies-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--color-text-muted);
+}
+
+.office-card__people--deputies .office-person__photo,
+.office-card__people--deputies .office-person__initials {
+  width: 44px;
+  height: 44px;
+}
+
+.knesset-tooltip {
+  position: fixed;
+  z-index: 20;
+  min-width: 200px;
+  padding: 10px 12px;
+  border: 1px solid #dddddd;
+  border-radius: 0;
+  background: var(--color-white);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.knesset-tooltip__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.knesset-tooltip__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.knesset-tooltip__photo,
+.knesset-tooltip__initials {
+  width: 64px;
+  height: 64px;
+  border: 2px solid;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.knesset-tooltip__photo {
+  object-fit: cover;
+}
+
+.knesset-tooltip__initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.knesset-tooltip__identity,
+.knesset-tooltip__details {
+  display: flex;
+  flex-direction: column;
+}
+
+.knesset-tooltip__identity {
+  gap: 0;
+  min-width: 0;
+}
+
+.knesset-tooltip__details {
+  gap: 2px;
+}
+
+.knesset-tooltip__name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+.knesset-tooltip__faction {
+  font-size: 0.875rem;
+  line-height: 1.2;
+  color: var(--color-text-muted);
+}
+
+.knesset-tooltip__roles {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.knesset-tooltip__meta,
+.knesset-tooltip__tenure {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 767px) {
+  .government-pyramid {
+    padding-inline: var(--container-pad);
+  }
+
+  .government-pyramid__meta {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .government-pyramid__meta-item {
+    position: static;
+    max-width: none;
+    align-items: flex-start;
+    text-align: right;
+  }
+
+  .government-pyramid__meta-item--count {
+    align-items: flex-start;
+  }
+
+  .government-pyramid__member {
+    width: 88px;
+  }
+
+  .government-pyramid__avatar,
+  .government-pyramid__initials {
+    width: 64px;
+    height: 64px;
+  }
+
+  .government-pyramid__member--primeMinister .government-pyramid__avatar,
+  .government-pyramid__member--primeMinister .government-pyramid__initials {
+    width: 84px;
+    height: 84px;
+  }
+
+  .government-pyramid__role {
+    display: none;
+  }
+
+  .knesset-tooltip {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .government-pyramid__member,
+  .office-person {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .government-pyramid__member {
+    opacity: 1;
+    animation: none;
+  }
+
+  .government-pyramid__avatar-wrap,
+  .office-person__photo,
+  .office-person__initials {
+    transition: none;
+  }
+}

@@ -11,7 +11,7 @@ Central reference for agents working on this repository. Use this file to unders
 | Homepage hub | `/` | Live |
 | הכנסת — Knesset hemicycle | `/knesset` | Live |
 | צינורות נתונים — Data pipelines docs | `/piplines` | Live |
-| דשבורד ממשלה — Government dashboard | `#government-dashboard` | Placeholder on homepage |
+| דשבורד ממשלה — Government dashboard | `/government` | Live |
 | בחירות 2026 — Elections 2026 | `#elections-2026` | Planned |
 | ציר זמן — Timeline | `#timeline` | Planned |
 | מיפוי סוגיות פוליטיות — Political issues map | `#political-issues` | Planned |
@@ -59,21 +59,26 @@ StateoftheNation2.0/
 
 | Path | Role |
 |------|------|
-| `main.tsx` | `BrowserRouter`, route table (`/` → `App`, `/knesset` → `KnessetPage`, `/piplines/*` → `PiplinesPage`) |
+| `main.tsx` | `BrowserRouter`, route table (`/` → `App`, `/government` → `GovernmentPage`, `/knesset` → `KnessetPage`, `/piplines/*` → `PiplinesPage`) |
 | `App.tsx` | Homepage sections: hero, news strip, government-dashboard teaser |
+| `pages/GovernmentPage.tsx` | Government picker, hierarchy pyramid, office list |
 | `pages/KnessetPage.tsx` | Knesset term picker, hemicycle, faction list |
 | `pages/KnessetPage.css` | Knesset-specific layout, tooltip, MK dot animation |
 | `pages/PiplinesPage.tsx` | Data-pipeline docs hub (sidebar + main column) |
 | `pages/PiplinesPage.css` | Pipelines docs layout and typography |
 | `content/pipelines/` | Pipeline registry and per-pipeline doc content |
-| `components/SiteHeader.tsx` | Shared logo header (links home) — used on all pages |
+| `components/SiteHeader.tsx` | Shared header with home logo, Israel-time civil/Hebrew-numeral date labels, and current government/Knesset context — used on all pages |
 | `components/SiteFooter.tsx` | Shared footer — primary blue background, brand + copyright |
 | `components/SiteLayout.tsx` | Header + `{children}` + footer shell for all routes |
 | `components/knesset/` | Hemicycle visualization subtree (see below) |
+| `components/government/` | Government hierarchy and office-list subtree |
 | `hooks/useKnessetList.ts` | Loads all Knesset terms for the picker dropdown |
 | `hooks/useKnessetMembers.ts` | Members, counts, faction groups for selected term |
+| `hooks/useGovernmentList.ts` | Loads all governments for the picker dropdown |
+| `hooks/useGovernmentMinisters.ts` | Ministers, pyramid tiers, office groups for selected government |
 | `lib/supabase.ts` | Supabase client, env guard, shared DB row types |
 | `lib/hemicycle.ts` | 17×15 seat grid, bloc/faction layout, colors, reveal order |
+| `lib/governmentStructure.ts` | Government role classification, pyramid tiers, office grouping |
 | `lib/knessetTenure.ts` | Cumulative tenure stats per MK |
 | `lib/memberRoles.ts` | Formats minister appointments and membership duty into tooltip roles |
 | `lib/memberSort.ts` | `MemberSortMode` enum + Hebrew sort labels |
@@ -87,6 +92,13 @@ StateoftheNation2.0/
 | `CenterCounter.tsx` | Coalition/opposition donut or neutral total |
 | `FactionList.tsx` | Sortable party cards with MK thumbnails below hemicycle |
 | `Tooltip.tsx` | Desktop-only floating member info overlay |
+
+### `components/government/` subtree
+
+| Component | Responsibility |
+|-----------|----------------|
+| `GovernmentPyramid.tsx` | PM/deputy/ministers hierarchy diagram with hover tooltips |
+| `OfficeList.tsx` | Office cards with ministers and deputy ministers |
 
 ### `public/` assets
 
@@ -111,12 +123,15 @@ These scripts use `SUPABASE_SERVICE_KEY` (service role). The frontend uses only 
 │  index.html (RTL, Hebrew)                                   │
 │    └─ main.tsx (React Router)                               │
 │         ├─ /           → App.tsx (static homepage)          │
+│         ├─ /government → GovernmentPage.tsx                 │
 │         ├─ /knesset    → KnessetPage.tsx                    │
 │         └─ /piplines/* → PiplinesPage.tsx                   │
 │              ├─ SiteLayout (header + footer)              │
 │              ├─ useKnessetList → Supabase knessets          │
 │              ├─ useKnessetMembers → Supabase memberships    │
-│              └─ hemicycle.ts (pure layout logic)            │
+│              ├─ useGovernmentList → Supabase governments    │
+│              ├─ useGovernmentMinisters → Supabase roles     │
+│              └─ lib/ pure layout/grouping logic             │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -136,10 +151,9 @@ Tables consumed by the live app:
 | `knesset_memberships` | Member list + hemicycle | `person_id`, `faction_id`, `start_date`, `end_date`, `knesset_id`, `duty_desc` |
 | `knesset_factions` | Party names, colors, coalition flag | `name`, `short_name`, `color`, `is_coalition`, `logo_url` |
 | `people` | MK display | `full_name`, `image_url` |
-| `minister_appointments` | MK tooltip government roles | `person_id`, `duty_desc`, `is_acting`, `office_id`, dates |
+| `governments` | Government picker | `government_number`, `knesset_id`, `start_date`, `end_date`, `is_active` |
+| `minister_appointments` | MK tooltip government roles + Government page | `person_id`, `government_id`, `duty_desc`, `is_acting`, `office_id`, dates |
 | `offices` | Ministry names (joined from appointments) | `name`, `knesset_category_name` |
-
-Additional tables exist from seeding (`governments`) for future dashboard work.
 
 Env vars required for live data:
 
@@ -174,6 +188,7 @@ Read the overview first, then the doc for the area you are changing:
 |-----|-------|
 | [ProjectOverview.md](./ProjectOverview.md) | This file — structure, stack, data model |
 | [DesignLanguage.md](./DesignLanguage.md) | Project color palette and UI rules for new pages/components |
+| [GovernmentPage.md](./GovernmentPage.md) | `/government` — government hierarchy, ministers, offices |
 | [HomePage.md](./HomePage.md) | `/` — hero, news strip, dashboard teaser, `.container`, routing |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` — hemicycle grid, coalition layout, hooks, animations |
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` — data pipeline documentation hub |

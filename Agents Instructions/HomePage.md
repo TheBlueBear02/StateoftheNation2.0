@@ -9,7 +9,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Header (white, full-bleed)                             │
-│    └─ .container — logo RTL start                       │
+│    └─ .container — logo RTL start + date/context block  │
 ├─────────────────────────────────────────────────────────┤
 │  Hero (blue, full-bleed)                                │
 │    └─ .container — 2-col grid: text | bear            │
@@ -29,8 +29,8 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | File | Role |
 |------|------|
 | `src/App.tsx` | Section markup and static content arrays |
-| `src/main.tsx` | React Router — `/` homepage, `/knesset` Knesset page |
-| `src/components/SiteHeader.tsx` | Shared header with logo link home |
+| `src/main.tsx` | React Router — `/` homepage, `/government` Government page, `/knesset` Knesset page |
+| `src/components/SiteHeader.tsx` | Shared header with logo link home, Israel-time Hebrew-numeral/civil date labels, and current government/Knesset context |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue background) |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
 | `src/App.css` | `.container` primitive and section-specific styles |
@@ -71,8 +71,10 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 ### 1. Header (`site-header`)
 
 - White full-bleed background with bottom border.
-- Inner wrapper (`site-header__inner container`): logo at RTL start (top-right).
+- Inner wrapper (`site-header__inner container`): logo at RTL start (top-right), metadata block at the opposite side.
 - Logo path: `/header-logo%203.svg` (URL-encoded space in filename).
+- Date block: client-side `Intl.DateTimeFormat` using `Asia/Jerusalem`; Gregorian label is `DD.MM.YYYY`, Hebrew label uses `he-IL-u-ca-hebrew` civil-day behavior and formats day/year as Hebrew numerals (for example `י״ח בתמוז תשפ״ו`).
+- Context line below the date is static copy: `ממשלת ישראל ה37 | הכנסת ה25`.
 
 ### 2. Hero (`hero`)
 
@@ -88,12 +90,12 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 | Label | Anchor |
 |-------|--------|
 | בחירות 2026 | `#elections-2026` |
-| דשבורד ממשלה | `#government-dashboard` |
+| הממשלה | `/government` (route) |
 | ציר זמן | `#timeline` |
 | מיפוי סוגיות פוליטיות | `#political-issues` |
 | הכנסת | `/knesset` (route) |
 
-Buttons with `#` anchors are placeholders until dedicated routes exist. **הכנסת** links to the live Knesset hemicycle page.
+Buttons with `#` anchors are placeholders until dedicated routes exist. **הממשלה** links to the live Government page, and **הכנסת** links to the live Knesset hemicycle page.
 
 ### 3. News strip (`news-strip`)
 
@@ -107,7 +109,7 @@ Buttons with `#` anchors are placeholders until dedicated routes exist. **הכנ
 
 - White section with title, description, and CTA **לדשבורד >>**.
 - `.project-section__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, preview second — text right, dashboard preview left in RTL.
-- CTA currently links to `#government-dashboard` until a dashboard route exists.
+- CTA links to `/government`.
 
 ### 5. Footer (`site-footer`)
 
@@ -132,12 +134,13 @@ Buttons with `#` anchors are placeholders until dedicated routes exist. **הכנ
 
 - `react-router-dom` in `src/main.tsx`
 - `/` → homepage
+- `/government` → Government page
 - `/knesset` → Knesset hemicycle page
 
 ## Responsive Behavior
 
 - **≤900px:** Hero and project 2-col grids collapse to single column; container padding remains fluid via `clamp()`.
-- **≤480px:** Hero buttons become single column; header height and logo scale down.
+- **≤480px:** Hero buttons become single column; header height, logo, and date text scale down.
 
 ## Future Work
 
