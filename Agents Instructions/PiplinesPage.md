@@ -44,11 +44,11 @@ Documentation hub for data pipelines that feed the project database. Layout mimi
 ## Elections Candidates Pipeline (live)
 
 - **Route:** `/piplines/elections-candidates`
-- **Scripts:** `Layer 1 - Gathering Data/Elections/insert_raw_list.py`, `run_pipeline.py`, `resolve_candidates.py`, `enrich_wikidata.py`, `generate_descriptions.py`, `geocode_cities.py`
+- **Scripts:** `Layer 1 - Gathering Data/Elections/insert_raw_list.py`, `run_pipeline.py`, `resolve_candidates.py`, `enrich_wikidata.py`, `generate_descriptions.py`, `geocode_cities.py`, `fetch_candidate_birthdates.py`, `fetch_candidate_wiki_urls.py`
 - **Sources:** manually inserted candidate lists, Knesset OData, Wikidata, Hebrew Wikipedia summaries, Nominatim / OpenStreetMap
 - **Tables:** `elections`, `election_parties`, `raw_candidate_lists`, `election_candidates`, `people`
-- **Workflow:** prepare a `.txt` or `.csv` party-list file, preview it with `insert_raw_list.py --dry-run`, insert it into `raw_candidate_lists`, run `run_pipeline.py`, resolve `review_queue.json` if created, then verify `election_candidates`.
-- **Behavior:** starts from `raw_candidate_lists.processed = false`, resolves candidate identity, enriches missing factual fields, generates a short neutral Hebrew description, geocodes cities, supports repeated list updates, and leaves party stats/map data to be computed from `election_candidates` at page load.
+- **Workflow:** prepare a `.txt` or `.csv` party-list file (plain names or numbered lines like `1. name`), preview it with `insert_raw_list.py --dry-run`, insert it into `raw_candidate_lists`, run `run_pipeline.py`, resolve `review_queue.json` if created, then verify `election_candidates`.
+- **Behavior:** starts from `raw_candidate_lists.processed = false`, resolves candidate identity, enriches missing factual fields, generates a one-sentence Hebrew role summary (`[name] כיהן כ[roles]`), geocodes cities, retries missing birth dates and Wikipedia URLs from Wikidata, supports repeated list updates, and leaves party stats/map data to be computed from `election_candidates` at page load.
 
 ## Design
 

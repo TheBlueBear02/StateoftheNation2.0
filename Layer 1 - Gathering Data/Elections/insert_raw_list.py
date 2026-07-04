@@ -15,12 +15,15 @@ Usage:
   python insert_raw_list.py --party "הליכוד" --file likud.txt --dry-run
   python insert_raw_list.py --list-parties
 
-Text file format (likud.txt):
+Text file format — plain names or numbered lists (both work):
   בנימין נתניהו
   יריב לוין
-  דוד אמסלם
+
+  # numbered lists copied from party sites are also supported:
+  1. בנימין נתניהו
+  2. יריב לוין
+  3.אלי כהן          ← space after the dot is optional
   # lines starting with # are ignored
-  מירי רגב
 
 CSV file format (beyachad.csv):
   שם,עיר
@@ -63,8 +66,8 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# Strips leading "1. " or "1) " position prefixes if the party published them
-STRIP_POSITION = re.compile(r"^\d+[\.\)]\s*")
+# Matches "1. name", "1) name", "3.name" — optional space after separator
+NUMBERED_LINE = re.compile(r"^(\d+)[\.\)]\s*(.*)$")
 
 
 # ── Supabase ──────────────────────────────────────────────────────────────────
@@ -97,18 +100,53 @@ def get_party_map(sb: Client, election_id: int) -> dict[str, dict]:
 
 # ── File parsing ──────────────────────────────────────────────────────────────
 
+def parse_numbered_line(raw: str) -> tuple[int | None, str]:
+    """Return (list_position, name) — position is None when the line is not numbered."""
+    raw = raw.strip()
+    match = NUMBERED_LINE.match(raw)
+    if match:
+        return int(match.group(1)), match.group(2).strip()
+    return None, raw
+
+
 def clean_name(raw: str) -> str:
     """Strip leading position numbers and whitespace from a name."""
-    raw = raw.strip()
-    raw = STRIP_POSITION.sub("", raw)
-    return raw.strip()
+    _, name = parse_numbered_line(raw)
+    return name
+
+
+def validate_list_positions(candidates: list[dict]) -> None:
+    """Warn when numbered-list positions look inconsistent."""
+    numbered = [c for c in candidates if c.get("list_position") is not None]
+    if not numbered:
+        return
+
+    unnumbered = len(candidates) - len(numbered)
+    if unnumbered:
+        log.warning(
+            "  Mixed format: %d numbered and %d plain lines — plain lines use file order",
+            len(numbered), unnumbered,
+        )
+
+    positions = [c["list_position"] for c in numbered]
+    if len(positions) != len(set(positions)):
+        log.warning("  Duplicate list positions in file: %s", positions)
+
+    if unnumbered == 0:
+        expected = list(range(1, len(candidates) + 1))
+        if positions != expected:
+            log.warning(
+                "  Numbered positions don't run 1..%d — got %s (file numbers will be used)",
+                len(candidates), positions,
+            )
 
 
 def parse_txt(path: Path) -> list[dict]:
     """
     Parse a plain text file — one candidate per line.
     Empty lines and lines starting with # are skipped.
-    List position = order of non-empty lines (1-based).
+    Numbered lines (1. name / 1) name) use the embedded position;
+    plain lines get list_position from file order at insert time.
     """
     candidates = []
     with open(path, encoding="utf-8") as f:
@@ -116,9 +154,14 @@ def parse_txt(path: Path) -> list[dict]:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            name = clean_name(line)
+            list_position, name = parse_numbered_line(line)
             if name:
-                candidates.append({"name": name, "city": None})
+                entry: dict = {"name": name, "city": None}
+                if list_position is not None:
+                    entry["list_position"] = list_position
+                candidates.append(entry)
+
+    validate_list_positions(candidates)
     return candidates
 
 
@@ -139,11 +182,16 @@ def parse_csv(path: Path) -> list[dict]:
             # Skip header row
             if i == 0 and name_raw.lower() in HEADER_VALUES:
                 continue
-            name = clean_name(name_raw)
+            list_position, name = parse_numbered_line(name_raw)
             if not name:
                 continue
             city = row[1].strip() if len(row) > 1 and row[1].strip() else None
-            candidates.append({"name": name, "city": city})
+            entry: dict = {"name": name, "city": city}
+            if list_position is not None:
+                entry["list_position"] = list_position
+            candidates.append(entry)
+
+    validate_list_positions(candidates)
     return candidates
 
 
@@ -194,13 +242,13 @@ def insert_list(
             len(already_processed),
         )
 
-    # Build rows with 1-based list positions
+    # Build rows — numbered lines keep their file position; plain lines use file order
     rows = [
         {
             "election_id":   election_id,
             "party_id":      party_id,
             "raw_name":      c["name"],
-            "list_position": i + 1,
+            "list_position": c.get("list_position") or (i + 1),
             "raw_city":      c["city"],
             "processed":     False,
         }

@@ -29,7 +29,6 @@
 .election-party-page__error,
 .election-party-page__not-found {
   padding: 18px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fafafa;
   color: var(--color-text-muted);
 }
@@ -37,22 +36,13 @@
 .party-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(120px, 180px) 1fr;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) minmax(160px, 220px);
   gap: clamp(18px, 4vw, 36px);
   align-items: center;
   padding: clamp(22px, 4vw, 42px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 0;
   background: var(--color-white);
   overflow: hidden;
-}
-
-.party-hero__accent {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: 0;
-  width: 6px;
-  background: var(--party-color);
 }
 
 .party-hero__logo-wrap {
@@ -101,7 +91,6 @@
 
 .party-detail-card {
   padding: clamp(18px, 3vw, 28px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 0;
   background: var(--color-white);
 }
@@ -131,10 +120,34 @@
   grid-template-columns: minmax(150px, 0.5fr) 1fr;
   gap: clamp(18px, 4vw, 42px);
   align-items: center;
-  border-color: rgba(72, 144, 253, 0.3);
   background:
     linear-gradient(90deg, rgba(72, 144, 253, 0.1), rgba(72, 144, 253, 0)),
     var(--color-white);
+}
+
+.party-hero .seats-trend {
+  align-self: center;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.party-hero .seats-trend__chart {
+  min-height: 52px;
+}
+
+.party-hero .seats-trend__value {
+  font-size: clamp(2.7rem, 5vw, 4.25rem);
+}
+
+.party-hero .seats-trend__label {
+  font-size: 0.78rem;
+}
+
+.party-hero .seats-trend__caption {
+  font-size: 0.9rem;
 }
 
 .seats-trend__copy {
@@ -196,8 +209,8 @@
 
 .stats-bar__item {
   padding: 18px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fafafa;
+  text-align: center;
 }
 
 .stats-bar__value {
@@ -231,30 +244,40 @@
 .candidate-card {
   position: relative;
   display: grid;
-  grid-template-columns: 28px 58px 1fr;
+  grid-template-columns: 86px 1fr;
   gap: 12px;
-  align-items: start;
-  min-height: 96px;
-  padding: 14px;
+  align-items: stretch;
+  min-height: 112px;
+  padding-block: 0;
+  padding-inline-start: 0;
+  padding-inline-end: 14px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fafafa;
 }
 
 .candidate-card__position {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
   color: var(--party-color);
   font-size: 1.25rem;
   font-weight: 800;
-  line-height: 58px;
+  line-height: 1;
   text-align: center;
 }
 
 .candidate-card__photo {
   display: flex;
+  align-self: stretch;
   align-items: center;
   justify-content: center;
-  width: 58px;
-  height: 58px;
-  border: 2px solid var(--party-color);
+  width: 100%;
+  height: 100%;
   background: var(--party-soft, rgba(72, 144, 253, 0.16));
   color: var(--color-text);
   font-weight: 800;
@@ -266,6 +289,8 @@
   min-width: 0;
   flex-direction: column;
   gap: 4px;
+  justify-content: center;
+  padding-block: 14px;
 }
 
 .candidate-card__name {
@@ -278,9 +303,27 @@
   font-size: 0.9rem;
 }
 
+.candidate-card__tenure {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
 .candidate-card__description {
   margin-block-start: 4px;
   line-height: 1.35;
+}
+
+.candidate-card__read-more {
+  color: var(--party-color);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.candidate-card__read-more:hover,
+.candidate-card__read-more:focus-visible {
+  text-decoration: underline;
+  outline: none;
 }
 
 .candidate-card__tag {
@@ -301,7 +344,10 @@
 }
 
 .candidate-list__toggle {
+  display: block;
+  width: fit-content;
   margin-block-start: 16px;
+  margin-inline: auto;
   padding: 10px 18px;
   border: 1px solid var(--color-border);
   border-radius: 0;
@@ -319,11 +365,39 @@
   outline: none;
 }
 
+.candidate-map {
+  position: relative;
+}
+
+.candidate-map__logo-badge {
+  position: absolute;
+  inset-block-start: clamp(18px, 3vw, 28px);
+  inset-inline-end: clamp(18px, 3vw, 28px);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.candidate-map__logo {
+  max-width: 100px;
+  max-height: 100px;
+  object-fit: contain;
+}
+
 .candidate-map__layout {
   display: grid;
   grid-template-columns: minmax(220px, 360px) 1fr;
   gap: clamp(18px, 4vw, 44px);
   align-items: center;
+}
+
+.candidate-map__canvas {
+  position: relative;
 }
 
 .candidate-map__svg {
@@ -359,59 +433,88 @@
     stroke-width 0.16s ease;
 }
 
-.candidate-map__tooltip {
-  opacity: 0;
-  overflow: visible;
-  pointer-events: none;
-  transform: translateY(4px);
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
-}
-
-.candidate-map__tooltip-content {
-  display: flex;
-  width: 118px;
-  height: 38px;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  padding: 5px;
-  border: 1px solid color-mix(in srgb, var(--party-color) 36%, rgba(0, 0, 0, 0.12));
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
-  color: var(--color-text);
-  line-height: 1.15;
-}
-
-.candidate-map__tooltip-name,
-.candidate-map__tooltip-city {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.candidate-map__tooltip-name {
-  font-size: 0.86rem;
-  font-weight: 800;
-}
-
-.candidate-map__tooltip-city {
-  color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
 .candidate-map__pin-group:hover .candidate-map__pin,
 .candidate-map__pin-group:focus-visible .candidate-map__pin {
   r: 9;
   stroke-width: 2.4;
 }
 
-.candidate-map__pin-group:hover .candidate-map__tooltip,
-.candidate-map__pin-group:focus-visible .candidate-map__tooltip {
-  opacity: 1;
-  transform: translateY(0);
+.knesset-tooltip {
+  position: fixed;
+  z-index: 20;
+  min-width: 200px;
+  padding: 10px 12px;
+  border: 1px solid #dddddd;
+  border-radius: 0;
+  background: var(--color-white);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.knesset-tooltip__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.knesset-tooltip__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.knesset-tooltip__photo,
+.knesset-tooltip__initials {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: none;
+}
+
+.knesset-tooltip__photo {
+  object-fit: cover;
+}
+
+.knesset-tooltip__initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.knesset-tooltip__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.knesset-tooltip__details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.knesset-tooltip__faction {
+  font-size: 0.875rem;
+  line-height: 1.2;
+  color: var(--color-text-muted);
+}
+
+.knesset-tooltip__name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+.knesset-tooltip__tenure {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
 }
 
 .candidate-map__copy {
@@ -450,7 +553,8 @@
 
 .candidate-card--skeleton .candidate-card__position {
   height: 20px;
-  margin-block-start: 18px;
+  width: 28px;
+  min-height: 20px;
 }
 
 .candidate-card__line {
@@ -480,12 +584,21 @@
 @media (prefers-reduced-motion: reduce) {
   .candidate-list__toggle,
   .candidate-map__pin,
-  .candidate-map__tooltip,
   .candidate-card--skeleton .candidate-card__position,
   .candidate-card--skeleton .candidate-card__photo,
   .candidate-card__line {
     transition: none;
     animation: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .party-hero {
+    grid-template-columns: minmax(110px, 150px) 1fr;
+  }
+
+  .party-hero .seats-trend {
+    grid-column: 1 / -1;
   }
 }
 
@@ -500,20 +613,30 @@
   .party-hero__logo-wrap {
     max-width: 148px;
   }
+
+  .candidate-map__logo-badge {
+    inset-block-start: 14px;
+    inset-inline-end: 14px;
+    width: 88px;
+    height: 88px;
+  }
+
+  .candidate-map__logo {
+    max-width: 72px;
+    max-height: 72px;
+  }
 }
 
 @media (max-width: 520px) {
   .candidate-card {
-    grid-template-columns: 24px 48px 1fr;
-    padding: 12px;
+    grid-template-columns: 68px 1fr;
+    min-height: 104px;
+    padding-block: 0;
+    padding-inline-start: 0;
+    padding-inline-end: 12px;
   }
 
-  .candidate-card__position {
-    line-height: 48px;
-  }
-
-  .candidate-card__photo {
-    width: 48px;
-    height: 48px;
+  .candidate-card__body {
+    padding-block: 12px;
   }
 }

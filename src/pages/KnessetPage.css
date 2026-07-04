@@ -88,6 +88,16 @@
   overflow: visible;
 }
 
+.knesset-hemicycle__skeleton {
+  width: 100%;
+  max-width: 900px;
+  min-height: clamp(260px, 54vw, 520px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(90deg, #f1f1f1, #e6e6e6, #f1f1f1);
+  background-size: 200% 100%;
+  animation: knesset-page-skeleton 1500ms ease-in-out infinite;
+}
+
 .knesset-page__below {
   display: flex;
   flex-direction: column;
@@ -101,12 +111,6 @@
 .mk-dot__body {
   transform-box: fill-box;
   transform-origin: center;
-}
-
-.mk-dot__body--skeleton {
-  opacity: 0.74;
-  animation: mk-dot-skeleton-pulse 1800ms ease-in-out infinite;
-  will-change: opacity, transform;
 }
 
 .mk-dot__scale {
@@ -124,19 +128,6 @@
 .mk-dot__body--enter.mk-dot__body--hovered {
   animation: mk-dot-reveal var(--mk-dot-reveal-duration, 520ms)
     cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-@keyframes mk-dot-skeleton-pulse {
-  0%,
-  100% {
-    opacity: 0.58;
-    transform: scale(0.96);
-  }
-
-  50% {
-    opacity: 0.9;
-    transform: scale(1);
-  }
 }
 
 @keyframes mk-dot-reveal {
@@ -196,6 +187,16 @@
 
 .center-counter__glow--opposition {
   opacity: 0.45;
+}
+
+@keyframes knesset-page-skeleton {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -662,13 +663,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .knesset-hemicycle__skeleton,
   .mk-dot__scale,
   .faction-member__photo,
   .faction-member__initials {
     transition: none;
+    animation: none;
   }
 
-  .mk-dot__body--skeleton,
   .mk-dot__body--enter,
   .center-counter--enter {
     opacity: 1;

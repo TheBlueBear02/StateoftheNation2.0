@@ -2,8 +2,8 @@
 """
 generate_descriptions.py  — Pipeline Stage 3
 =============================================
-Generates a short Hebrew bio for each election candidate
-who doesn't yet have a description.
+Generates a short Hebrew role summary for each election candidate
+who doesn't yet have a description (format: «[שם] כיהן כ[תפקידים]»).
 
 Process per candidate:
   1. Fetch Wikipedia Hebrew article intro (free, no key)
@@ -39,7 +39,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 WIKI_API  = "https://he.wikipedia.org/api/rest_v1/page/summary/{}"
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = "gpt-4o"
 REQUEST_DELAY = 0.5   # seconds between OpenAI calls
 
 
@@ -82,19 +82,27 @@ def fetch_wikipedia_intro(name: str) -> str | None:
 
 # ── OpenAI ────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """אתה כותב תיאורים קצרים ומדויקים על פוליטיקאים ישראלים עבור אתר נתוני אזרחות.
-כתוב שתי משפטים בלבד בעברית. המשפטים יהיו עובדתיים, ניטרליים ותמציתיים.
-אל תכלול דעות, שיפוטים, או מידע שאינו מאומת. אל תתחיל ב"הוא" או "היא" — התחיל בשם המלא."""
+SYSTEM_PROMPT = """אתה כותב תיאורים קצרים ומדויקים על מועמדים לכנסת עבור אתר נתוני אזרחות.
 
-USER_PROMPT = """כתוב תיאור של שתי משפטים על {name}, המתמודד/ת בבחירות 2026 מטעם {party}.
+כתוב משפט אחד בלבד בעברית, בפורמט קבוע:
+[שם מלא] כיהן כ[תפקיד1], [תפקיד2], ...
+
+כללים:
+- הדגש את התפקידים הבולטים ביותר — בפוליטיקה או מחוץ לה (שר, חבר כנסת, ראש עיר, רופא, עיתונאי, אקדמאי וכו').
+- המשפט חייב להתחיל בשם המלא, ואחריו «כיהן כ».
+- אל תכתוב «הוא/היא פוליטיקאי/ת ישראלי/ת», אל תציין מפלגה, ואל תפתח ב«הוא» או «היא».
+- אם אין תפקידים רשמיים, השתמש ב«עסק/ה כ» או «פעל/ה כ» עם המקצוע או הפעילות הבולטת.
+- ניטרלי, עובדתי, ללא דעות, שיפוטים או מידע שאינו מאומת."""
+
+USER_PROMPT = """כתוב תיאור קצר על {name}.
 
 מידע רקע מויקיפדיה:
 {wiki}
 
-כתוב שתי משפטים בלבד, בעברית."""
+כתוב משפט אחד בלבד בפורמט: {name} כיהן כ[תפקידים בולטים]."""
 
-USER_PROMPT_NO_WIKI = """כתוב תיאור של שתי משפטים על {name}, המתמודד/ת בבחירות 2026 מטעם {party}.
-כתוב שתי משפטים בלבד, בעברית, על סמך הידוע לך."""
+USER_PROMPT_NO_WIKI = """כתוב תיאור קצר על {name}, על סמך הידוע לך.
+כתוב משפט אחד בלבד בפורמט: {name} כיהן כ[תפקידים בולטים]."""
 
 
 def generate_description(
@@ -115,7 +123,7 @@ def generate_description(
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user",   "content": user_msg},
             ],
-            max_tokens=200,
+            max_tokens=120,
             temperature=0.3,
         )
         text = resp.choices[0].message.content.strip()

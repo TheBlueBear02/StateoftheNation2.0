@@ -1,6 +1,5 @@
-import { useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import {
-  buildSkeletonLayout,
   HEMICYCLE_VIEWBOX,
   SEAT_REVEAL_ORDER,
   type PlacedMember,
@@ -27,15 +26,16 @@ export function KnessetHemicycle({
   const [hoveredMember, setHoveredMember] = useState<PlacedMember | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
 
-  const dots = useMemo(
-    () => (loading ? buildSkeletonLayout() : placedMembers),
-    [loading, placedMembers],
-  )
-
   const totalCount = useMemo(
     () => placedMembers.filter((member) => member.fullName).length,
     [placedMembers],
   )
+
+  useEffect(() => {
+    if (loading) {
+      setHoveredMember(null)
+    }
+  }, [loading])
 
   function handleMove(event: MouseEvent<SVGGElement>) {
     setTooltipPosition({ x: event.clientX, y: event.clientY })
@@ -58,6 +58,16 @@ export function KnessetHemicycle({
         : 'opposition'
       : null
 
+  if (loading) {
+    return (
+      <div className="knesset-hemicycle" aria-busy="true">
+        <div className="knesset-hemicycle__skeleton" role="status">
+          <span className="visually-hidden">טוען מפת חברי הכנסת</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="knesset-hemicycle">
       <svg
@@ -68,14 +78,13 @@ export function KnessetHemicycle({
         role="img"
         aria-label="מפת חברי הכנסת"
       >
-        {dots.map((member) => (
+        {placedMembers.map((member) => (
           <MKDot
             key={member.seatIndex}
             member={member}
-            isSkeleton={loading}
             isHovered={isFactionHovered(member)}
             revealIndex={SEAT_REVEAL_ORDER.get(member.seatIndex) ?? 0}
-            animate={!loading}
+            animate
             onHover={setHoveredMember}
             onMove={handleMove}
           />
@@ -87,11 +96,11 @@ export function KnessetHemicycle({
           totalCount={totalCount}
           hasCoalitionData={hasCoalitionData}
           hoveredBloc={hoveredBloc}
-          animate={!loading}
+          animate
         />
       </svg>
 
-      {hoveredMember && !loading ? (
+      {hoveredMember ? (
         <Tooltip
           fullName={hoveredMember.fullName}
           factionName={hoveredMember.factionName}

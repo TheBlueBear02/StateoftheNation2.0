@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { ElectionCandidate } from '../../hooks/useElectionCandidates'
 import { getInitials, tintColor } from '../../lib/hemicycle'
+import { formatTenureYears } from '../../lib/knessetTenure'
 
-const INITIAL_VISIBLE_COUNT = 15
+const PAGE_SIZE = 9
 
 type CandidateListProps = {
   candidates: ElectionCandidate[]
@@ -29,7 +30,7 @@ function CandidateListSkeleton() {
 }
 
 export function CandidateList({ candidates, partyColor, loading }: CandidateListProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const partyId = candidates[0]?.partyId ?? null
   const accentColor = partyColor ?? '#4890fd'
   const style = {
@@ -38,14 +39,15 @@ export function CandidateList({ candidates, partyColor, loading }: CandidateList
   } as CSSProperties
 
   useEffect(() => {
-    setExpanded(false)
+    setVisibleCount(PAGE_SIZE)
   }, [partyId])
 
   const visibleCandidates = useMemo(
-    () => (expanded ? candidates : candidates.slice(0, INITIAL_VISIBLE_COUNT)),
-    [candidates, expanded],
+    () => candidates.slice(0, visibleCount),
+    [candidates, visibleCount],
   )
-  const hiddenCount = Math.max(candidates.length - INITIAL_VISIBLE_COUNT, 0)
+  const hiddenCount = Math.max(candidates.length - visibleCount, 0)
+  const nextBatchSize = Math.min(PAGE_SIZE, hiddenCount)
 
   return (
     <section
@@ -56,7 +58,7 @@ export function CandidateList({ candidates, partyColor, loading }: CandidateList
       <div className="party-detail-card__header">
         <p className="party-detail-card__eyebrow">הרשימה</p>
         <h2 id="candidate-list-title" className="party-detail-card__title">
-          מועמדים לפי מיקום
+          מועמדים לפי סדר הרשימה
         </h2>
       </div>
 
@@ -93,14 +95,32 @@ export function CandidateList({ candidates, partyColor, loading }: CandidateList
                 <span className="candidate-card__body">
                   <span className="candidate-card__name">{candidate.fullName}</span>
                   <span className="candidate-card__city">
-                    {candidate.city ?? 'עיר מגורים לא פורסמה'}
+                    {candidate.city ?? 'לא ידוע מקום מגורים'}
                   </span>
+                  {candidate.totalYearsInKnesset > 0 ? (
+                    <span className="candidate-card__tenure">
+                      {formatTenureYears(candidate.totalYearsInKnesset)} בכנסת
+                    </span>
+                  ) : null}
                   {candidate.isNewMk ? (
                     <span className="candidate-card__tag">חדש/ה לכנסת</span>
                   ) : null}
                   {candidate.description ? (
                     <span className="candidate-card__description">
                       {candidate.description}
+                      {candidate.wikipediaUrl ? (
+                        <>
+                          {' '}
+                          <a
+                            className="candidate-card__read-more"
+                            href={candidate.wikipediaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            קרא עוד
+                          </a>
+                        </>
+                      ) : null}
                     </span>
                   ) : null}
                 </span>
@@ -112,9 +132,13 @@ export function CandidateList({ candidates, partyColor, loading }: CandidateList
             <button
               type="button"
               className="candidate-list__toggle"
-              onClick={() => setExpanded((current) => !current)}
+              onClick={() =>
+                setVisibleCount((current) =>
+                  Math.min(current + PAGE_SIZE, candidates.length),
+                )
+              }
             >
-              {expanded ? 'הצג פחות' : `ראה עוד ${hiddenCount} מועמדים`}
+              {`ראה עוד ${nextBatchSize} מועמדים`}
             </button>
           ) : null}
         </>

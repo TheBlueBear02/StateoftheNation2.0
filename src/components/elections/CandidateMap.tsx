@@ -1,5 +1,6 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
 import type { CandidateMapPin } from '../../hooks/useElectionCandidates'
+import { CandidateMapTooltip } from './CandidateMapTooltip'
 
 const MAP_VIEWBOX = {
   width: 213,
@@ -9,12 +10,6 @@ const MAP_VIEWBOX = {
 } as const
 
 const MAP_IMAGE_SRC = '/images/elections%20page/israel%20map.svg'
-const TOOLTIP = {
-  width: 128,
-  height: 48,
-  gap: 12,
-  edgePad: 4,
-} as const
 
 const LATITUDE_BOUNDS = {
   minLat: 29.45,
@@ -29,6 +24,8 @@ const X_CALIBRATION = {
 
 type CandidateMapProps = {
   pins: CandidateMapPin[]
+  partyName: string
+  partyLogoUrl: string | null
   partyColor: string | null
   loading: boolean
 }
@@ -41,8 +38,6 @@ type ProjectedPoint = {
 type ProjectedPin = CandidateMapPin &
   ProjectedPoint & {
     offsetIndex: number
-    tooltipX: number
-    tooltipY: number
   }
 
 function clamp(value: number, min: number, max: number): number {
@@ -64,25 +59,6 @@ function project(latitude: number, longitude: number): ProjectedPoint {
   return {
     x: clamp(x, MAP_VIEWBOX.padX, MAP_VIEWBOX.width - MAP_VIEWBOX.padX),
     y: clamp(y, MAP_VIEWBOX.padY, MAP_VIEWBOX.height - MAP_VIEWBOX.padY),
-  }
-}
-
-function getTooltipPosition(point: ProjectedPoint): ProjectedPoint {
-  const preferredY = point.y - TOOLTIP.height - TOOLTIP.gap
-  const fallbackY = point.y + TOOLTIP.gap
-  const y = preferredY >= TOOLTIP.edgePad ? preferredY : fallbackY
-
-  return {
-    x: clamp(
-      point.x - TOOLTIP.width / 2,
-      TOOLTIP.edgePad,
-      MAP_VIEWBOX.width - TOOLTIP.width - TOOLTIP.edgePad,
-    ),
-    y: clamp(
-      y,
-      TOOLTIP.edgePad,
-      MAP_VIEWBOX.height - TOOLTIP.height - TOOLTIP.edgePad,
-    ),
   }
 }
 
@@ -110,22 +86,46 @@ function buildProjectedPins(pins: CandidateMapPin[]): ProjectedPin[] {
         MAP_VIEWBOX.height - MAP_VIEWBOX.padY,
       ),
     }
-    const tooltipPosition = getTooltipPosition(point)
 
     return {
       ...pin,
       ...point,
       offsetIndex,
-      tooltipX: tooltipPosition.x,
-      tooltipY: tooltipPosition.y,
     }
   })
 }
 
-export function CandidateMap({ pins, partyColor, loading }: CandidateMapProps) {
+export function CandidateMap({
+  pins,
+  partyName,
+  partyLogoUrl,
+  partyColor,
+  loading,
+}: CandidateMapProps) {
   const accentColor = partyColor ?? '#4890fd'
   const style = { '--party-color': accentColor } as CSSProperties
   const projectedPins = buildProjectedPins(pins)
+  const [hoveredPin, setHoveredPin] = useState<ProjectedPin | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    if (loading) {
+      setHoveredPin(null)
+    }
+  }, [loading])
+
+  function handleMove(event: MouseEvent<SVGGElement>) {
+    setTooltipPosition({ x: event.clientX, y: event.clientY })
+  }
+
+  function handleFocus(event: FocusEvent<SVGGElement>, pin: ProjectedPin) {
+    setHoveredPin(pin)
+    const rect = event.currentTarget.getBoundingClientRect()
+    setTooltipPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    })
+  }
 
   return (
     <section
@@ -133,6 +133,12 @@ export function CandidateMap({ pins, partyColor, loading }: CandidateMapProps) {
       style={style}
       aria-labelledby="candidate-map-title"
     >
+      {partyLogoUrl ? (
+        <span className="candidate-map__logo-badge">
+          <img className="candidate-map__logo" src={partyLogoUrl} alt="" />
+        </span>
+      ) : null}
+
       <div className="party-detail-card__header">
         <p className="party-detail-card__eyebrow">מפה</p>
         <h2 id="candidate-map-title" className="party-detail-card__title">
@@ -141,72 +147,73 @@ export function CandidateMap({ pins, partyColor, loading }: CandidateMapProps) {
       </div>
 
       <div className="candidate-map__layout">
-        <svg
-          className={`candidate-map__svg${loading ? ' candidate-map__svg--loading' : ''}`}
-          viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
-          role="img"
-          aria-label="מפת ישראל עם נקודות לפי עיר מגורי המועמדים"
-        >
-          <image
-            className="candidate-map__image"
-            href={MAP_IMAGE_SRC}
-            width={MAP_VIEWBOX.width}
-            height={MAP_VIEWBOX.height}
-            preserveAspectRatio="xMidYMid meet"
-          />
+        <div className="candidate-map__canvas">
+          <svg
+            className={`candidate-map__svg${loading ? ' candidate-map__svg--loading' : ''}`}
+            viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
+            role="img"
+            aria-label="מפת ישראל עם נקודות לפי עיר מגורי המועמדים"
+          >
+            <image
+              className="candidate-map__image"
+              href={MAP_IMAGE_SRC}
+              width={MAP_VIEWBOX.width}
+              height={MAP_VIEWBOX.height}
+              preserveAspectRatio="xMidYMid meet"
+            />
 
-          <g className="candidate-map__pins" role="list">
-            {projectedPins.map((pin) => (
-              <g
-                key={pin.id}
-                className="candidate-map__pin-group"
-                role="listitem"
-                tabIndex={0}
-                aria-label={`${pin.fullName}, ${pin.city}`}
-              >
-                <circle
-                  className="candidate-map__pin-hit-area"
-                  cx={pin.x}
-                  cy={pin.y}
-                  r={15}
-                />
-                <circle
-                  className="candidate-map__pin"
-                  cx={pin.x}
-                  cy={pin.y}
-                  r={pin.offsetIndex === 0 ? 7 : 5.8}
-                />
-                <foreignObject
-                  className="candidate-map__tooltip"
-                  x={pin.tooltipX}
-                  y={pin.tooltipY}
-                  width={TOOLTIP.width}
-                  height={TOOLTIP.height}
+            <g className="candidate-map__pins" role="list">
+              {projectedPins.map((pin) => (
+                <g
+                  key={pin.id}
+                  className="candidate-map__pin-group"
+                  role="listitem"
+                  tabIndex={0}
+                  aria-label={`${pin.fullName}, ${pin.city}`}
+                  onMouseEnter={() => setHoveredPin(pin)}
+                  onMouseLeave={() => setHoveredPin(null)}
+                  onMouseMove={handleMove}
+                  onFocus={(event) => handleFocus(event, pin)}
+                  onBlur={() => setHoveredPin(null)}
                 >
-                  <div
-                    className="candidate-map__tooltip-content"
-                    dir="rtl"
-                  >
-                    <span className="candidate-map__tooltip-name">
-                      {pin.fullName}
-                    </span>
-                    <span className="candidate-map__tooltip-city">
-                      {pin.city}
-                    </span>
-                  </div>
-                </foreignObject>
-              </g>
-            ))}
-          </g>
-        </svg>
+                  <circle
+                    className="candidate-map__pin-hit-area"
+                    cx={pin.x}
+                    cy={pin.y}
+                    r={15}
+                  />
+                  <circle
+                    className="candidate-map__pin"
+                    cx={pin.x}
+                    cy={pin.y}
+                    r={pin.offsetIndex === 0 ? 7 : 5.8}
+                  />
+                </g>
+              ))}
+            </g>
+          </svg>
+
+          {hoveredPin ? (
+            <CandidateMapTooltip
+              fullName={hoveredPin.fullName}
+              city={hoveredPin.city}
+              imageUrl={hoveredPin.imageUrl}
+              accentColor={accentColor}
+              totalYearsInKnesset={hoveredPin.totalYearsInKnesset}
+              x={tooltipPosition.x}
+              y={tooltipPosition.y}
+            />
+          ) : null}
+        </div>
 
         <div className="candidate-map__copy">
           <p className="candidate-map__count">
-            {loading ? 'טוען נקודות...' : `${pins.length} מועמדים עם עיר וקואורדינטות`}
+            {loading
+              ? 'טוען נקודות...'
+              : `מציג ${pins.length} מועמדים מרשימת ${partyName}`}
           </p>
           <p className="candidate-map__note">
-            נקודות מוצגות רק עבור מועמדים שעברו גיאוקודינג בהצלחה. מועמדים ללא
-            עיר או קואורדינטות נשארים מחוץ למפה ולא מחושבים כטעות.
+            נקודות מוצגות רק עבור מועמדים שעיר מגורם נמצאת במערכת.
           </p>
         </div>
       </div>

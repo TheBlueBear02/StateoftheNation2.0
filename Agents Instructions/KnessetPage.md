@@ -165,7 +165,7 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 15 rows × 17 columns. Each cell is
 - Border: `2.5px solid factionColor` (DB color or hash-derived HSL)
 - Interior: clipped `<image>` when `image_url` exists; else initials on 20% tint
 - Hover: scales to 1.15× for every dot in the hovered member’s faction (`factionName` match); tooltip still shows the individual member under the cursor
-- **Loading / entrance animation:** the SVG stays mounted while a term fetch is in progress, so the diagram does not hard-reset between picker changes. Skeleton grey dots breathe with a subtle stagger during fetch. When member data finishes loading, each dot fades/scales in sequentially via CSS (`mk-dot-reveal`, 520ms, stagger 14ms). Reveal order from `SEAT_REVEAL_ORDER` in `hemicycle.ts` — left wing bottom-up (starting bottom-left), then the shared top arc left-to-right, then the right wing top-to-bottom. Respects `prefers-reduced-motion`.
+- **Loading / entrance animation:** while the Knesset list or selected-term members are loading, `KnessetHemicycle` shows the standard page skeleton shimmer panel instead of rendering animated placeholder seats. When member data finishes loading, the real SVG mounts and each dot fades/scales in sequentially via CSS (`mk-dot-reveal`, 520ms, stagger 14ms). Reveal order from `SEAT_REVEAL_ORDER` in `hemicycle.ts` — left wing bottom-up (starting bottom-left), then the shared top arc left-to-right, then the right wing top-to-bottom. Respects `prefers-reduced-motion`.
 
 ### CenterCounter
 
@@ -198,7 +198,7 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 15 rows × 17 columns. Each cell is
 | `loadedTermId` | `useKnessetMembers` guard that keeps the selected term in loading state until its own fetch resolves |
 | `sortMode` | `KnessetPage` local state (`useState<MemberSortMode>('parties')`) |
 | `hoveredMember`, tooltip position | `KnessetHemicycle` / `FactionList` local state; hemicycle hover highlights all MKs sharing `hoveredMember.factionName` |
-| Loading | skeleton dots + faction skeletons while the Knesset list loads, member data loads, or the selected term does not match `loadedTermId` |
+| Loading | standard hemicycle shimmer panel + faction skeletons while the Knesset list loads, member data loads, or the selected term does not match `loadedTermId` |
 | Error | Hebrew message: `לא ניתן לטעון את נתוני הכנסת` |
 
 ## Verification

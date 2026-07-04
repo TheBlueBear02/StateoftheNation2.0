@@ -115,6 +115,7 @@ export type ElectionCandidatePerson = {
   image_url: string | null
   birth_date: string | null
   gender: string | null
+  wikipedia_url: string | null
 }
 
 export type ElectionCandidateRow = {

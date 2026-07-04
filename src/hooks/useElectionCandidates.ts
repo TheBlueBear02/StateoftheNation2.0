@@ -4,8 +4,9 @@ import {
   supabaseConfigError,
   type ElectionCandidatePerson,
   type ElectionCandidateRow,
-  type ElectionMembershipRow,
+  type KnessetMembershipTenureRow,
 } from '../lib/supabase'
+import { computeMemberTenureStats } from '../lib/knessetTenure'
 
 export type ElectionCandidate = {
   id: number
@@ -18,9 +19,12 @@ export type ElectionCandidate = {
   gender: string | null
   description: string | null
   city: string | null
+  wikipediaUrl: string | null
   latitude: number | null
   longitude: number | null
   isNewMk: boolean
+  totalDaysInKnesset: number
+  totalYearsInKnesset: number
 }
 
 export type ElectionStat = {
@@ -40,8 +44,11 @@ export type CandidateMapPin = {
   id: number
   fullName: string
   city: string
+  imageUrl: string | null
   latitude: number
   longitude: number
+  totalDaysInKnesset: number
+  totalYearsInKnesset: number
 }
 
 export type UseElectionCandidatesResult = {
@@ -116,11 +123,50 @@ function average(values: number[]): number | null {
   return Math.round((sum / values.length) * 10) / 10
 }
 
+function buildTenureMap(
+  tenureRows: KnessetMembershipTenureRow[],
+): Map<number, { totalDaysInKnesset: number; totalYearsInKnesset: number }> {
+  const membershipsByPerson = new Map<number, KnessetMembershipTenureRow[]>()
+
+  for (const row of tenureRows) {
+    const existing = membershipsByPerson.get(row.person_id) ?? []
+    existing.push(row)
+    membershipsByPerson.set(row.person_id, existing)
+  }
+
+  const tenureMap = new Map<
+    number,
+    { totalDaysInKnesset: number; totalYearsInKnesset: number }
+  >()
+
+  for (const [personId, memberships] of membershipsByPerson) {
+    const tenure = computeMemberTenureStats(
+      memberships.map((membership) => ({
+        startDate: membership.start_date ?? '',
+        endDate: membership.end_date,
+      })),
+      null,
+    )
+
+    tenureMap.set(personId, {
+      totalDaysInKnesset: tenure.totalDaysInKnesset,
+      totalYearsInKnesset: tenure.totalYearsInKnesset,
+    })
+  }
+
+  return tenureMap
+}
+
 function normalizeCandidate(
   row: ElectionCandidateRow,
   servedPersonIds: Set<number>,
+  tenureMap: Map<number, { totalDaysInKnesset: number; totalYearsInKnesset: number }>,
 ): ElectionCandidate {
   const person = unwrapRelation<ElectionCandidatePerson>(row.person)
+  const tenure = tenureMap.get(row.person_id) ?? {
+    totalDaysInKnesset: 0,
+    totalYearsInKnesset: 0,
+  }
 
   return {
     id: row.id,
@@ -133,9 +179,12 @@ function normalizeCandidate(
     gender: person?.gender ?? null,
     description: row.description,
     city: row.city,
+    wikipediaUrl: person?.wikipedia_url ?? null,
     latitude: toNumber(row.latitude),
     longitude: toNumber(row.longitude),
     isNewMk: !servedPersonIds.has(row.person_id),
+    totalDaysInKnesset: tenure.totalDaysInKnesset,
+    totalYearsInKnesset: tenure.totalYearsInKnesset,
   }
 }
 
@@ -188,8 +237,11 @@ function buildMapPins(candidates: ElectionCandidate[]): CandidateMapPin[] {
         id: candidate.id,
         fullName: candidate.fullName,
         city: candidate.city,
+        imageUrl: candidate.imageUrl,
         latitude: candidate.latitude,
         longitude: candidate.longitude,
+        totalDaysInKnesset: candidate.totalDaysInKnesset,
+        totalYearsInKnesset: candidate.totalYearsInKnesset,
       },
     ]
   })
@@ -225,7 +277,7 @@ export function useElectionCandidates(
       const { data, error: queryError } = await supabase
         .from('election_candidates')
         .select(
-          'id, election_id, party_id, person_id, list_position, description, city, latitude, longitude, person:people(full_name, image_url, birth_date, gender)',
+          'id, election_id, party_id, person_id, list_position, description, city, latitude, longitude, person:people(full_name, image_url, birth_date, gender, wikipedia_url)',
         )
         .eq('party_id', partyId)
         .order('list_position', { ascending: true })
@@ -254,7 +306,7 @@ export function useElectionCandidates(
 
       const { data: membershipData, error: membershipError } = await supabase
         .from('knesset_memberships')
-        .select('person_id')
+        .select('person_id, start_date, end_date, knesset:knessets(knesset_number)')
         .in('person_id', personIds)
 
       if (cancelled) {
@@ -269,12 +321,17 @@ export function useElectionCandidates(
       }
 
       const servedPersonIds = new Set(
-        ((membershipData ?? []) as ElectionMembershipRow[]).map(
+        ((membershipData ?? []) as KnessetMembershipTenureRow[]).map(
           (row) => row.person_id,
         ),
       )
+      const tenureMap = buildTenureMap(
+        (membershipData ?? []) as unknown as KnessetMembershipTenureRow[],
+      )
 
-      setCandidates(rows.map((row) => normalizeCandidate(row, servedPersonIds)))
+      setCandidates(
+        rows.map((row) => normalizeCandidate(row, servedPersonIds, tenureMap)),
+      )
       setLoading(false)
     }
 

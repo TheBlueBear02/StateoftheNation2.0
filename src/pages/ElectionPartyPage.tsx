@@ -60,7 +60,6 @@ export function ElectionPartyPage() {
           {party && !error ? (
             <>
               <header className="party-hero">
-                <span className="party-hero__accent" aria-hidden="true" />
                 <div className="party-hero__logo-wrap">
                   {party.logoUrl ? (
                     <img className="party-hero__logo" src={party.logoUrl} alt="" />
@@ -77,9 +76,10 @@ export function ElectionPartyPage() {
                     <p className="party-hero__description">{party.description}</p>
                   ) : null}
                 </div>
+
+                <SeatsTrend color={party.color} />
               </header>
 
-              <SeatsTrend color={party.color} />
               <StatsBar stats={stats} />
               <CandidateList
                 candidates={candidates}
@@ -88,6 +88,8 @@ export function ElectionPartyPage() {
               />
               <CandidateMap
                 pins={mapPins}
+                partyName={partyName}
+                partyLogoUrl={party.logoUrl}
                 partyColor={party.color}
                 loading={loading}
               />

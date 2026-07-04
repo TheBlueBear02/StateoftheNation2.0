@@ -86,17 +86,53 @@ def fuzzy(a: str, b: str) -> float:
 
 # ── Entity resolution ─────────────────────────────────────────────────────────
 
+def token_subset_match(a: str, b: str) -> bool:
+    """
+    Returns True if every token in the shorter name appears in the longer name.
+    Handles middle names in either direction:
+      "david bitan" vs "david bitan-amsalem"  -> True
+      "yariv levin-koren" vs "yariv levin"     -> True
+    Requires at least 2 tokens to avoid false positives on single-word names.
+    """
+    tokens_a = set(a.split())
+    tokens_b = set(b.split())
+    if len(tokens_a) <= len(tokens_b):
+        shorter, longer = tokens_a, tokens_b
+    else:
+        shorter, longer = tokens_b, tokens_a
+    return len(shorter) >= 2 and shorter.issubset(longer)
+
+
 def resolve(raw_name: str, people: list[dict]) -> tuple:
     """
     Returns (matched_row | None, score, tier)
-    tier: 'exact' | 'fuzzy' | 'review' | 'none'
+    tier: 'exact' | 'token' | 'fuzzy' | 'review' | 'none'
+
+    Matching order:
+      1. Exact (normalised)          -> auto-commit
+      2. Token subset (middle names) -> auto-commit if exactly one match
+      3. Fuzzy >= FUZZY_AUTO         -> auto-commit
+      4. Fuzzy >= FUZZY_REVIEW       -> review queue
+      5. No match                    -> review queue / new person
     """
     norm = normalize(raw_name)
 
+    # 1. Exact match
     for p in people:
         if normalize(p["full_name"]) == norm:
             return p, 1.0, "exact"
 
+    # 2. Token subset - catches middle name differences in either direction
+    token_matches = [
+        p for p in people
+        if token_subset_match(norm, normalize(p["full_name"]))
+    ]
+    if len(token_matches) == 1:
+        # Exactly one match - safe to auto-commit
+        return token_matches[0], 0.95, "token"
+    # If multiple matches share the same tokens, fall through to fuzzy
+
+    # 3. Fuzzy match
     scored = sorted(
         [(p, fuzzy(norm, normalize(p["full_name"]))) for p in people],
         key=lambda x: x[1], reverse=True,
@@ -228,14 +264,24 @@ def run_approve(sb: Client, dry_run: bool) -> None:
     new_items = [item for item in queue if item["action"] == "new"]
 
     if pending:
-        log.warning("%d items still 'pending' — skipping them", len(pending))
+        log.warning("%d items still pending - skipping them", len(pending))
 
     election_id = get_election_id(sb)
-    people      = load_people(sb)
 
     for item in approved:
-        person_id = item["best_match_id"]
-        log.info("  APPROVE %-20s → person_id %s", item["raw_name"], person_id)
+        # Use correct_person_id if the human supplied one, else use best_match_id
+        person_id = item.get("correct_person_id") or item["best_match_id"]
+        if item.get("correct_person_id"):
+            log.info(
+                "  APPROVE %-25s -> person_id %s (manual correction, was %s)",
+                item["raw_name"], person_id, item["best_match_id"],
+            )
+        else:
+            log.info(
+                "  APPROVE %-25s -> person_id %s (best match: %s, score: %s)",
+                item["raw_name"], person_id,
+                item.get("best_match", "?"), item.get("score", "?"),
+            )
         upsert_candidate(
             sb, election_id, item["party_id"],
             person_id, item["list_position"], None, dry_run,
@@ -243,7 +289,7 @@ def run_approve(sb: Client, dry_run: bool) -> None:
         mark_processed(sb, item["raw_id"], dry_run)
 
     for item in new_items:
-        log.info("  NEW     %-20s → creating person", item["raw_name"])
+        log.info("  NEW     %-25s -> creating person", item["raw_name"])
         person_id = create_person(sb, item["raw_name"]) if not dry_run else -1
         upsert_candidate(
             sb, election_id, item["party_id"],
@@ -251,11 +297,13 @@ def run_approve(sb: Client, dry_run: bool) -> None:
         )
         mark_processed(sb, item["raw_id"], dry_run)
 
-    # clear processed items from queue file
     remaining = [item for item in queue if item["action"] == "pending"]
     with open(REVIEW_FILE, "w", encoding="utf-8") as f:
         json.dump(remaining, f, ensure_ascii=False, indent=2)
-    log.info("Done. %d items remain in review queue.", len(remaining))
+    log.info(
+        "Done - approved: %d, new: %d, still pending: %d",
+        len(approved), len(new_items), len(remaining),
+    )
 
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────

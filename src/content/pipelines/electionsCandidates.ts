@@ -11,7 +11,7 @@ export const electionsCandidatesPipeline: PipelineDoc = {
       id: 'overview',
       title: 'סקירה',
       paragraphs: [
-        'הצינור מתחיל בכל פעם שמפלגה מפרסמת או מעדכנת רשימת מועמדים. מכינים קובץ פשוט לפי סדר הרשימה, מכניסים אותו לטבלת הקלט, ואז מריצים את ארבעת שלבי העיבוד.',
+        'הצינור מתחיל בכל פעם שמפלגה מפרסמת או מעדכנת רשימת מועמדים. מכינים קובץ פשוט לפי סדר הרשימה, מכניסים אותו לטבלת הקלט, ואז מריצים את ששת שלבי העיבוד.',
         'בסוף התהליך האתר מקבל רשימת מועמדים נקייה עם שיוך לאנשים, פרטים חסרים ממקורות מובנים, תקצירי פרופיל, עיר וקואורדינטות כאשר המקורות מאפשרים זאת.',
       ],
     },
@@ -22,7 +22,7 @@ export const electionsCandidatesPipeline: PipelineDoc = {
         'זה המחזור שחוזרים עליו לכל מפלגה חדשה או לכל עדכון רשימה. מומלץ להתחיל תמיד בתצוגה מקדימה, במיוחד כשמעתיקים שמות ממאמר או הודעה לעיתונות.',
       ],
       list: [
-        '1. מכינים קובץ txt עם שם אחד בכל שורה, לפי סדר הרשימה. שורות שמתחילות ב-# מתעלמות.',
+        '1. מכינים קובץ txt עם שם אחד בכל שורה, לפי סדר הרשימה. אפשר גם רשימה ממוספרת (1. שם / 3.שם) כמו שמפרסמים באתרי מפלגות. שורות שמתחילות ב-# מתעלמות.',
         '2. אם פורסמו גם ערים, אפשר להשתמש בקובץ csv עם כותרות שם,עיר.',
         '3. מריצים insert_raw_list.py --dry-run כדי לראות את הרשימה והעמדות בלי כתיבה.',
         '4. מריצים insert_raw_list.py כדי להכניס את השורות ל-raw_candidate_lists עם processed=false.',
@@ -30,12 +30,18 @@ export const electionsCandidatesPipeline: PipelineDoc = {
         '6. אם נוצר review_queue.json, מאשרים או מסמנים אנשים חדשים ואז מריצים resolve_candidates.py --approve.',
         '7. בודקים את election_candidates ומוודאים שתיאור, עיר וקואורדינטות מולאו כאשר יש מקור זמין.',
       ],
-      code: `# 1. קובץ txt פשוט
+      code: `# 1. קובץ txt — שמות פשוטים
 # likud.txt
 בנימין נתניהו
 יריב לוין
 דוד אמסלם
 מירי רגב
+
+# או רשימה ממוספרת (כמו שמעתיקים מאתר מפלגה)
+# likud-numbered.txt
+1. בנימין נתניהו
+2. יריב לוין
+3.אלי כהן
 
 # או CSV אם יש עיר
 # beyachad.csv
@@ -47,7 +53,7 @@ export const electionsCandidatesPipeline: PipelineDoc = {
       id: 'insert',
       title: 'הכנסת רשימה גולמית',
       paragraphs: [
-        'insert_raw_list.py הוא שער הכניסה היחיד לרשימות מועמדים. הוא מחפש מפלגה לפי election_parties.short_name, ממספר את השורות לפי סדר הקובץ, וכותב אותן ל-raw_candidate_lists.',
+        'insert_raw_list.py הוא שער הכניסה היחיד לרשימות מועמדים. הוא מחפש מפלגה לפי election_parties.short_name, מפרק שמות מרשימות ממוספרות (1. / 1)), וכותב אותן ל-raw_candidate_lists עם list_position מהמספר בקובץ או לפי סדר השורות.',
         'בהכנסה חוזרת של רשימה מעודכנת לאותה מפלגה, שורות ישנות שעדיין לא עובדו נמחקות ומוחלפות אוטומטית. אם לא בטוחים בשם הקצר המדויק של המפלגה, מריצים את רשימת המפלגות לפני ההכנסה.',
       ],
       code: `# לראות אילו מפלגות זמינות
@@ -72,7 +78,7 @@ python insert_raw_list.py --party "הליכוד" --file likud.txt`,
       id: 'run',
       title: 'הרצת הצינור',
       paragraphs: [
-        'run_pipeline.py אוסף את כל השורות שבהן processed=false מכל המפלגות ומריץ את ארבעת השלבים. אם הכנסתם שלוש רשימות לפני ההרצה, כולן יעובדו באותה ריצה.',
+        'run_pipeline.py אוסף את כל השורות שבהן processed=false מכל המפלגות ומריץ את ששת השלבים. אם הכנסתם שלוש רשימות לפני ההרצה, כולן יעובדו באותה ריצה.',
         'ברירת המחדל היא ריצה מלאה. במצב תחזוקה אפשר להריץ בדיקה, dry-run, שלב בודד, או לדלג על העשרת Wikidata כאשר המידע כבר קיים.',
       ],
       code: `# ריצה מלאה על כל השורות הלא מעובדות
@@ -95,7 +101,7 @@ python run_pipeline.py --skip-enrich`,
           ['ללא דגלים', 'ריצה מלאה על כל raw_candidate_lists שבהן processed=false'],
           ['--test', 'יצירת fixtures של חמישה ח"כים ידועים ואז ריצת כל השלבים'],
           ['--dry-run', 'הצגת הפעולות המתוכננות בלי כתיבה'],
-          ['--stage 1-4', 'הרצת שלב אחד בלבד'],
+          ['--stage 1-6', 'הרצת שלב אחד בלבד'],
           ['--skip-enrich', 'דילוג על שלב Wikidata'],
         ],
       },
@@ -109,8 +115,10 @@ python run_pipeline.py --skip-enrich`,
       list: [
         'Stage 1 — resolve_candidates.py: קורא raw_candidate_lists, מנרמל שמות, מתאים ל-people, יוצר אנשים חדשים כשאין התאמה, כותב ל-election_candidates ומסמן processed=true.',
         'Stage 2 — enrich_wikidata.py: משלים רק שדות NULL של תאריך לידה, מגדר, תמונה ועיר מגורים. לא דורס מידע קיים.',
-        'Stage 3 — generate_descriptions.py: מביא תקציר ויקיפדיה עברי ושולח אותו ליצירת ביו עברי ניטרלי בן שני משפטים.',
+        'Stage 3 — generate_descriptions.py: מביא תקציר ויקיפדיה עברי ושולח אותו ליצירת משפט עברי ניטרלי בפורמט «[שם] כיהן כ[תפקידים בולטים]».',
         'Stage 4 — geocode_cities.py: ממיר עיר לקואורדינטות בישראל דרך Nominatim, עם cache בזיכרון כדי שכל עיר תישלח פעם אחת.',
+        'Stage 5 — fetch_candidate_birthdates.py: משלים people.birth_date חסר למועמדים בבחירות 2026 דרך Wikidata, בלי לשנות שדות אחרים.',
+        'Stage 6 — fetch_candidate_wiki_urls.py: משלים people.wikipedia_url חסר למועמדים בבחירות 2026 דרך Wikidata, בלי לשנות שדות אחרים.',
       ],
       code: `raw_candidate_lists (processed=false)
         │
@@ -124,7 +132,13 @@ Stage 2 — enrich_wikidata.py
 Stage 3 — generate_descriptions.py
         │
         ▼
-Stage 4 — geocode_cities.py`,
+Stage 4 — geocode_cities.py
+        │
+        ▼
+Stage 5 — fetch_candidate_birthdates.py
+        │
+        ▼
+Stage 6 — fetch_candidate_wiki_urls.py`,
     },
     {
       id: 'review',
@@ -175,11 +189,13 @@ WHERE party_id = <party_id>
       ],
       list: [
         'insert_raw_list.py — הכנסת קובץ רשימת מועמדים ל-raw_candidate_lists',
-        'run_pipeline.py — אורקסטרטור שמריץ את כל ארבעת השלבים',
+        'run_pipeline.py — אורקסטרטור שמריץ את כל ששת השלבים',
         'resolve_candidates.py — זיהוי מועמדים מול people ועדכון election_candidates',
         'enrich_wikidata.py — השלמת תאריך לידה, מגדר, תמונה ועיר',
         'generate_descriptions.py — יצירת תיאור עברי קצר',
         'geocode_cities.py — המרת עיר לקואורדינטות',
+        'fetch_candidate_birthdates.py — השלמת people.birth_date חסר',
+        'fetch_candidate_wiki_urls.py — השלמת people.wikipedia_url חסר',
       ],
       code: `pip install supabase python-dotenv requests geopy openai
 
@@ -197,7 +213,7 @@ OPENAI_API_KEY=...`,
         headers: ['מקור', 'מספק', 'עלות / מפתח'],
         rows: [
           ['Knesset OData API', 'היסטוריית חברי כנסת, סיעות וחברויות', 'חינמי'],
-          ['Wikidata SPARQL', 'תאריך לידה, מגדר, תמונה ועיר מגורים', 'חינמי, ללא מפתח'],
+          ['Wikidata SPARQL', 'תאריך לידה, מגדר, תמונה, עיר מגורים וכתובת ויקיפדיה', 'חינמי, ללא מפתח'],
           ['Nominatim / OpenStreetMap', 'עיר עברית לקו רוחב וקו אורך', 'חינמי, ללא מפתח'],
           ['Wikipedia Hebrew API', 'תקצירי ערכים לביוגרפיות', 'חינמי, ללא מפתח'],
           ['OpenAI GPT-4o-mini', 'ניסוח ביו עברי בן שני משפטים', 'בתשלום'],

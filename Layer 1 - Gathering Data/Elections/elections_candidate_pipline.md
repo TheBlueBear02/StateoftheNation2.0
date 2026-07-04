@@ -16,18 +16,27 @@ This is the repeating cycle you run each time a party publishes or updates their
 
 ### Step 1 — Prepare the list file
 
-Copy the names from the party website, news article, or press release into a plain text file — one name per line, in order:
+Copy the names from the party website, news article, or press release into a plain text file — one name per line, in order. Both plain names and numbered lists work:
 
 ```
-# likud.txt
+# likud.txt — plain names
 בנימין נתניהו
 יריב לוין
 דוד אמסלם
 מירי רגב
 ...
+
+# or numbered (as copied from party sites — spacing after the dot is optional)
+1. בנימין נתניהו
+2. יריב לוין
+3.אלי כהן
+4.יואב גלנט
+...
 ```
 
-Lines starting with `#` are ignored. You can also use a CSV if the party published cities:
+Lines starting with `#` are ignored. Empty lines are skipped. When every line is numbered, `insert_raw_list.py` uses the embedded position; plain lines get position from file order.
+
+You can also use a CSV if the party published cities:
 
 ```
 # beyachad.csv
@@ -64,7 +73,7 @@ python insert_raw_list.py --list-parties
 python run_pipeline.py
 ```
 
-Picks up all `processed = false` rows across all parties and runs all five stages. If you just inserted one party it processes that party; if you inserted three back to back it processes all three in one run.
+Picks up all `processed = false` rows across all parties and runs all six stages. If you just inserted one party it processes that party; if you inserted three back to back it processes all three in one run.
 
 ### Step 5 — Handle the review queue (if it appears)
 
@@ -89,7 +98,7 @@ In practice the review queue is small — most realistic candidates are existing
 
 ### Step 6 — Verify in Supabase
 
-Check `election_candidates` for the party. Rows should have `description` filled, `city` filled where Wikidata had residence data, and `latitude`/`longitude` filled. The linked `people` rows should have `birth_date` where Wikidata exposes one. Nulls are genuinely missing from sources — not a bug.
+Check `election_candidates` for the party. Rows should have `description` filled, `city` filled where Wikidata had residence data, and `latitude`/`longitude` filled. The linked `people` rows should have `birth_date` and `wikipedia_url` where Wikidata exposes them. Nulls are genuinely missing from sources — not a bug.
 
 ### When the list changes
 
@@ -114,12 +123,13 @@ All scripts live under `Layer 1 - Gathering Data/Elections/`:
 ```
 Elections/
 ├── insert_raw_list.py         # Insert a party list file → raw_candidate_lists
-├── run_pipeline.py            # Orchestrator — runs all 5 pipeline stages
+├── run_pipeline.py            # Orchestrator — runs all 6 pipeline stages
 ├── resolve_candidates.py      # Stage 1: name matching → election_candidates
 ├── enrich_wikidata.py         # Stage 2: Wikidata → birth_date / gender / image / city
 ├── generate_descriptions.py   # Stage 3: OpenAI → description
 ├── geocode_cities.py          # Stage 4: Nominatim → lat/long
-└── fetch_candidate_birthdates.py # Stage 5: retry missing people.birth_date
+├── fetch_candidate_birthdates.py # Stage 5: retry missing people.birth_date
+└── fetch_candidate_wiki_urls.py  # Stage 6: retry missing people.wikipedia_url
 ```
 
 Knesset data sync (separate, runs weekly via GitHub Actions):
@@ -145,7 +155,7 @@ Layer 1 - Gathering Data/knesset/
 | _(no flags)_ | Full run on all `processed=false` rows |
 | `--test` | Seed 5 known MK fixtures then run all stages |
 | `--dry-run` | Print what would happen, no DB writes |
-| `--stage 1–5` | Run one stage only |
+| `--stage 1–6` | Run one stage only |
 | `--skip-enrich` | Skip the general Wikidata enrichment stage (Stage 2) |
 
 ### resolve_candidates.py flags
@@ -186,13 +196,16 @@ normalises it (strips titles like ד"ר, פרופ', הרב), then tries to match
 For every candidate in `election_candidates`, runs a SPARQL query against Wikidata. Fills `NULL` fields only — never overwrites existing values. Enriches `people.birth_date`, `people.gender`, `people.image_url`, and `election_candidates.city` (from Wikidata residence P551). Batches 10 names per query. Rate-limited to 1 req/sec.
 
 **Stage 3 — `generate_descriptions.py`**
-For every candidate without a description: fetches the Wikipedia Hebrew article intro (first 500 chars), then sends it to OpenAI GPT-4o-mini with a tight prompt to produce a 2-sentence neutral Hebrew bio. Writes to `election_candidates.description`.
+For every candidate without a description: fetches the Wikipedia Hebrew article intro (first 500 chars), then sends it to OpenAI GPT-4o-mini with a tight prompt to produce a one-sentence neutral Hebrew role summary in the format `[name] כיהן כ[prominent roles]` (no generic «Israeli politician from party X» opener). Writes to `election_candidates.description`.
 
 **Stage 4 — `geocode_cities.py`**
 For every candidate with a `city` but no coordinates: geocodes via Nominatim (OpenStreetMap), constrained to Israel (`country_codes="il"`). Cities are cached in memory — each unique city only hits the API once. Rate-limited to 1.1 req/sec automatically via `RateLimiter`.
 
 **Stage 5 — `fetch_candidate_birthdates.py`**
-For candidates in the 2026 election whose linked `people.birth_date` is still null: runs batched Hebrew-name SPARQL queries against Wikidata and updates only `people.birth_date`. This final pass is intentionally narrow and idempotent; it does not modify gender, images, cities, descriptions, or coordinates.
+For candidates in the 2026 election whose linked `people.birth_date` is still null: runs batched Hebrew-name SPARQL queries against Wikidata and updates only `people.birth_date`. This pass is intentionally narrow and idempotent; it does not modify gender, images, cities, descriptions, or coordinates.
+
+**Stage 6 — `fetch_candidate_wiki_urls.py`**
+For candidates in the 2026 election whose linked `people.wikipedia_url` is still null: runs batched Hebrew-name SPARQL queries against Wikidata and updates only `people.wikipedia_url`. This pass is intentionally narrow and idempotent; it does not modify birth dates, gender, images, cities, descriptions, or coordinates.
 
 ### Matching tiers
 
@@ -284,7 +297,7 @@ The only manual insert point. Written by `insert_raw_list.py`, read by the pipel
 | Source | Provides | Cost |
 |--------|----------|------|
 | Knesset OData API (`knesset.gov.il/Odata/ParliamentInfo.svc/`) | All MK history — `people`, `knesset_factions`, `knesset_memberships` | Free |
-| Wikidata SPARQL (`query.wikidata.org/sparql`) | birth date, gender, image, residence for candidates | Free, no key |
+| Wikidata SPARQL (`query.wikidata.org/sparql`) | birth date, gender, image, residence, Wikipedia URL for candidates | Free, no key |
 | Nominatim via geopy | Hebrew city → lat/long | Free, no key |
 | Wikipedia Hebrew API (`he.wikipedia.org/api/rest_v1/`) | Article intros for bio generation | Free, no key |
 | OpenAI GPT-4o-mini | 2-sentence Hebrew bios | Paid (cheap — ~$0.01 per 100 candidates) |

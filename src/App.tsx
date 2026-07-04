@@ -33,7 +33,7 @@ function App() {
                 מצב האומה
               </h1>
               <p className="hero__subtitle">
-              כל המידע הפוליטי של ישראל במקום אחד – בשביל להבין מה באמת המצב של ישראל
+                הבית של המידע הפוליטי בישראל
               </p>
               <nav className="hero__nav" aria-label="פרויקטים עיקריים">
                 <ul className="hero__buttons">
