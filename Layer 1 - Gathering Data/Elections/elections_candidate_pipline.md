@@ -315,16 +315,23 @@ Stats and map require no separate aggregation job — they recompute at page loa
 
 ```
 src/pages/ElectionsPage.tsx / .css
+src/pages/ElectionPartyPage.tsx / .css
 src/components/elections/
   ├── PartyCard.tsx        # short_name, logo, color, ballot_letter
+  ├── SeatsTrend.tsx       # temporary mock seats average + decorative trend
   ├── CandidateList.tsx    # ordered list, photo, position, description
   ├── StatsBar.tsx         # avg age / % women / % new MK
-  └── CandidateMap.tsx     # city pins, party-colored (React Leaflet)
+  └── CandidateMap.tsx     # static SVG Israel map with projected city pins
 src/hooks/useElectionParties.ts
 src/hooks/useElectionCandidates.ts
 ```
 
-Route: `/elections` → `ElectionsPage` in `main.tsx`.
+Routes in `main.tsx`:
+
+- `/elections` → `ElectionsPage`
+- `/elections/:partyId` → `ElectionPartyPage` keyed by `election_parties.id`
+
+Poll averages and seat trend history are not in the DB yet. `SeatsTrend.tsx` uses a clearly labeled `MOCK_SEATS` placeholder until a real polling table exists.
 
 ---
 

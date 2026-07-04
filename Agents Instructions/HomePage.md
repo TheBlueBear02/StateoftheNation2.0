@@ -29,7 +29,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | File | Role |
 |------|------|
 | `src/App.tsx` | Section markup and static content arrays |
-| `src/main.tsx` | React Router — `/` homepage, `/government` Government page, `/knesset` Knesset page |
+| `src/main.tsx` | React Router — `/` homepage, `/elections` Elections page, `/elections/:partyId` party detail page, `/government` Government page, `/knesset` Knesset page |
 | `src/components/SiteHeader.tsx` | Shared header with logo link home, Israel-time Hebrew-numeral/civil date labels, and current government/Knesset context |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue background) |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
@@ -88,14 +88,14 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 - **Subtitle:** להבין מה באמת המצב של ישראל באמצעות טכנולוגיה
 - **Nav buttons** (`HERO_BUTTONS` in `App.tsx`):
 
-| Label | Anchor |
+| Label | Destination |
 |-------|--------|
-| בחירות 2026 | `#elections-2026` |
+| בחירות 2026 | `/elections` (route) |
 | הממשלה | `/government` (route) |
 | מיפוי סוגיות פוליטיות | `#political-issues` |
 | הכנסת | `/knesset` (route) |
 
-Buttons with `#` anchors are placeholders until dedicated routes exist. **הממשלה** links to the live Government page, and **הכנסת** links to the live Knesset hemicycle page.
+Buttons with `#` anchors are placeholders until dedicated routes exist. **בחירות 2026** links to the live Elections page, **הממשלה** links to the live Government page, and **הכנסת** links to the live Knesset hemicycle page.
 
 ### 3. News strip (`news-strip`)
 
@@ -129,12 +129,15 @@ Buttons with `#` anchors are placeholders until dedicated routes exist. **הממ
 ## State Management
 
 - Homepage content is static arrays in `App.tsx`.
+- The **בחירות 2026** hero CTA routes to the `/elections` module documented in `Agents Instructions/ElectionsPage.md`.
 - Knesset page uses `useKnessetMembers` hook with Supabase (see `Agents Instructions/KnessetPage.md`).
 
 ## Routing
 
 - `react-router-dom` in `src/main.tsx`
 - `/` → homepage
+- `/elections` → Elections 2026 party index
+- `/elections/:partyId` → Elections 2026 party detail page
 - `/government` → Government page
 - `/knesset` → Knesset hemicycle page
 
@@ -145,7 +148,7 @@ Buttons with `#` anchors are placeholders until dedicated routes exist. **הממ
 
 ## Future Work
 
-- Wire remaining hero buttons and dashboard CTA to real routes.
+- Wire remaining placeholder hero buttons and dashboard CTA to real routes.
 - Replace `NEWS_ITEMS` with live news feed API.
 - Replace dashboard CSS placeholder with final dashboard screenshot/asset.
 - Add remaining project sections below the first one.

@@ -135,20 +135,34 @@ def parse_entry(entry: ET.Element) -> dict:
 
 
 def fetch_odata(entity: str, filter_expr: str = None) -> list[dict]:
-    """Fetch all rows from a KNS_* entity, following pagination automatically."""
-    url    = f"{ODATA_BASE}/{entity}"
-    params = {"$top": PAGE_SIZE, "$skip": 0}
+    """
+    Fetch ALL rows from a KNS_* entity using explicit $skip-based pagination.
+
+    The Knesset OData API does not reliably return <link rel="next"> in its
+    Atom XML responses, so we never rely on that element. Instead we keep
+    incrementing $skip by PAGE_SIZE until a page comes back with fewer rows
+    than PAGE_SIZE — that signals the last page.
+    """
+    base_params: dict = {"$top": PAGE_SIZE}
     if filter_expr:
-        params["$filter"] = filter_expr
+        base_params["$filter"] = filter_expr
 
-    all_rows, page = [], 1
+    all_rows: list[dict] = []
+    skip = 0
+    page = 1
 
-    while url:
-        log.info("  %s: page %d (skip=%s)…", entity, page, params.get("$skip", "—"))
+    while True:
+        params = {**base_params, "$skip": skip}
+        log.info("  %s: page %d (skip=%d)…", entity, page, skip)
 
         for attempt in range(1, RETRY_MAX + 1):
             try:
-                resp = requests.get(url, params=params, headers=HEADERS, timeout=30)
+                resp = requests.get(
+                    f"{ODATA_BASE}/{entity}",
+                    params=params,
+                    headers=HEADERS,
+                    timeout=30,
+                )
                 resp.raise_for_status()
                 if is_reblaze_block(resp.text):
                     wait = RETRY_DELAY * attempt
@@ -169,12 +183,11 @@ def fetch_odata(entity: str, filter_expr: str = None) -> list[dict]:
         all_rows.extend(rows)
         log.info("  %s: page %d → %d rows (total: %d)", entity, page, len(rows), len(all_rows))
 
-        next_link = root.find("./atom:link[@rel='next']", NS)
-        if next_link is not None and len(rows) == PAGE_SIZE:
-            url, params, page = next_link.get("href"), {}, page + 1
-        else:
-            url = None
+        if len(rows) < PAGE_SIZE:
+            break   # last page — fewer rows than requested means no more data
 
+        skip += PAGE_SIZE
+        page += 1
         time.sleep(0.3)
 
     return all_rows
@@ -278,8 +291,28 @@ def upsert(sb: Client, table: str, rows: list[dict], conflict_col: str) -> None:
 
 
 def load_id_map(sb: Client, table: str, key_col: str) -> dict:
-    result = sb.table(table).select(f"id, {key_col}").execute()
-    return {row[key_col]: row["id"] for row in result.data}
+    """
+    Return {key_col_value → supabase id} for every row in the table.
+    Paginates past Supabase's 1000-row default limit so nothing is silently missed.
+    """
+    result_map: dict = {}
+    page_size   = 1000
+    offset      = 0
+    while True:
+        rows = (
+            sb.table(table)
+            .select(f"id, {key_col}")
+            .range(offset, offset + page_size - 1)
+            .execute()
+            .data
+        )
+        for row in rows:
+            if row[key_col] is not None:
+                result_map[row[key_col]] = row["id"]
+        if len(rows) < page_size:
+            break
+        offset += page_size
+    return result_map
 
 
 # ── Sync functions ────────────────────────────────────────────────────────────
@@ -357,7 +390,9 @@ def sync_factions(sb: Client, knesset_map: dict[int, int]) -> dict[int, int]:
     """
     Source:   KNS_Faction
     Verified: FactionID · Name · KnessetNum · StartDate · FinishDate · IsCurrent
-    Note:     color, logo_url, short_name, is_coalition must be set manually.
+
+    Fields NOT included in the upsert (manually curated, never overwritten):
+      color · logo_url · short_name · is_coalition
     """
     log.info("── syncing knesset_factions ──")
     raw = fetch_odata("KNS_Faction")
@@ -411,34 +446,24 @@ def sync_offices(sb: Client) -> dict[int, int]:
 def sync_governments(sb: Client) -> dict[int, int]:
     """
     No KNS_Government endpoint exists in the Knesset OData API (confirmed via --probe).
-    Derives unique government numbers from KNS_PersonToPosition.GovernmentNum.
+    The governments table has NOT NULL constraints on knesset_id and start_date which
+    cannot be satisfied from OData data alone.
 
-    Limitation: knesset_id, start_date, end_date, is_active will all be NULL.
-    The governments table exists mainly to satisfy the FK from minister_appointments.
-    If you need full government metadata, it must be entered manually.
+    This function does NOT write to the governments table. It loads whatever rows
+    already exist in the DB and returns them as a map for use by minister_appointments.
+
+    To populate governments properly, data must be entered manually in Supabase
+    with the correct knesset_id and start_date values.
     """
-    log.info("── syncing governments (derived from KNS_PersonToPosition) ──")
-    positions = fetch_odata("KNS_PersonToPosition")
-
-    gov_nums = sorted({
-        r["GovernmentNum"] for r in positions
-        if r.get("GovernmentNum") is not None
-    })
-    log.info("  found %d unique government numbers", len(gov_nums))
-
-    rows = [
-        {
-            "government_number": n,
-            "knesset_id":        None,
-            "start_date":        None,
-            "end_date":          None,
-            "is_active":         False,
-        }
-        for n in gov_nums
-    ]
-
-    upsert(sb, "governments", rows, "government_number")
-    return load_id_map(sb, "governments", "government_number")
+    log.info("── governments: loading from DB (no OData endpoint, cannot auto-sync) ──")
+    gov_map = load_id_map(sb, "governments", "government_number")
+    log.info("  found %d government rows in DB", len(gov_map))
+    if not gov_map:
+        log.warning(
+            "  governments table is empty - minister_appointments will be skipped. "
+            "Populate governments manually in Supabase with knesset_id + start_date."
+        )
+    return gov_map
 
 
 def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map: dict, gov_map: dict, office_map: dict) -> None:
@@ -468,7 +493,7 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
             MK_POSITION_IDS,
         )
 
-    membership_rows, skipped = [], 0
+    membership_rows, faction_updates, skipped = [], [], 0
     for r in mk_positions:
         person_id  = people_map.get(r.get("PersonID"))
         knesset_id = knesset_map.get(r.get("KnessetNum"))
@@ -476,19 +501,37 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
         if not person_id or not knesset_id:
             skipped += 1
             continue
+        # Base row — never includes faction_id so we never overwrite an existing
+        # correct link with a null from OData. faction_id is managed separately below.
         membership_rows.append({
             "knesset_position_id": r["PersonToPositionID"],
             "person_id":           person_id,
             "knesset_id":          knesset_id,
-            "faction_id":          faction_id,
             "is_coalition":        False,   # not in OData — set via knesset_factions.is_coalition
             "start_date":          r.get("StartDate"),
             "end_date":            r.get("FinishDate"),  # ← FinishDate, NOT EndDate
             "duty_desc":           r.get("DutyDesc"),
         })
+        # Only update faction_id when OData actually has a value.
+        # This preserves any faction links set by previous scripts or manual curation.
+        if faction_id is not None:
+            faction_updates.append({
+                "knesset_position_id": r["PersonToPositionID"],
+                "faction_id":          faction_id,
+            })
+
     if skipped:
         log.warning("  knesset_memberships: skipped %d unmapped rows", skipped)
+
+    # Pass 1: upsert all base data (person, knesset, dates) — faction_id untouched
     upsert(sb, "knesset_memberships", membership_rows, "knesset_position_id")
+
+    # Pass 2: upsert faction links only where OData has a value
+    if faction_updates:
+        upsert(sb, "knesset_memberships", faction_updates, "knesset_position_id")
+        log.info("  → faction_id updated for %d rows", len(faction_updates))
+    else:
+        log.warning("  OData returned no FactionID values — faction links unchanged")
 
     # ── minister_appointments ────────────────────────────────────────────────
     log.info("── syncing minister_appointments ──")

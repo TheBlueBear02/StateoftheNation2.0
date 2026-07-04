@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { SiteLayout } from './components/SiteLayout'
 
 const HERO_BUTTONS = [
-  { label: 'בחירות 2026', href: '#elections-2026' },
+  { label: 'בחירות 2026', to: '/elections' },
   { label: 'הממשלה', to: '/government' },
   { label: 'מיפוי סוגיות פוליטיות', href: '#political-issues' },
   { label: 'הכנסת', to: '/knesset' },
@@ -33,7 +33,7 @@ function App() {
                 מצב האומה
               </h1>
               <p className="hero__subtitle">
-                להבין מה באמת המצב של ישראל באמצעות טכנולוגיה
+                אנחנו אוספים את כל המידע הפוליטי של ישראל במקום אחד כדי להבין מה באמת המצב של ישראל
               </p>
               <nav className="hero__nav" aria-label="פרויקטים עיקריים">
                 <ul className="hero__buttons">

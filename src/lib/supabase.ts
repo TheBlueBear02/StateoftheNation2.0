@@ -13,6 +13,7 @@ export const supabase: SupabaseClient | null = supabaseConfigError
   : createClient(supabaseUrl, supabaseAnonKey)
 
 export const ACTIVE_KNESSET_ID = 26
+export const ACTIVE_ELECTION_YEAR = 2026
 
 export type KnessetOption = {
   id: number
@@ -30,6 +31,26 @@ export type GovernmentOption = {
   startDate: string | null
   endDate: string | null
   isActive: boolean
+}
+
+export type ElectionOption = {
+  id: number
+  year: number
+  date: string | null
+  name: string | null
+  knessetNumber: number | null
+}
+
+export type ElectionParty = {
+  id: number
+  electionId: number
+  knessetFactionId: number | null
+  name: string
+  shortName: string | null
+  color: string | null
+  logoUrl: string | null
+  ballotLetter: string | null
+  description: string | null
 }
 
 export type KnessetRow = {
@@ -50,6 +71,26 @@ export type GovernmentRow = {
   is_active: boolean
 }
 
+export type ElectionRow = {
+  id: number
+  year: number
+  date: string | null
+  name: string | null
+  knesset_number: number | null
+}
+
+export type ElectionPartyRow = {
+  id: number
+  election_id: number
+  knesset_faction_id?: number | null
+  name: string
+  short_name: string | null
+  color: string | null
+  logo_url: string | null
+  ballot_letter: string | null
+  description: string | null
+}
+
 export type KnessetFaction = {
   name: string
   short_name: string | null
@@ -61,6 +102,30 @@ export type KnessetFaction = {
 export type KnessetPerson = {
   full_name: string
   image_url: string | null
+}
+
+export type ElectionCandidatePerson = {
+  full_name: string
+  image_url: string | null
+  birth_date: string | null
+  gender: string | null
+}
+
+export type ElectionCandidateRow = {
+  id: number
+  election_id: number
+  party_id: number
+  person_id: number
+  list_position: number
+  description: string | null
+  city: string | null
+  latitude: string | number | null
+  longitude: string | number | null
+  person: ElectionCandidatePerson | ElectionCandidatePerson[] | null
+}
+
+export type ElectionMembershipRow = {
+  person_id: number
 }
 
 export type KnessetTerm = {

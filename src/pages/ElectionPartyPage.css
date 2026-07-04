@@ -1,0 +1,460 @@
+.election-party-page__main {
+  --party-color: var(--color-blue);
+
+  padding-block: clamp(24px, 4vw, 56px);
+  background:
+    linear-gradient(180deg, rgba(72, 144, 253, 0.08), rgba(72, 144, 253, 0) 280px),
+    var(--color-white);
+}
+
+.election-party-page__inner {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(18px, 3vw, 28px);
+}
+
+.election-party-page__back {
+  width: fit-content;
+  color: var(--color-blue-dark);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.election-party-page__back:hover,
+.election-party-page__back:focus-visible {
+  text-decoration: underline;
+}
+
+.election-party-page__error,
+.election-party-page__not-found {
+  padding: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+  color: var(--color-text-muted);
+}
+
+.party-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  gap: clamp(18px, 4vw, 36px);
+  align-items: center;
+  padding: clamp(22px, 4vw, 42px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0;
+  background: var(--color-white);
+  overflow: hidden;
+}
+
+.party-hero__accent {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 6px;
+  background: var(--party-color);
+}
+
+.party-hero__logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+}
+
+.party-hero__logo {
+  max-width: 74%;
+  max-height: 74%;
+  object-fit: contain;
+}
+
+.party-hero__swatch {
+  width: 62%;
+  height: 62%;
+  background: var(--party-color);
+}
+
+.party-hero__content {
+  max-width: 760px;
+}
+
+.party-hero__title {
+  margin: 0;
+  font-size: clamp(2.4rem, 6vw, 5rem);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.party-hero__subtitle {
+  margin-block-start: 10px;
+  color: var(--color-text-muted);
+  font-size: clamp(1rem, 2vw, 1.18rem);
+}
+
+.party-hero__description {
+  max-width: 680px;
+  margin-block-start: 16px;
+  color: var(--color-text);
+}
+
+.party-detail-card {
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0;
+  background: var(--color-white);
+}
+
+.party-detail-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-block-end: 18px;
+}
+
+.party-detail-card__eyebrow {
+  margin: 0;
+  color: var(--color-blue-dark);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.party-detail-card__title {
+  margin: 0;
+  font-size: clamp(1.45rem, 2.6vw, 2rem);
+  font-weight: 800;
+}
+
+.seats-trend {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.5fr) 1fr;
+  gap: clamp(18px, 4vw, 42px);
+  align-items: center;
+  border-color: rgba(72, 144, 253, 0.3);
+  background:
+    linear-gradient(90deg, rgba(72, 144, 253, 0.1), rgba(72, 144, 253, 0)),
+    var(--color-white);
+}
+
+.seats-trend__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.seats-trend__label {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.seats-trend__value {
+  margin: 0;
+  color: var(--party-color);
+  font-size: clamp(4rem, 12vw, 8rem);
+  font-weight: 800;
+  line-height: 0.95;
+}
+
+.seats-trend__caption {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.seats-trend__chart {
+  width: 100%;
+  min-height: 140px;
+  overflow: visible;
+}
+
+.seats-trend__grid {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.08);
+  stroke-width: 1;
+}
+
+.seats-trend__line {
+  fill: none;
+  stroke: var(--party-color);
+  stroke-linecap: square;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.seats-trend__dot {
+  fill: var(--color-white);
+  stroke: var(--party-color);
+  stroke-width: 2;
+}
+
+.stats-bar__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.stats-bar__item {
+  padding: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+}
+
+.stats-bar__value {
+  color: var(--party-color);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stats-bar__label {
+  margin-block-start: 8px;
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.stats-bar__coverage {
+  margin-block-start: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+.candidate-list__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 58px 1fr;
+  gap: 12px;
+  align-items: start;
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+}
+
+.candidate-card__position {
+  color: var(--party-color);
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 58px;
+  text-align: center;
+}
+
+.candidate-card__photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border: 2px solid var(--party-color);
+  background: var(--party-soft, rgba(72, 144, 253, 0.16));
+  color: var(--color-text);
+  font-weight: 800;
+  object-fit: cover;
+}
+
+.candidate-card__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.candidate-card__name {
+  font-weight: 800;
+}
+
+.candidate-card__city,
+.candidate-card__description {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.candidate-card__description {
+  margin-block-start: 4px;
+  line-height: 1.35;
+}
+
+.candidate-card__tag {
+  width: fit-content;
+  padding: 2px 6px;
+  border: 1px solid rgba(72, 144, 253, 0.34);
+  background: rgba(72, 144, 253, 0.1);
+  color: var(--color-blue-dark);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.candidate-list__empty {
+  padding: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+  color: var(--color-text-muted);
+}
+
+.candidate-list__toggle {
+  margin-block-start: 16px;
+  padding: 10px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-white);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.candidate-list__toggle:hover,
+.candidate-list__toggle:focus-visible {
+  border-color: var(--party-color);
+  color: var(--party-color);
+  outline: none;
+}
+
+.candidate-map__layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) 1fr;
+  gap: clamp(18px, 4vw, 44px);
+  align-items: center;
+}
+
+.candidate-map__svg {
+  width: 100%;
+  max-height: 560px;
+  background: #fafafa;
+}
+
+.candidate-map__svg--loading {
+  opacity: 0.72;
+}
+
+.candidate-map__outline {
+  fill: var(--color-white);
+  stroke: var(--color-text);
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.candidate-map__coast {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.22);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.candidate-map__pin {
+  fill: var(--party-color);
+  stroke: var(--color-white);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.candidate-map__copy {
+  display: flex;
+  max-width: 460px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.candidate-map__count {
+  color: var(--party-color);
+  font-size: clamp(1.3rem, 3vw, 2rem);
+  font-weight: 800;
+}
+
+.candidate-map__note,
+.candidate-map__empty {
+  color: var(--color-text-muted);
+}
+
+.candidate-map__empty {
+  margin-block-start: 16px;
+  padding: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+}
+
+.candidate-card--skeleton .candidate-card__position,
+.candidate-card--skeleton .candidate-card__photo,
+.candidate-card__line {
+  display: block;
+  background: linear-gradient(90deg, #f1f1f1, #e6e6e6, #f1f1f1);
+  background-size: 200% 100%;
+  animation: party-page-skeleton 1500ms ease-in-out infinite;
+}
+
+.candidate-card--skeleton .candidate-card__position {
+  height: 20px;
+  margin-block-start: 18px;
+}
+
+.candidate-card__line {
+  height: 12px;
+  width: 100%;
+}
+
+.candidate-card__line--title {
+  height: 18px;
+  width: 70%;
+}
+
+.candidate-card__line--short {
+  width: 46%;
+}
+
+@keyframes party-page-skeleton {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .candidate-list__toggle,
+  .candidate-card--skeleton .candidate-card__position,
+  .candidate-card--skeleton .candidate-card__photo,
+  .candidate-card__line {
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .party-hero,
+  .seats-trend,
+  .stats-bar__grid,
+  .candidate-map__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .party-hero__logo-wrap {
+    max-width: 148px;
+  }
+}
+
+@media (max-width: 520px) {
+  .candidate-card {
+    grid-template-columns: 24px 48px 1fr;
+    padding: 12px;
+  }
+
+  .candidate-card__position {
+    line-height: 48px;
+  }
+
+  .candidate-card__photo {
+    width: 48px;
+    height: 48px;
+  }
+}
