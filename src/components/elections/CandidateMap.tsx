@@ -2,44 +2,30 @@ import type { CSSProperties } from 'react'
 import type { CandidateMapPin } from '../../hooks/useElectionCandidates'
 
 const MAP_VIEWBOX = {
-  width: 240,
-  height: 540,
-  padX: 28,
-  padY: 18,
+  width: 213,
+  height: 598,
+  padX: 6,
+  padY: 6,
 } as const
 
-const BOUNDS = {
-  minLon: 34.15,
-  maxLon: 35.95,
+const MAP_IMAGE_SRC = '/images/elections%20page/israel%20map.svg'
+const TOOLTIP = {
+  width: 128,
+  height: 48,
+  gap: 12,
+  edgePad: 4,
+} as const
+
+const LATITUDE_BOUNDS = {
   minLat: 29.45,
   maxLat: 33.35,
 } as const
 
-const ISRAEL_OUTLINE = [
-  { lat: 33.28, lon: 35.56 },
-  { lat: 33.17, lon: 35.72 },
-  { lat: 32.92, lon: 35.72 },
-  { lat: 32.78, lon: 35.55 },
-  { lat: 32.48, lon: 35.57 },
-  { lat: 32.16, lon: 35.51 },
-  { lat: 31.83, lon: 35.49 },
-  { lat: 31.47, lon: 35.39 },
-  { lat: 31.1, lon: 35.36 },
-  { lat: 30.58, lon: 35.18 },
-  { lat: 30.12, lon: 35.02 },
-  { lat: 29.55, lon: 34.95 },
-  { lat: 29.48, lon: 34.9 },
-  { lat: 30.12, lon: 34.72 },
-  { lat: 30.78, lon: 34.48 },
-  { lat: 31.28, lon: 34.3 },
-  { lat: 31.52, lon: 34.34 },
-  { lat: 31.78, lon: 34.62 },
-  { lat: 32.1, lon: 34.75 },
-  { lat: 32.48, lon: 34.9 },
-  { lat: 32.82, lon: 35 },
-  { lat: 33.1, lon: 35.1 },
-  { lat: 33.28, lon: 35.56 },
-] as const
+const X_CALIBRATION = {
+  lonScale: 135.315883,
+  latScale: 2.768261,
+  offset: -4725.09223,
+} as const
 
 type CandidateMapProps = {
   pins: CandidateMapPin[]
@@ -55,6 +41,8 @@ type ProjectedPoint = {
 type ProjectedPin = CandidateMapPin &
   ProjectedPoint & {
     offsetIndex: number
+    tooltipX: number
+    tooltipY: number
   }
 
 function clamp(value: number, min: number, max: number): number {
@@ -62,15 +50,16 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function project(latitude: number, longitude: number): ProjectedPoint {
-  const innerWidth = MAP_VIEWBOX.width - MAP_VIEWBOX.padX * 2
-  const innerHeight = MAP_VIEWBOX.height - MAP_VIEWBOX.padY * 2
+  // The map asset is visually slanted, so x needs latitude-aware calibration.
   const x =
-    MAP_VIEWBOX.padX +
-    ((longitude - BOUNDS.minLon) / (BOUNDS.maxLon - BOUNDS.minLon)) * innerWidth
+    longitude * X_CALIBRATION.lonScale +
+    latitude * X_CALIBRATION.latScale +
+    X_CALIBRATION.offset
   const y =
-    MAP_VIEWBOX.padY +
-    (1 - (latitude - BOUNDS.minLat) / (BOUNDS.maxLat - BOUNDS.minLat)) *
-      innerHeight
+    (1 -
+      (latitude - LATITUDE_BOUNDS.minLat) /
+        (LATITUDE_BOUNDS.maxLat - LATITUDE_BOUNDS.minLat)) *
+    MAP_VIEWBOX.height
 
   return {
     x: clamp(x, MAP_VIEWBOX.padX, MAP_VIEWBOX.width - MAP_VIEWBOX.padX),
@@ -78,12 +67,23 @@ function project(latitude: number, longitude: number): ProjectedPoint {
   }
 }
 
-function buildOutlinePath(): string {
-  return ISRAEL_OUTLINE.map((point, index) => {
-    const projected = project(point.lat, point.lon)
-    const command = index === 0 ? 'M' : 'L'
-    return `${command}${projected.x.toFixed(1)} ${projected.y.toFixed(1)}`
-  }).join(' ')
+function getTooltipPosition(point: ProjectedPoint): ProjectedPoint {
+  const preferredY = point.y - TOOLTIP.height - TOOLTIP.gap
+  const fallbackY = point.y + TOOLTIP.gap
+  const y = preferredY >= TOOLTIP.edgePad ? preferredY : fallbackY
+
+  return {
+    x: clamp(
+      point.x - TOOLTIP.width / 2,
+      TOOLTIP.edgePad,
+      MAP_VIEWBOX.width - TOOLTIP.width - TOOLTIP.edgePad,
+    ),
+    y: clamp(
+      y,
+      TOOLTIP.edgePad,
+      MAP_VIEWBOX.height - TOOLTIP.height - TOOLTIP.edgePad,
+    ),
+  }
 }
 
 function buildProjectedPins(pins: CandidateMapPin[]): ProjectedPin[] {
@@ -98,8 +98,7 @@ function buildProjectedPins(pins: CandidateMapPin[]): ProjectedPin[] {
     const radius = offsetIndex === 0 ? 0 : 4 + Math.floor(offsetIndex / 6) * 3
     const angle = offsetIndex * 2.399963229728653
 
-    return {
-      ...pin,
+    const point = {
       x: clamp(
         projected.x + Math.cos(angle) * radius,
         MAP_VIEWBOX.padX,
@@ -110,7 +109,15 @@ function buildProjectedPins(pins: CandidateMapPin[]): ProjectedPin[] {
         MAP_VIEWBOX.padY,
         MAP_VIEWBOX.height - MAP_VIEWBOX.padY,
       ),
+    }
+    const tooltipPosition = getTooltipPosition(point)
+
+    return {
+      ...pin,
+      ...point,
       offsetIndex,
+      tooltipX: tooltipPosition.x,
+      tooltipY: tooltipPosition.y,
     }
   })
 }
@@ -140,23 +147,57 @@ export function CandidateMap({ pins, partyColor, loading }: CandidateMapProps) {
           role="img"
           aria-label="מפת ישראל עם נקודות לפי עיר מגורי המועמדים"
         >
-          <path className="candidate-map__outline" d={buildOutlinePath()} />
-          <path
-            className="candidate-map__coast"
-            d="M108 62 C92 118, 83 165, 78 226 C74 278, 62 329, 48 390"
+          <image
+            className="candidate-map__image"
+            href={MAP_IMAGE_SRC}
+            width={MAP_VIEWBOX.width}
+            height={MAP_VIEWBOX.height}
+            preserveAspectRatio="xMidYMid meet"
           />
 
-          {projectedPins.map((pin) => (
-            <circle
-              key={pin.id}
-              className="candidate-map__pin"
-              cx={pin.x}
-              cy={pin.y}
-              r={pin.offsetIndex === 0 ? 4 : 3.2}
-            >
-              <title>{`${pin.fullName} — ${pin.city}`}</title>
-            </circle>
-          ))}
+          <g className="candidate-map__pins" role="list">
+            {projectedPins.map((pin) => (
+              <g
+                key={pin.id}
+                className="candidate-map__pin-group"
+                role="listitem"
+                tabIndex={0}
+                aria-label={`${pin.fullName}, ${pin.city}`}
+              >
+                <circle
+                  className="candidate-map__pin-hit-area"
+                  cx={pin.x}
+                  cy={pin.y}
+                  r={15}
+                />
+                <circle
+                  className="candidate-map__pin"
+                  cx={pin.x}
+                  cy={pin.y}
+                  r={pin.offsetIndex === 0 ? 7 : 5.8}
+                />
+                <foreignObject
+                  className="candidate-map__tooltip"
+                  x={pin.tooltipX}
+                  y={pin.tooltipY}
+                  width={TOOLTIP.width}
+                  height={TOOLTIP.height}
+                >
+                  <div
+                    className="candidate-map__tooltip-content"
+                    dir="rtl"
+                  >
+                    <span className="candidate-map__tooltip-name">
+                      {pin.fullName}
+                    </span>
+                    <span className="candidate-map__tooltip-city">
+                      {pin.city}
+                    </span>
+                  </div>
+                </foreignObject>
+              </g>
+            ))}
+          </g>
         </svg>
 
         <div className="candidate-map__copy">

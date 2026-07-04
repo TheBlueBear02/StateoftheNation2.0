@@ -72,31 +72,31 @@ supabase
   .order('government_number', { ascending: false })
 ```
 
-**2. Active appointments** (when selected government changes)
+**2. Government appointments** (when selected government changes)
 
-Reference date: `refDate = government.endDate ?? today` (ISO `YYYY-MM-DD`).
+Preferred reference date: `preferredRefDate = government.endDate ?? today` (ISO `YYYY-MM-DD`).
+The hook first loads all appointments tied to the selected `government_id`, then derives a snapshot client-side. If no appointment is active at `preferredRefDate` (common when historical government dates are missing or slightly misaligned with OData appointment dates), it falls back to the latest appointment date within that government, capped by the preferred date when possible.
 
 ```ts
 supabase
   .from('minister_appointments')
   .select('id, person_id, government_id, office_id, start_date, end_date, duty_desc, is_acting, person:people(...), office:offices(...)')
   .eq('government_id', government.id)
-  .lte('start_date', refDate)
-  .or(`end_date.is.null,end_date.gte.${refDate}`)
 ```
 
 Client-side: dedupe by `person_id + office_id`, keeping the row with latest `start_date`.
 
-**3. Faction snapshot** (for appointment `person_id`s, when `government.knessetId` exists)
+**3. Faction snapshot** (for appointment `person_id`s)
+
+Government terms can extend past a Knesset term's formal end date, and some historical `government.knesset_id` links only describe where the government was formed. For minister avatars/tooltips, the hook therefore looks across each minister's Knesset membership history up to the derived `refDate`, then keeps the latest row with a known faction per `person_id` (falling back to the latest row when no faction is known).
 
 ```ts
 supabase
   .from('knesset_memberships')
   .select('person_id, faction_id, start_date, end_date, faction:knesset_factions(...)')
-  .eq('knesset_id', government.knessetId)
   .in('person_id', personIds)
   .lte('start_date', refDate)
-  .or(`end_date.is.null,end_date.gte.${refDate}`)
+  .order('start_date', { ascending: false })
 ```
 
 ## Derived Client-Side
@@ -111,7 +111,7 @@ supabase
   - all other appointments are treated as ministers
 - `pyramidTiers` — deduped by `person_id`; deputy ministers excluded from the pyramid and shown under offices only; `סגן ראש הממשלה`, alternate PM, and ministers in `משרד ראש הממשלה` remain in the top leadership tier at non-PM avatar size
 - `officeGroups` — office cards with `ministers` and `deputies`, PM office first, then Hebrew office-name sort
-- `ministerAndDeputyCount` — unique `person_id` count across all active minister and deputy-minister appointments, so multi-office holders are not double-counted
+- `ministerAndDeputyCount` — unique `person_id` count across the derived snapshot's minister and deputy-minister appointments, so multi-office holders are not double-counted
 
 ## Visual Specs
 

@@ -4,7 +4,9 @@ import {
   supabase,
   supabaseConfigError,
   type ElectionOption,
+  type ElectionPartyLeader,
   type ElectionParty,
+  type ElectionLeaderCandidateRow,
   type ElectionPartyRow,
   type ElectionRow,
 } from '../lib/supabase'
@@ -26,7 +28,33 @@ function normalizeElection(row: ElectionRow): ElectionOption {
   }
 }
 
-function normalizeParty(row: ElectionPartyRow): ElectionParty {
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null
+  }
+
+  return value ?? null
+}
+
+function normalizeLeader(
+  row: ElectionLeaderCandidateRow,
+): ElectionPartyLeader | null {
+  const person = unwrapRelation(row.person)
+
+  if (!person?.full_name) {
+    return null
+  }
+
+  return {
+    fullName: person.full_name,
+    imageUrl: person.image_url,
+  }
+}
+
+function normalizeParty(
+  row: ElectionPartyRow,
+  leadersByPartyId: Map<number, ElectionPartyLeader>,
+): ElectionParty {
   return {
     id: row.id,
     electionId: row.election_id,
@@ -37,6 +65,7 @@ function normalizeParty(row: ElectionPartyRow): ElectionParty {
     logoUrl: row.logo_url,
     ballotLetter: row.ballot_letter,
     description: row.description,
+    leader: leadersByPartyId.get(row.id) ?? null,
   }
 }
 
@@ -53,6 +82,34 @@ async function fetchPartyRows(electionId: number | null) {
   }
 
   return query
+}
+
+async function fetchPartyLeaders(partyIds: number[]) {
+  const leadersByPartyId = new Map<number, ElectionPartyLeader>()
+
+  if (!supabase || partyIds.length === 0) {
+    return leadersByPartyId
+  }
+
+  const { data, error } = await supabase
+    .from('election_candidates')
+    .select('party_id, person:people(full_name, image_url)')
+    .in('party_id', partyIds)
+    .eq('list_position', 1)
+
+  if (error) {
+    return leadersByPartyId
+  }
+
+  for (const row of (data ?? []) as unknown as ElectionLeaderCandidateRow[]) {
+    const leader = normalizeLeader(row)
+
+    if (leader) {
+      leadersByPartyId.set(row.party_id, leader)
+    }
+  }
+
+  return leadersByPartyId
 }
 
 export function formatElectionDate(date: string | null): string | null {
@@ -149,8 +206,19 @@ export function useElectionParties(): UseElectionPartiesResult {
         return
       }
 
+      const partyRows = (partyData ?? []) as ElectionPartyRow[]
+      const leadersByPartyId = await fetchPartyLeaders(
+        partyRows.map((party) => party.id),
+      )
+
+      if (cancelled) {
+        return
+      }
+
       setElection(electionRow ? normalizeElection(electionRow) : null)
-      setParties(((partyData ?? []) as ElectionPartyRow[]).map(normalizeParty))
+      setParties(
+        partyRows.map((party) => normalizeParty(party, leadersByPartyId)),
+      )
       setLoading(false)
     }
 

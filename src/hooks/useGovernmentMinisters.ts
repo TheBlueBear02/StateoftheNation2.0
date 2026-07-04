@@ -48,6 +48,64 @@ function toDateString(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
 
+function normalizeDate(value: string | null | undefined): string | null {
+  return value?.slice(0, 10) ?? null
+}
+
+function isActiveAtSnapshot(row: GovernmentAppointmentRow, refDate: string): boolean {
+  const startDate = normalizeDate(row.start_date)
+  const endDate = normalizeDate(row.end_date)
+
+  if (startDate && startDate > refDate) {
+    return false
+  }
+
+  return !endDate || endDate >= refDate
+}
+
+function latestAppointmentDate(
+  rows: GovernmentAppointmentRow[],
+  upperBound?: string,
+): string | null {
+  let latest: string | null = null
+
+  for (const row of rows) {
+    const date = normalizeDate(row.end_date) ?? normalizeDate(row.start_date)
+
+    if (!date || (upperBound && date > upperBound)) {
+      continue
+    }
+
+    if (!latest || date > latest) {
+      latest = date
+    }
+  }
+
+  return latest
+}
+
+function buildSnapshotRows(
+  rows: GovernmentAppointmentRow[],
+  preferredRefDate: string,
+): { rows: GovernmentAppointmentRow[]; refDate: string } {
+  const preferredRows = rows.filter((row) => isActiveAtSnapshot(row, preferredRefDate))
+
+  if (preferredRows.length > 0) {
+    return { rows: dedupeAppointmentRows(preferredRows), refDate: preferredRefDate }
+  }
+
+  const fallbackRefDate =
+    latestAppointmentDate(rows, preferredRefDate) ??
+    latestAppointmentDate(rows) ??
+    preferredRefDate
+  const fallbackRows = rows.filter((row) => isActiveAtSnapshot(row, fallbackRefDate))
+
+  return {
+    rows: dedupeAppointmentRows(fallbackRows.length > 0 ? fallbackRows : rows),
+    refDate: fallbackRefDate,
+  }
+}
+
 function dedupeAppointmentRows(
   rows: GovernmentAppointmentRow[],
 ): GovernmentAppointmentRow[] {
@@ -80,8 +138,15 @@ function buildFactionMap(
 
   for (const row of rows) {
     const existing = byPerson.get(row.person_id)
+    const rowHasFaction = row.faction_id !== null
+    const existingHasFaction = existing ? existing.faction_id !== null : false
 
-    if (!existing || (row.start_date ?? '') > (existing.start_date ?? '')) {
+    if (
+      !existing ||
+      (rowHasFaction !== existingHasFaction && rowHasFaction) ||
+      (rowHasFaction === existingHasFaction &&
+        (row.start_date ?? '') > (existing.start_date ?? ''))
+    ) {
       byPerson.set(row.person_id, row)
     }
   }
@@ -163,7 +228,7 @@ export function useGovernmentMinisters(
         return
       }
 
-      const refDate = government.endDate?.slice(0, 10) ?? toDateString(new Date())
+      const preferredRefDate = normalizeDate(government.endDate) ?? toDateString(new Date())
 
       const { data, error: queryError } = await supabase
         .from('minister_appointments')
@@ -171,8 +236,6 @@ export function useGovernmentMinisters(
           'id, person_id, government_id, office_id, start_date, end_date, duty_desc, is_acting, person:people(full_name, image_url), office:offices(name, knesset_category_name)',
         )
         .eq('government_id', government.id)
-        .lte('start_date', refDate)
-        .or(`end_date.is.null,end_date.gte.${refDate}`)
         .order('office_id')
 
       if (cancelled) {
@@ -186,8 +249,9 @@ export function useGovernmentMinisters(
         return
       }
 
-      const snapshotRows = dedupeAppointmentRows(
+      const { rows: snapshotRows, refDate } = buildSnapshotRows(
         (data ?? []) as unknown as GovernmentAppointmentRow[],
+        preferredRefDate,
       )
       const personIds = [
         ...new Set(snapshotRows.map((row) => row.person_id).filter(Boolean)),
@@ -201,31 +265,27 @@ export function useGovernmentMinisters(
 
       let factionRows: GovernmentMembershipFactionRow[] = []
 
-      if (government.knessetId) {
-        const { data: factionData, error: factionError } = await supabase
-          .from('knesset_memberships')
-          .select(
-            'person_id, faction_id, start_date, end_date, faction:knesset_factions(name, short_name, logo_url, color, is_coalition)',
-          )
-          .eq('knesset_id', government.knessetId)
-          .in('person_id', personIds)
-          .lte('start_date', refDate)
-          .or(`end_date.is.null,end_date.gte.${refDate}`)
-          .order('start_date', { ascending: false })
+      const { data: factionData, error: factionError } = await supabase
+        .from('knesset_memberships')
+        .select(
+          'person_id, faction_id, start_date, end_date, faction:knesset_factions(name, short_name, logo_url, color, is_coalition)',
+        )
+        .in('person_id', personIds)
+        .lte('start_date', refDate)
+        .order('start_date', { ascending: false })
 
-        if (cancelled) {
-          return
-        }
-
-        if (factionError) {
-          setError(factionError.message)
-          setAppointments([])
-          setLoading(false)
-          return
-        }
-
-        factionRows = (factionData ?? []) as unknown as GovernmentMembershipFactionRow[]
+      if (cancelled) {
+        return
       }
+
+      if (factionError) {
+        setError(factionError.message)
+        setAppointments([])
+        setLoading(false)
+        return
+      }
+
+      factionRows = (factionData ?? []) as unknown as GovernmentMembershipFactionRow[]
 
       setAppointments(
         normalizeAppointments(snapshotRows, buildFactionMap(factionRows)),

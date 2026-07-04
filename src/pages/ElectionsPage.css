@@ -5,7 +5,7 @@
 .elections-page__hero {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   background:
-    linear-gradient(90deg, rgba(72, 144, 253, 0.12), rgba(72, 144, 253, 0)),
+    linear-gradient(180deg, rgba(72, 144, 253, 0.12), rgba(72, 144, 253, 0)),
     var(--color-white);
 }
 
@@ -53,9 +53,6 @@
 .elections-page__date {
   display: inline-block;
   margin-block-start: 20px;
-  padding: 8px 12px;
-  border: 1px solid rgba(72, 144, 253, 0.38);
-  background: rgba(72, 144, 253, 0.1);
   color: var(--color-text);
   font-weight: 700;
 }
@@ -74,13 +71,9 @@
   font-weight: 800;
 }
 
-.elections-page__section-copy {
-  color: var(--color-text-muted);
-}
-
 .elections-page__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -89,7 +82,7 @@
 
   position: relative;
   display: grid;
-  grid-template-columns: 74px 1fr;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 162px;
   padding: 18px;
   gap: 16px;
@@ -97,41 +90,59 @@
   border-radius: 0;
   color: inherit;
   text-decoration: none;
-  background: var(--color-white);
+  background:
+    radial-gradient(
+      circle at 0 0,
+      color-mix(in srgb, var(--party-color) 16%, transparent),
+      transparent 56%
+    ),
+    var(--color-white);
   overflow: hidden;
   transition:
     border-color 0.18s ease,
     transform 0.18s ease;
 }
 
-.election-party-card:hover,
-.election-party-card:focus-visible {
-  border-color: var(--party-color);
-  transform: translateY(-2px);
-  outline: none;
+.election-party-card--has-image {
+  grid-template-columns: 92px minmax(0, 1fr);
+  padding-block: 0;
+  padding-inline-start: 0;
 }
 
-.election-party-card__accent {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: 0;
-  width: 5px;
-  background: var(--party-color);
+.election-party-card:hover,
+.election-party-card:focus-visible {
+  border-color: color-mix(in srgb, var(--party-color) 55%, rgba(0, 0, 0, 0.1));
+  transform: translateY(-2px);
+  outline: none;
 }
 
 .election-party-card__media {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 74px;
-  height: 74px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fafafa;
+  width: 92px;
+  height: 100%;
+  align-self: stretch;
+  background: color-mix(in srgb, var(--party-color) 18%, #ffffff);
+  overflow: hidden;
+}
+
+.election-party-card__logo-badge {
+  position: absolute;
+  inset-block-start: 14px;
+  inset-inline-end: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .election-party-card__logo {
-  max-width: 58px;
-  max-height: 58px;
+  max-width: 46px;
+  max-height: 46px;
   object-fit: contain;
 }
 
@@ -141,11 +152,22 @@
   background: var(--party-color);
 }
 
+.election-party-card__leader-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .election-party-card__content {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 6px;
+  padding-inline-end: 62px;
+}
+
+.election-party-card--has-image .election-party-card__content {
+  padding-block: 18px;
 }
 
 .election-party-card__name {
@@ -160,23 +182,12 @@
   line-height: 1.35;
 }
 
-.election-party-card__ballot {
-  margin-block-start: auto;
-  color: var(--color-text);
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.election-party-card__ballot--muted {
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
 .election-party-card--skeleton {
   --party-color: #d8e7ff;
 }
 
 .election-party-card--skeleton .election-party-card__swatch,
+.election-party-card__logo-badge--skeleton,
 .election-party-card__line {
   display: block;
   background: linear-gradient(90deg, #f1f1f1, #e6e6e6, #f1f1f1);
@@ -192,10 +203,6 @@
 .election-party-card__line--title {
   height: 20px;
   width: 72%;
-}
-
-.election-party-card__line--short {
-  width: 48%;
 }
 
 .elections-page__error,
@@ -219,26 +226,58 @@
 @media (prefers-reduced-motion: reduce) {
   .election-party-card,
   .election-party-card__line,
+  .election-party-card__logo-badge--skeleton,
   .election-party-card--skeleton .election-party-card__swatch {
     transition: none;
     animation: none;
   }
 }
 
+@media (max-width: 900px) {
+  .elections-page__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 620px) {
+  .elections-page__grid {
+    grid-template-columns: 1fr;
+  }
+
   .election-party-card {
-    grid-template-columns: 58px 1fr;
+    grid-template-columns: minmax(0, 1fr);
     min-height: 132px;
     padding: 14px;
   }
 
+  .election-party-card--has-image {
+    grid-template-columns: 72px minmax(0, 1fr);
+    padding-block: 0;
+    padding-inline-start: 0;
+  }
+
   .election-party-card__media {
-    width: 58px;
-    height: 58px;
+    width: 72px;
+    height: 100%;
+  }
+
+  .election-party-card__logo-badge {
+    inset-block-start: 10px;
+    inset-inline-end: 10px;
+    width: 44px;
+    height: 44px;
   }
 
   .election-party-card__logo {
-    max-width: 46px;
-    max-height: 46px;
+    max-width: 36px;
+    max-height: 36px;
+  }
+
+  .election-party-card__content {
+    padding-inline-end: 48px;
+  }
+
+  .election-party-card--has-image .election-party-card__content {
+    padding-block: 14px;
   }
 }

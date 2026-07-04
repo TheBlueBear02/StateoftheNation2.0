@@ -51,6 +51,12 @@ export type ElectionParty = {
   logoUrl: string | null
   ballotLetter: string | null
   description: string | null
+  leader: ElectionPartyLeader | null
+}
+
+export type ElectionPartyLeader = {
+  fullName: string
+  imageUrl: string | null
 }
 
 export type KnessetRow = {
@@ -122,6 +128,11 @@ export type ElectionCandidateRow = {
   latitude: string | number | null
   longitude: string | number | null
   person: ElectionCandidatePerson | ElectionCandidatePerson[] | null
+}
+
+export type ElectionLeaderCandidateRow = {
+  party_id: number
+  person: Pick<ElectionCandidatePerson, 'full_name' | 'image_url'> | Pick<ElectionCandidatePerson, 'full_name' | 'image_url'>[] | null
 }
 
 export type ElectionMembershipRow = {

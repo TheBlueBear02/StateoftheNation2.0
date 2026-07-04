@@ -11,7 +11,7 @@ The schema is split into four logical groups:
 | Group | Tables | Status |
 |-------|--------|--------|
 | **Knesset** | `people` · `knessets` · `knesset_factions` · `knesset_memberships` | Live — powers the Knesset page |
-| **Government** | `governments` · `offices` · `minister_appointments` | Seeded — dashboard page planned |
+| **Government** | `governments` · `offices` · `minister_appointments` | Seeded — powers the Government page |
 | **KPI data** | `indexes` · `index_data` | Seeded — dashboard page planned |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | In progress — elections page planned |
 
@@ -153,13 +153,13 @@ One row per Israeli government (ממשלה).
 |--------|------|-------------|
 | `id` | bigint | Primary key |
 | `government_number` | integer | Official government number. UNIQUE. |
-| `knesset_id` | bigint | FK → `knessets.id` — null in current data (see notes) |
-| `start_date` | date | Government formation date — null in current data |
-| `end_date` | date | Government end date — null in current data |
+| `knesset_id` | bigint | FK → `knessets.id` — may be manually incomplete for historical rows |
+| `start_date` | date | Government formation date — may be manually incomplete for historical rows |
+| `end_date` | date | Government end date — may be manually incomplete for historical rows |
 | `is_active` | boolean | True for the current government |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py`. No `KNS_Government` endpoint exists in the Knesset OData API — government numbers are derived from unique `GovernmentNum` values in `KNS_PersonToPosition`. This means `knesset_id`, `start_date`, and `end_date` are currently null. The table exists primarily as an FK anchor for `minister_appointments`.
+**Data source:** `sync_knesset_data.py`. No `KNS_Government` endpoint exists in the Knesset OData API — government numbers are derived from unique `GovernmentNum` values in `KNS_PersonToPosition`. The loader does not overwrite government metadata, so `knesset_id`, `start_date`, and `end_date` must be curated manually when available. The Government page tolerates missing or misaligned historical dates by falling back from `governments.end_date` to the latest appointment date inside the selected government, and resolves minister faction data from each person's latest known-faction Knesset membership before the government snapshot date rather than relying only on `governments.knesset_id`.
 
 ---
 
@@ -313,7 +313,7 @@ Ordered candidate list per party. One row per candidate per party.
 - `UNIQUE (party_id, list_position)` — no duplicate positions within a party
 - `UNIQUE (party_id, person_id)` — same person can't appear twice on one list
 
-**Data source:** Written by `resolve_candidates.py` (Stage 1 of the election pipeline). Enriched by `enrich_wikidata.py`, `generate_descriptions.py`, and `geocode_cities.py`. Never written directly.
+**Data source:** Written by `resolve_candidates.py` (Stage 1 of the election pipeline). Enriched by `enrich_wikidata.py`, `generate_descriptions.py`, `geocode_cities.py`, and the final `fetch_candidate_birthdates.py` pass for any remaining null `people.birth_date` values. Never written directly.
 
 **Stats computed at query time from this table:**
 
@@ -375,7 +375,7 @@ Staging table. The only place where data is inserted manually. The election pipe
 
 **Data source:** Written by `insert_raw_list.py` from a `.txt` or `.csv` file. Re-inserting a party's list deletes existing `processed=false` rows for that party and replaces them. Rows with `processed=true` are never deleted automatically.
 
-**Pipeline trigger:** The pipeline (`run_pipeline.py`) picks up all rows where `processed=false` and processes them through four stages: name resolution → Wikidata enrichment → description generation → geocoding.
+**Pipeline trigger:** The pipeline (`run_pipeline.py`) picks up all rows where `processed=false` and processes them through five stages: name resolution → Wikidata enrichment → description generation → geocoding → missing-birthdate retry.
 
 ---
 

@@ -10,58 +10,62 @@ export function PartyCard({ party }: PartyCardProps) {
   const displayName = party.shortName ?? party.name
   const accentColor = party.color ?? '#4890fd'
   const style = { '--party-color': accentColor } as CSSProperties
+  const leaderImageUrl = party.leader?.imageUrl
+  const cardClassName = leaderImageUrl
+    ? 'election-party-card election-party-card--has-image'
+    : 'election-party-card'
 
   return (
     <Link
       to={`/elections/${party.id}`}
-      className="election-party-card"
+      className={cardClassName}
       style={style}
       aria-label={`לעמוד הבחירות של ${displayName}`}
     >
-      <span className="election-party-card__accent" aria-hidden="true" />
+      {leaderImageUrl ? (
+        <span className="election-party-card__media">
+          <img
+            className="election-party-card__leader-image"
+            src={leaderImageUrl}
+            alt={`תמונת ${party.leader?.fullName ?? displayName}`}
+            loading="lazy"
+          />
+        </span>
+      ) : null}
 
-      <span className="election-party-card__media">
-        {party.logoUrl ? (
+      <span className="election-party-card__content">
+        <span className="election-party-card__name">{displayName}</span>
+        <span className="election-party-card__full-name">{party.name}</span>
+      </span>
+
+      {party.logoUrl ? (
+        <span className="election-party-card__logo-badge">
           <img
             className="election-party-card__logo"
             src={party.logoUrl}
             alt=""
             loading="lazy"
           />
-        ) : (
-          <span className="election-party-card__swatch" aria-hidden="true" />
-        )}
-      </span>
-
-      <span className="election-party-card__content">
-        <span className="election-party-card__name">{displayName}</span>
-        <span className="election-party-card__full-name">{party.name}</span>
-        {party.ballotLetter ? (
-          <span className="election-party-card__ballot">
-            אות בקלפי: {party.ballotLetter}
-          </span>
-        ) : (
-          <span className="election-party-card__ballot election-party-card__ballot--muted">
-            אות בקלפי טרם פורסמה
-          </span>
-        )}
-      </span>
+        </span>
+      ) : null}
     </Link>
   )
 }
 
 export function PartyCardSkeleton() {
   return (
-    <div className="election-party-card election-party-card--skeleton" aria-hidden="true">
-      <span className="election-party-card__accent" />
+    <div
+      className="election-party-card election-party-card--has-image election-party-card--skeleton"
+      aria-hidden="true"
+    >
       <span className="election-party-card__media">
         <span className="election-party-card__swatch" />
       </span>
       <span className="election-party-card__content">
         <span className="election-party-card__line election-party-card__line--title" />
         <span className="election-party-card__line" />
-        <span className="election-party-card__line election-party-card__line--short" />
       </span>
+      <span className="election-party-card__logo-badge election-party-card__logo-badge--skeleton" />
     </div>
   )
 }
