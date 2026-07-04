@@ -19,8 +19,8 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 │  Project: דשבורד ממשלה (white, full-bleed)             │
 │    └─ .container — 2-col grid: text | dashboard preview │
 ├─────────────────────────────────────────────────────────┤
-│  Footer (blue, full-bleed) — brand + copyright        │
-│    └─ .container — flex row, space-between            │
+│  Footer (blue, full-bleed) — logo + social + copyright│
+│    └─ .container — 3-column grid                      │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -37,6 +37,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/index.css` | Global reset, CSS variables, Heebo font |
 | `index.html` | `lang="he"`, `dir="rtl"`, page title |
 | `public/header-logo 3.svg` | Header logo |
+| `public/white logo.svg` | White footer logo |
 | `public/hero-bear-image.svg` | Hero bear illustration |
 
 ## Layout primitive: `.container`
@@ -91,7 +92,6 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 |-------|--------|
 | בחירות 2026 | `#elections-2026` |
 | הממשלה | `/government` (route) |
-| ציר זמן | `#timeline` |
 | מיפוי סוגיות פוליטיות | `#political-issues` |
 | הכנסת | `/knesset` (route) |
 
@@ -114,7 +114,8 @@ Buttons with `#` anchors are placeholders until dedicated routes exist. **הממ
 ### 5. Footer (`site-footer`)
 
 - Blue background (`--color-blue: #4890FD`), white text.
-- Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: brand (RTL start), centered social links, copyright (RTL end).
+- Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: white logo brand (RTL start), centered social links, copyright (RTL end).
+- Footer logo path: `/white%20logo.svg` (URL-encoded space in filename).
 - Social nav (`site-footer__social`): icon links to X, Instagram, and Facebook — icons from `public/icons.svg` (`x-icon`, `instagram-icon`, `facebook-icon`), opened in a new tab.
 - URLs are defined in `SOCIAL_LINKS` at the top of `SiteFooter.tsx`.
 - Rendered via `SiteLayout` on every page (homepage and Knesset).

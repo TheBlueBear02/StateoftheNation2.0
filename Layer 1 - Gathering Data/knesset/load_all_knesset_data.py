@@ -10,10 +10,10 @@ Tables updated:
   offices  · governments · minister_appointments
 
 Usage:
-  python sync_knesset_data.py               # full sync
-  python sync_knesset_data.py --discover    # print raw fields for every known entity
-  python sync_knesset_data.py --probe       # find correct names for 404 entities
-  python sync_knesset_data.py --table people   # sync one table only
+  python sync_knesset_data.py                        # full sync
+  python sync_knesset_data.py --discover             # all known entities
+  python sync_knesset_data.py --discover KNS_Position  # one entity only
+  python sync_knesset_data.py --table people         # sync one table only
 
 Requirements:
   pip install requests supabase python-dotenv
@@ -76,21 +76,14 @@ HEADERS = {
 }
 
 # PositionIDs that mean "Knesset Member" in KNS_PersonToPosition.
-# Run --probe or --discover KNS_Position to verify these are correct
-# for the live API. Update here if wrong.
-MK_POSITION_IDS = {1, 61}
+# Confirmed via --discover KNS_Position against the live API:
+#   43 = חבר הכנסת  (male MK)
+#   61 = חברת הכנסת (female MK)
+MK_POSITION_IDS = {43, 61}
 
-# Candidate entity names to try when probing for unknown endpoints
-PROBE_CANDIDATES = {
-    "knessets": [
-        "KNS_KnessetDates", "KNS_KnessetDate", "KNS_KnessetTerm",
-        "KNS_Knesset_Dates", "KNS_KnessetInfo",
-    ],
-    "governments": [
-        "KNS_GovCoalition", "KNS_GovMinistryChair", "KNS_GovernmentCoalition",
-        "KNS_Gov", "KNS_GovernmentInfo", "KNS_GovInfo",
-    ],
-}
+# Confirmed via --probe against the live API:
+#   KNS_KnessetDates ✓  — stores plenum sessions; aggregated by KnessetNum in sync_knessets
+#   KNS_Government   ✗  — no endpoint exists; governments derived from KNS_PersonToPosition
 
 
 # ── Supabase ──────────────────────────────────────────────────────────────────
@@ -209,10 +202,11 @@ def probe_entity(name: str) -> bool:
 
 DISCOVER_ENTITIES = [
     "KNS_Person",
+    "KNS_KnessetDates",
     "KNS_Faction",
     "KNS_PersonToPosition",
     "KNS_GovMinistry",
-    "KNS_Position",          # lets us verify MK_POSITION_IDS
+    "KNS_Position",   # all 29 rows printed — find PositionID for חבר כנסת here
 ]
 
 
@@ -292,58 +286,42 @@ def load_id_map(sb: Client, table: str, key_col: str) -> dict:
 
 def sync_knessets(sb: Client) -> dict[int, int]:
     """
-    PRIMARY: tries KNS_KnessetDates (most likely correct name).
-    FALLBACK: derives knesset numbers from KNS_Faction.KnessetNum.
-              Dates will be NULL — that's acceptable for FK resolution.
-    Run --probe first to confirm the correct entity name, then update
-    PROBE_CANDIDATES['knessets'][0] to put the correct name first.
+    Source:   KNS_KnessetDates (confirmed via --probe)
+    Verified: KnessetNum · PlenumStart · PlenumFinish · IsCurrent
+
+    KNS_KnessetDates stores individual plenum sessions — multiple rows per
+    Knesset (e.g. Knesset 13 has Assembly 1/Plenum 2, Assembly 1/Plenum 3…).
+    We aggregate by KnessetNum:
+      start_date = min(PlenumStart)   across all plenums for that Knesset
+      end_date   = max(PlenumFinish)  across all plenums for that Knesset
+      is_active  = any(IsCurrent)
     """
+    from collections import defaultdict
+
     log.info("── syncing knessets ──")
+    raw = fetch_odata("KNS_KnessetDates")
+    log.info("  %d plenum-session rows fetched — aggregating by KnessetNum", len(raw))
 
-    # Try known candidate names in order
-    knesset_entity = None
-    for candidate in PROBE_CANDIDATES["knessets"]:
-        if probe_entity(candidate):
-            knesset_entity = candidate
-            log.info("  Using entity: %s", knesset_entity)
-            break
+    groups: dict[int, list] = defaultdict(list)
+    for r in raw:
+        k = r.get("KnessetNum")
+        if k is not None:
+            groups[k].append(r)
 
-    if knesset_entity:
-        raw = fetch_odata(knesset_entity)
-        # Field names will vary — log them so you can adjust
-        if raw:
-            log.info("  Fields found: %s", list(raw[0].keys()))
-        rows = [
-            {
-                # Adjust field names below once you see the --probe output
-                "knesset_number": r.get("KnessetNum") or r.get("Number"),
-                "knesset_name":   r.get("Name"),
-                "start_date":     r.get("StartDate"),
-                "end_date":       r.get("FinishDate") or r.get("EndDate"),
-                "is_active":      bool(r.get("IsCurrent", False)),
-            }
-            for r in raw
-            if (r.get("KnessetNum") or r.get("Number")) is not None
-        ]
-    else:
-        log.warning(
-            "  No knesset entity found via probe — deriving from KNS_Faction.KnessetNum.\n"
-            "  Run --probe to find the correct entity name and add it to PROBE_CANDIDATES."
-        )
-        factions = fetch_odata("KNS_Faction")
-        knesset_nums = sorted({r["KnessetNum"] for r in factions if r.get("KnessetNum")})
-        rows = [
-            {
-                "knesset_number": n,
-                "knesset_name":   f"כנסת ה-{n}",
-                "start_date":     None,
-                "end_date":       None,
-                "is_active":      False,
-            }
-            for n in knesset_nums
-        ]
-        log.info("  Derived %d knesset numbers from faction data", len(rows))
+    rows = []
+    for knum in sorted(groups):
+        plenums     = groups[knum]
+        start_dates = [p["PlenumStart"]  for p in plenums if p.get("PlenumStart")]
+        end_dates   = [p["PlenumFinish"] for p in plenums if p.get("PlenumFinish")]
+        rows.append({
+            "knesset_number": knum,
+            "knesset_name":   f"כנסת ה-{knum}",
+            "start_date":     min(start_dates) if start_dates else None,
+            "end_date":       max(end_dates)   if end_dates   else None,
+            "is_active":      any(bool(p.get("IsCurrent")) for p in plenums),
+        })
 
+    log.info("  aggregated into %d knesset rows", len(rows))
     upsert(sb, "knessets", rows, "knesset_number")
     return load_id_map(sb, "knessets", "knesset_number")
 
@@ -430,63 +408,34 @@ def sync_offices(sb: Client) -> dict[int, int]:
     return load_id_map(sb, "offices", "knesset_category_id")
 
 
-def sync_governments(sb: Client, knesset_map: dict[int, int]) -> dict[int, int]:
+def sync_governments(sb: Client) -> dict[int, int]:
     """
-    PRIMARY: tries candidates in PROBE_CANDIDATES['governments'].
-    FALLBACK: derives government numbers from KNS_PersonToPosition.GovernmentNum.
-              knesset_id / dates will be NULL in the fallback path.
+    No KNS_Government endpoint exists in the Knesset OData API (confirmed via --probe).
+    Derives unique government numbers from KNS_PersonToPosition.GovernmentNum.
+
+    Limitation: knesset_id, start_date, end_date, is_active will all be NULL.
+    The governments table exists mainly to satisfy the FK from minister_appointments.
+    If you need full government metadata, it must be entered manually.
     """
-    log.info("── syncing governments ──")
+    log.info("── syncing governments (derived from KNS_PersonToPosition) ──")
+    positions = fetch_odata("KNS_PersonToPosition")
 
-    gov_entity = None
-    for candidate in PROBE_CANDIDATES["governments"]:
-        if probe_entity(candidate):
-            gov_entity = candidate
-            log.info("  Using entity: %s", gov_entity)
-            break
+    gov_nums = sorted({
+        r["GovernmentNum"] for r in positions
+        if r.get("GovernmentNum") is not None
+    })
+    log.info("  found %d unique government numbers", len(gov_nums))
 
-    if gov_entity:
-        raw = fetch_odata(gov_entity)
-        if raw:
-            log.info("  Fields found: %s", list(raw[0].keys()))
-        rows, skipped = [], 0
-        for r in raw:
-            k_id = knesset_map.get(r.get("KnessetNum"))
-            if not k_id:
-                skipped += 1
-                continue
-            rows.append({
-                # Adjust field names once you see the --probe output
-                "government_number": r.get("GovNum") or r.get("GovernmentNum") or r.get("Number"),
-                "knesset_id":        k_id,
-                "start_date":        r.get("StartDate"),
-                "end_date":          r.get("FinishDate") or r.get("EndDate"),
-                "is_active":         bool(r.get("IsActive", False)),
-            })
-        if skipped:
-            log.warning("  governments: skipped %d rows (unknown KnessetNum)", skipped)
-    else:
-        log.warning(
-            "  No government entity found via probe — deriving from "
-            "KNS_PersonToPosition.GovernmentNum.\n"
-            "  knesset_id / dates will be NULL. Run --probe to find the correct entity."
-        )
-        positions = fetch_odata("KNS_PersonToPosition")
-        gov_nums  = sorted({
-            r["GovernmentNum"] for r in positions
-            if r.get("GovernmentNum") is not None
-        })
-        rows = [
-            {
-                "government_number": n,
-                "knesset_id":        None,
-                "start_date":        None,
-                "end_date":          None,
-                "is_active":         False,
-            }
-            for n in gov_nums
-        ]
-        log.info("  Derived %d government numbers from position data", len(rows))
+    rows = [
+        {
+            "government_number": n,
+            "knesset_id":        None,
+            "start_date":        None,
+            "end_date":          None,
+            "is_active":         False,
+        }
+        for n in gov_nums
+    ]
 
     upsert(sb, "governments", rows, "government_number")
     return load_id_map(sb, "governments", "government_number")
@@ -583,7 +532,7 @@ def sync_all(sb: Client) -> None:
     people_map  = sync_people(sb)
     faction_map = sync_factions(sb, knesset_map)
     office_map  = sync_offices(sb)
-    gov_map     = sync_governments(sb, knesset_map)
+    gov_map     = sync_governments(sb)
     sync_positions(sb, people_map, knesset_map, faction_map, gov_map, office_map)
 
     elapsed = (datetime.now() - start).seconds
@@ -594,24 +543,31 @@ def sync_all(sb: Client) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Sync Knesset OData → Supabase")
-    parser.add_argument("--discover", action="store_true",
-                        help="Print raw API fields for all known entities")
-    parser.add_argument("--probe", action="store_true",
-                        help="Find correct entity names for knessets and governments")
-    parser.add_argument("--table",
-                        choices=["knessets", "people", "knesset_factions",
-                                 "offices", "governments", "knesset_memberships",
-                                 "minister_appointments"],
-                        help="Sync a single table only")
+    parser.add_argument(
+        "--discover",
+        nargs="?",
+        const="all",
+        metavar="ENTITY",
+        help=(
+            "Print raw API fields. No argument = all known entities. "
+            "Pass an entity name to target one: --discover KNS_Position"
+        ),
+    )
+    parser.add_argument(
+        "--table",
+        choices=["knessets", "people", "knesset_factions",
+                 "offices", "governments", "knesset_memberships",
+                 "minister_appointments"],
+        help="Sync a single table only",
+    )
     args = parser.parse_args()
 
     if args.discover:
-        for entity in DISCOVER_ENTITIES:
-            discover(entity)
-        return
-
-    if args.probe:
-        run_probe()
+        if args.discover == "all":
+            for entity in DISCOVER_ENTITIES:
+                discover(entity)
+        else:
+            discover(args.discover)
         return
 
     sb = get_supabase()
@@ -628,7 +584,7 @@ def main():
             "people":                lambda: sync_people(sb),
             "knesset_factions":      lambda: sync_factions(sb, km),
             "offices":               lambda: sync_offices(sb),
-            "governments":           lambda: sync_governments(sb, km),
+            "governments":           lambda: sync_governments(sb),
             "knesset_memberships":   lambda: sync_positions(sb, pm, km, fm, gm, om),
             "minister_appointments": lambda: sync_positions(sb, pm, km, fm, gm, om),
         }[args.table]()

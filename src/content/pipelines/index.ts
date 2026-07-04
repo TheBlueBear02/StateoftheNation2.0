@@ -1,7 +1,8 @@
 import { knessetPipeline } from './knesset'
+import { electionsCandidatesPipeline } from './electionsCandidates'
 import type { PipelineDoc } from './types'
 
-export const PIPELINES: PipelineDoc[] = [knessetPipeline]
+export const PIPELINES: PipelineDoc[] = [knessetPipeline, electionsCandidatesPipeline]
 
 export const DEFAULT_PIPELINE_ID = PIPELINES[0]?.id ?? 'knesset'
 

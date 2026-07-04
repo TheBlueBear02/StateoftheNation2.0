@@ -43,7 +43,15 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="site-footer__inner container">
-        <p className="site-footer__brand">מצב האומה</p>
+        <div className="site-footer__brand">
+          <img
+            src="/white%20logo.svg"
+            alt="מצב האומה"
+            className="site-footer__logo"
+            width={254}
+            height={83}
+          />
+        </div>
 
         <nav className="site-footer__social" aria-label="רשתות חברתיות">
           <ul className="site-footer__social-list">

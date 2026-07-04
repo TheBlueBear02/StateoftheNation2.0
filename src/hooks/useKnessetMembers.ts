@@ -162,6 +162,7 @@ export function useKnessetMembers(
   const [members, setMembers] = useState<KnessetMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [loadedTermId, setLoadedTermId] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -172,6 +173,7 @@ export function useKnessetMembers(
 
       if (!term) {
         setMembers([])
+        setLoadedTermId(null)
         setLoading(false)
         return
       }
@@ -179,6 +181,7 @@ export function useKnessetMembers(
       if (supabaseConfigError || !supabase) {
         setError(supabaseConfigError ?? 'Supabase client is not configured')
         setMembers([])
+        setLoadedTermId(term.id)
         setLoading(false)
         return
       }
@@ -203,6 +206,7 @@ export function useKnessetMembers(
       if (queryError) {
         setError(queryError.message)
         setMembers([])
+        setLoadedTermId(knessetId)
         setLoading(false)
         return
       }
@@ -216,6 +220,7 @@ export function useKnessetMembers(
 
       if (personIds.length === 0) {
         setMembers([])
+        setLoadedTermId(knessetId)
         setLoading(false)
         return
       }
@@ -242,6 +247,7 @@ export function useKnessetMembers(
       if (tenureResult.error) {
         setError(tenureResult.error.message)
         setMembers([])
+        setLoadedTermId(knessetId)
         setLoading(false)
         return
       }
@@ -249,6 +255,7 @@ export function useKnessetMembers(
       if (rolesResult.error) {
         setError(rolesResult.error.message)
         setMembers([])
+        setLoadedTermId(knessetId)
         setLoading(false)
         return
       }
@@ -270,6 +277,7 @@ export function useKnessetMembers(
       )
 
       setMembers(normalizeMembers(snapshotRows, tenureMap, ministerRolesMap))
+      setLoadedTermId(knessetId)
       setLoading(false)
     }
 
@@ -334,7 +342,7 @@ export function useKnessetMembers(
     coalitionCount,
     oppositionCount,
     hasCoalitionData,
-    loading,
+    loading: loading || (term !== null && loadedTermId !== term.id && !error),
     error,
   }
 }

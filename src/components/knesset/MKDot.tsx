@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react'
+import type { CSSProperties, MouseEvent } from 'react'
 import type { PlacedMember } from '../../lib/hemicycle'
 import {
   DOT_BORDER,
@@ -37,12 +37,18 @@ export function MKDot({
   const hasImage = Boolean(member.imageUrl) && !isSkeleton
   const clipId = `mk-clip-${member.seatIndex}`
   const shouldAnimate = animate && !isSkeleton && Boolean(member.fullName)
-  const popStyle = shouldAnimate
-    ? {
-        animationDelay: `${revealIndex * SEAT_REVEAL_STAGGER_MS}ms`,
-        animationDuration: `${SEAT_REVEAL_DURATION_MS}ms`,
-      }
-    : undefined
+  let bodyStyle: CSSProperties | undefined
+
+  if (shouldAnimate) {
+    bodyStyle = {
+      animationDelay: `${revealIndex * SEAT_REVEAL_STAGGER_MS}ms`,
+      animationDuration: `${SEAT_REVEAL_DURATION_MS}ms`,
+    }
+  } else if (isSkeleton) {
+    bodyStyle = {
+      animationDelay: `${(revealIndex % 30) * 45}ms`,
+    }
+  }
 
   function handleMouseLeave(event: MouseEvent<SVGGElement>) {
     const related = event.relatedTarget
@@ -71,53 +77,53 @@ export function MKDot({
     >
       <g
         className={`mk-dot__body${isSkeleton ? ' mk-dot__body--skeleton' : ''}${shouldAnimate ? ' mk-dot__body--enter' : ''}`}
-        style={popStyle}
+        style={bodyStyle}
       >
         <g className="mk-dot__scale" transform={`scale(${scale})`}>
-      {hasImage ? (
-        <>
-          <defs>
-            <clipPath id={clipId}>
-              <circle r={DOT_RADIUS - DOT_BORDER} />
-            </clipPath>
-          </defs>
-          <circle
-            r={DOT_RADIUS}
-            fill="#f0f0f0"
-            stroke={borderColor}
-            strokeWidth={DOT_BORDER}
-          />
-          <image
-            href={member.imageUrl ?? undefined}
-            x={-(DOT_RADIUS - DOT_BORDER)}
-            y={-(DOT_RADIUS - DOT_BORDER)}
-            width={(DOT_RADIUS - DOT_BORDER) * 2}
-            height={(DOT_RADIUS - DOT_BORDER) * 2}
-            clipPath={`url(#${clipId})`}
-            preserveAspectRatio="xMidYMid slice"
-          />
-        </>
-      ) : (
-        <>
-          <circle
-            r={DOT_RADIUS}
-            fill={fillColor}
-            stroke={borderColor}
-            strokeWidth={DOT_BORDER}
-          />
-          {!isSkeleton && member.fullName ? (
-            <text
-              className="mk-dot__initials"
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize="9"
-              fill="#1a1a1a"
-            >
-              {getInitials(member.fullName)}
-            </text>
-          ) : null}
-        </>
-      )}
+          {hasImage ? (
+            <>
+              <defs>
+                <clipPath id={clipId}>
+                  <circle r={DOT_RADIUS - DOT_BORDER} />
+                </clipPath>
+              </defs>
+              <circle
+                r={DOT_RADIUS}
+                fill="#f0f0f0"
+                stroke={borderColor}
+                strokeWidth={DOT_BORDER}
+              />
+              <image
+                href={member.imageUrl ?? undefined}
+                x={-(DOT_RADIUS - DOT_BORDER)}
+                y={-(DOT_RADIUS - DOT_BORDER)}
+                width={(DOT_RADIUS - DOT_BORDER) * 2}
+                height={(DOT_RADIUS - DOT_BORDER) * 2}
+                clipPath={`url(#${clipId})`}
+                preserveAspectRatio="xMidYMid slice"
+              />
+            </>
+          ) : (
+            <>
+              <circle
+                r={DOT_RADIUS}
+                fill={fillColor}
+                stroke={borderColor}
+                strokeWidth={DOT_BORDER}
+              />
+              {!isSkeleton && member.fullName ? (
+                <text
+                  className="mk-dot__initials"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize="9"
+                  fill="#1a1a1a"
+                >
+                  {getInitials(member.fullName)}
+                </text>
+              ) : null}
+            </>
+          )}
         </g>
       </g>
     </g>

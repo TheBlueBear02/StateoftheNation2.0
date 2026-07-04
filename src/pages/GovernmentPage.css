@@ -155,6 +155,16 @@
   list-style: none;
 }
 
+.government-pyramid__leadership {
+  --leadership-avatar-slot: clamp(92px, 12vw, 112px);
+
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
 .government-pyramid__leadership-row {
   position: relative;
   display: flex;
@@ -165,7 +175,8 @@
 }
 
 .government-pyramid__leadership-side,
-.government-pyramid__leadership-center {
+.government-pyramid__leadership-center,
+.government-pyramid__leadership-overflow {
   display: flex;
   align-items: flex-end;
   gap: clamp(12px, 2vw, 18px);
@@ -173,6 +184,12 @@
   padding: 0;
   list-style: none;
   direction: rtl;
+}
+
+.government-pyramid__leadership-overflow {
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .government-pyramid__leadership-side--left {
@@ -188,7 +205,35 @@
 }
 
 .government-pyramid__leadership-side--right {
-  display: none;
+  position: absolute;
+  bottom: 0;
+  left: calc(50% + clamp(60px, 7vw, 74px));
+  justify-content: flex-start;
+}
+
+.government-pyramid__leadership .government-pyramid__member {
+  display: grid;
+  width: clamp(108px, 11vw, 132px);
+  grid-template-rows: var(--leadership-avatar-slot) auto auto;
+  align-items: start;
+  justify-items: center;
+  row-gap: 2px;
+}
+
+.government-pyramid__leadership .government-pyramid__avatar-wrap {
+  align-self: end;
+}
+
+.government-pyramid__leadership .government-pyramid__name,
+.government-pyramid__leadership .government-pyramid__role {
+  display: flex;
+  min-height: 0;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.government-pyramid__leadership .government-pyramid__name {
+  margin-top: 3px;
 }
 
 .government-pyramid__member {
@@ -241,12 +286,6 @@
   width: clamp(92px, 12vw, 112px);
   height: clamp(92px, 12vw, 112px);
   border-width: 3px;
-}
-
-.government-pyramid__member--alternatePrimeMinister .government-pyramid__avatar,
-.government-pyramid__member--alternatePrimeMinister .government-pyramid__initials {
-  width: clamp(78px, 10vw, 92px);
-  height: clamp(78px, 10vw, 92px);
 }
 
 .government-pyramid__name {
@@ -459,13 +498,6 @@
   margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid #ececec;
-}
-
-.office-card__deputies-title {
-  margin: 0;
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: var(--color-text-muted);
 }
 
 .office-card__people--deputies .office-person__photo,

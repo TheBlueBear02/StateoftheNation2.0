@@ -33,7 +33,7 @@ function formatDate(value: string | null): string {
 }
 
 function formatGovernmentPeriod(startDate: string | null, endDate: string | null): string {
-  return `${formatDate(startDate)}–${endDate ? formatDate(endDate) : 'היום'}`
+  return `${endDate ? formatDate(endDate) : 'היום'}–${formatDate(startDate)}`
 }
 
 function GovernmentAvatar({
@@ -95,6 +95,31 @@ function GovernmentAvatar({
 
 function isLeadershipTier(tier: GovernmentPyramidTier): boolean {
   return tier.id === 'prime-minister'
+}
+
+function splitLeadershipMembers(members: GovernmentPyramidMember[]): {
+  left: GovernmentPyramidMember[]
+  center: GovernmentPyramidMember[]
+  right: GovernmentPyramidMember[]
+  overflow: GovernmentPyramidMember[]
+} {
+  const left: GovernmentPyramidMember[] = []
+  const right: GovernmentPyramidMember[] = []
+  const center = members.filter((member) => member.roleKind === 'primeMinister')
+  const nonPrimeMembers = members.filter(
+    (member) => member.roleKind !== 'primeMinister',
+  )
+
+  nonPrimeMembers.slice(0, 4).forEach((member, index) => {
+    if (index % 2 === 0) {
+      left.push(member)
+      return
+    }
+
+    right.push(member)
+  })
+
+  return { left, center, right, overflow: nonPrimeMembers.slice(4) }
 }
 
 export function GovernmentPyramid({
@@ -161,44 +186,73 @@ export function GovernmentPyramid({
             <h2 className="government-pyramid__tier-label">{tier.label}</h2>
             {isLeadershipTier(tier) &&
             tier.members.some((member) => member.roleKind === 'primeMinister') ? (
-              <div className="government-pyramid__leadership-row">
-                <ul className="government-pyramid__leadership-side government-pyramid__leadership-side--left">
-                  {tier.members
-                    .filter((member) => member.roleKind !== 'primeMinister')
-                    .map((member, memberIndex) => (
-                      <GovernmentAvatar
-                        key={`${tier.id}-${member.personId}`}
-                        member={member}
-                        tierIndex={tierIndex}
-                        memberIndex={memberIndex}
-                        onHover={setHovered}
-                        onLeave={() => setHovered(null)}
-                        onMove={handleMove}
-                      />
-                    ))}
-                </ul>
+              (() => {
+                const leadership = splitLeadershipMembers(tier.members)
 
-                <ul className="government-pyramid__leadership-center">
-                  {tier.members
-                    .filter((member) => member.roleKind === 'primeMinister')
-                    .map((member, memberIndex) => (
-                      <GovernmentAvatar
-                        key={`${tier.id}-${member.personId}`}
-                        member={member}
-                        tierIndex={tierIndex}
-                        memberIndex={memberIndex}
-                        onHover={setHovered}
-                        onLeave={() => setHovered(null)}
-                        onMove={handleMove}
-                      />
-                    ))}
-                </ul>
+                return (
+                  <div className="government-pyramid__leadership">
+                    <div className="government-pyramid__leadership-row">
+                      <ul className="government-pyramid__leadership-side government-pyramid__leadership-side--left">
+                        {leadership.left.map((member, memberIndex) => (
+                          <GovernmentAvatar
+                            key={`${tier.id}-${member.personId}`}
+                            member={member}
+                            tierIndex={tierIndex}
+                            memberIndex={memberIndex}
+                            onHover={setHovered}
+                            onLeave={() => setHovered(null)}
+                            onMove={handleMove}
+                          />
+                        ))}
+                      </ul>
 
-                <div
-                  className="government-pyramid__leadership-side government-pyramid__leadership-side--right"
-                  aria-hidden="true"
-                />
-              </div>
+                      <ul className="government-pyramid__leadership-center">
+                        {leadership.center.map((member, memberIndex) => (
+                          <GovernmentAvatar
+                            key={`${tier.id}-${member.personId}`}
+                            member={member}
+                            tierIndex={tierIndex}
+                            memberIndex={memberIndex}
+                            onHover={setHovered}
+                            onLeave={() => setHovered(null)}
+                            onMove={handleMove}
+                          />
+                        ))}
+                      </ul>
+
+                      <ul className="government-pyramid__leadership-side government-pyramid__leadership-side--right">
+                        {leadership.right.map((member, memberIndex) => (
+                          <GovernmentAvatar
+                            key={`${tier.id}-${member.personId}`}
+                            member={member}
+                            tierIndex={tierIndex}
+                            memberIndex={memberIndex + leadership.left.length}
+                            onHover={setHovered}
+                            onLeave={() => setHovered(null)}
+                            onMove={handleMove}
+                          />
+                        ))}
+                      </ul>
+                    </div>
+
+                    {leadership.overflow.length > 0 ? (
+                      <ul className="government-pyramid__leadership-overflow">
+                        {leadership.overflow.map((member, memberIndex) => (
+                          <GovernmentAvatar
+                            key={`${tier.id}-${member.personId}`}
+                            member={member}
+                            tierIndex={tierIndex}
+                            memberIndex={memberIndex + 4}
+                            onHover={setHovered}
+                            onLeave={() => setHovered(null)}
+                            onMove={handleMove}
+                          />
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                )
+              })()
             ) : (
               <ul className="government-pyramid__row">
                 {tier.members.map((member, memberIndex) => (

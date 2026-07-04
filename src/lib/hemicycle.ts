@@ -325,8 +325,8 @@ export const ARC_REVEAL_START_INDEX = Math.min(
     .map((seat) => SEAT_REVEAL_ORDER.get(seat.index) ?? 0),
 )
 
-export const SEAT_REVEAL_STAGGER_MS = 25
-export const SEAT_REVEAL_DURATION_MS = 350
+export const SEAT_REVEAL_STAGGER_MS = 14
+export const SEAT_REVEAL_DURATION_MS = 520
 
 function orderRegionForFill(
   seats: SeatPosition[],

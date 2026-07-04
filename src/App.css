@@ -86,9 +86,15 @@
 
 .site-footer__brand {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
   justify-self: start;
+}
+
+.site-footer__logo {
+  display: block;
+  width: auto;
+  height: 42px;
 }
 
 .site-footer__social {
@@ -496,6 +502,10 @@
   .site-footer__copy {
     justify-self: center;
     text-align: center;
+  }
+
+  .site-footer__logo {
+    height: 36px;
   }
 }
 

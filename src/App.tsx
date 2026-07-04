@@ -4,7 +4,6 @@ import { SiteLayout } from './components/SiteLayout'
 const HERO_BUTTONS = [
   { label: 'בחירות 2026', href: '#elections-2026' },
   { label: 'הממשלה', to: '/government' },
-  { label: 'ציר זמן', href: '#timeline' },
   { label: 'מיפוי סוגיות פוליטיות', href: '#political-issues' },
   { label: 'הכנסת', to: '/knesset' },
 ] as const

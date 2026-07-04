@@ -20,7 +20,7 @@ Route: `/knesset`
 │  FactionList (party cards: name + seats + MK photos)    │
 │    └─ Sort selector (default: by party)                 │
 ├─────────────────────────────────────────────────────────┤
-│  Footer (shared SiteFooter — primary blue background)   │
+│  Footer (shared SiteFooter — blue + white logo)         │
 └─────────────────────────────────────────────────────────┘
 │  Tooltip (desktop only, HTML overlay)                   │
 └─────────────────────────────────────────────────────────┘
@@ -165,14 +165,14 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 15 rows × 17 columns. Each cell is
 - Border: `2.5px solid factionColor` (DB color or hash-derived HSL)
 - Interior: clipped `<image>` when `image_url` exists; else initials on 20% tint
 - Hover: scales to 1.15× for every dot in the hovered member’s faction (`factionName` match); tooltip still shows the individual member under the cursor
-- **Entrance animation** (when member data finishes loading): each dot pops in sequentially via CSS (`mk-dot-pop`, 350ms, stagger 25ms). Reveal order from `SEAT_REVEAL_ORDER` in `hemicycle.ts` — left wing bottom-up (starting bottom-left), then the shared top arc left-to-right, then the right wing top-to-bottom. Skeleton grey dots show during fetch with no animation; animation replays when the Knesset picker changes term (`key` on `KnessetHemicycle`). Respects `prefers-reduced-motion`.
+- **Loading / entrance animation:** the SVG stays mounted while a term fetch is in progress, so the diagram does not hard-reset between picker changes. Skeleton grey dots breathe with a subtle stagger during fetch. When member data finishes loading, each dot fades/scales in sequentially via CSS (`mk-dot-reveal`, 520ms, stagger 14ms). Reveal order from `SEAT_REVEAL_ORDER` in `hemicycle.ts` — left wing bottom-up (starting bottom-left), then the shared top arc left-to-right, then the right wing top-to-bottom. Respects `prefers-reduced-motion`.
 
 ### CenterCounter
 
 - **With coalition data:** white disc with drop shadow; two-tone ring starting at 6 o'clock (coalition `#5C63E3` left arc, opposition `#FFC25E` right arc); fraction-style text — colored `{coalition}/{opposition}` on top (coalition num larger, italic black slash, opposition num slightly smaller), black divider line, large bold total below
 - **Without coalition data:** single neutral grey ring, large total count, label **הכנסת**
 - **Hemicycle hover:** when the user hovers an MK dot and coalition data exists, a blurred halo behind the white disc glows in the hovered member's bloc color (coalition or opposition); fades out when hover ends
-- **Entrance animation:** scales/fades in when the top-arc reveal pass begins (`ARC_REVEAL_START_INDEX × SEAT_REVEAL_STAGGER_MS` delay)
+- **Entrance animation:** gently scales/fades in when the top-arc reveal pass begins (`ARC_REVEAL_START_INDEX × SEAT_REVEAL_STAGGER_MS` delay)
 
 ### Tooltip
 
@@ -195,9 +195,10 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 15 rows × 17 columns. Each cell is
 | `knessets` | `useKnessetList` hook |
 | `selectedKnesset` | `KnessetPage` local state (defaults to active term) |
 | `members`, counts, `hasCoalitionData`, `factionGroups` | `useKnessetMembers(selectedKnesset)` |
+| `loadedTermId` | `useKnessetMembers` guard that keeps the selected term in loading state until its own fetch resolves |
 | `sortMode` | `KnessetPage` local state (`useState<MemberSortMode>('parties')`) |
 | `hoveredMember`, tooltip position | `KnessetHemicycle` / `FactionList` local state; hemicycle hover highlights all MKs sharing `hoveredMember.factionName` |
-| Loading | skeleton dots + faction skeletons while list or members load |
+| Loading | skeleton dots + faction skeletons while the Knesset list loads, member data loads, or the selected term does not match `loadedTermId` |
 | Error | Hebrew message: `לא ניתן לטעון את נתוני הכנסת` |
 
 ## Verification

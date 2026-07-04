@@ -19,6 +19,7 @@ Documentation hub for data pipelines that feed the project database. Layout mimi
 | `src/content/pipelines/index.ts` | `PIPELINES` registry, `getPipelineById`, `DEFAULT_PIPELINE_ID` |
 | `src/content/pipelines/types.ts` | `PipelineDoc`, `PipelineSection`, `PipelineTable` types |
 | `src/content/pipelines/knesset.ts` | Knesset OData → project database pipeline content |
+| `src/content/pipelines/electionsCandidates.ts` | Elections candidate-list → project database pipeline content |
 
 ## Adding a New Pipeline
 
@@ -39,6 +40,15 @@ Documentation hub for data pipelines that feed the project database. Layout mimi
 - **Source:** `http://knesset.gov.il/Odata/ParliamentInfo.svc`
 - **Tables:** `knessets`, `people`, `knesset_factions`, `offices`, `governments`, `knesset_memberships`, `minister_appointments`
 - **Related scripts:** `km_images.py`, `fix_faction_links*.py`, `check.py` in the same folder
+
+## Elections Candidates Pipeline (live)
+
+- **Route:** `/piplines/elections-candidates`
+- **Scripts:** `Layer 1 - Gathering Data/Elections/insert_raw_list.py`, `run_pipeline.py`, `resolve_candidates.py`, `enrich_wikidata.py`, `generate_descriptions.py`, `geocode_cities.py`
+- **Sources:** manually inserted candidate lists, Knesset OData, Wikidata, Hebrew Wikipedia summaries, Nominatim / OpenStreetMap
+- **Tables:** `elections`, `election_parties`, `raw_candidate_lists`, `election_candidates`, `people`
+- **Workflow:** prepare a `.txt` or `.csv` party-list file, preview it with `insert_raw_list.py --dry-run`, insert it into `raw_candidate_lists`, run `run_pipeline.py`, resolve `review_queue.json` if created, then verify `election_candidates`.
+- **Behavior:** starts from `raw_candidate_lists.processed = false`, resolves candidate identity, enriches missing factual fields, generates a short neutral Hebrew description, geocodes cities, supports repeated list updates, and leaves party stats/map data to be computed from `election_candidates` at page load.
 
 ## Design
 

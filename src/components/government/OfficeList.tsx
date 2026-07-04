@@ -117,7 +117,6 @@ export function OfficeList({ officeGroups, loading = false }: OfficeListProps) {
 
             {group.deputies.length > 0 ? (
               <div className="office-card__deputies">
-                <h4 className="office-card__deputies-title">סגני שרים</h4>
                 <ul className="office-card__people office-card__people--deputies">
                   {group.deputies.map((appointment) => (
                     <OfficePerson

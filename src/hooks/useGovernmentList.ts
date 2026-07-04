@@ -41,7 +41,7 @@ export function formatGovernmentLabel(government: GovernmentOption): string {
     ? new Date(government.endDate).getFullYear()
     : 'היום'
 
-  return `הממשלה ה-${government.governmentNumber} (${startYear}–${endYear})`
+  return `הממשלה ה-${government.governmentNumber} (${endYear}–${startYear})`
 }
 
 export function useGovernmentList(): UseGovernmentListResult {

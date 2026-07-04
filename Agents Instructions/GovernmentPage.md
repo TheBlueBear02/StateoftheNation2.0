@@ -21,7 +21,7 @@ Route: `/government`
 │  Error message (if fetch fails)                         │
 │  OfficeList (office cards: ministers + deputy ministers)│
 ├─────────────────────────────────────────────────────────┤
-│  Footer (shared SiteFooter — primary blue background)   │
+│  Footer (shared SiteFooter — blue + white logo)         │
 └─────────────────────────────────────────────────────────┘
 │  Tooltip (desktop only, HTML overlay)                   │
 └─────────────────────────────────────────────────────────┘
@@ -46,7 +46,7 @@ Route: `/government`
 
 - Dropdown lists rows from `governments`, newest first.
 - Title (`h1`): `הממשלה ה-{n}` via `formatGovernmentTitle()`.
-- Dropdown label: `הממשלה ה-{n} ({startYear}–{endYear})`; active term uses `היום` when `end_date` is null.
+- Dropdown label: `הממשלה ה-{n} ({endYear|היום}–{startYear})`; active term uses `היום` when `end_date` is null.
 - Default selection: `is_active = true`, else highest `government_number`.
 - Changing selection re-fetches minister appointments for that government.
 - Native select appearance is removed and replaced with a custom arrow positioned `14px` from the physical left edge; extra `padding-inline-end` keeps long labels clear of the arrow.
@@ -117,15 +117,17 @@ supabase
 
 - Page uses `.container`, white surfaces, restrained blue accents, RTL-first layout, and square-cornered cards per `DesignLanguage.md`.
 - Pyramid is an HTML/flex hierarchy, not SVG:
-  - government period value appears at the physical top-left of the diagram panel (`start_date` to `end_date`, or `היום` when active), without a label
+  - government period value appears at the physical top-left of the diagram panel in end-to-start order (`end_date|היום` to `start_date`), without a label
   - unique ministers + deputy ministers count appears at the physical top-right of the diagram panel, without a label
-  - the leadership tier keeps the actual Prime Minister fixed in the visual center; alternate PM / deputy PMs / ministers in the PM office are positioned adjacent to the PM on the physical left and bottom-align with the row
-  - only actual PM avatars are largest; deputy PMs and ministers in the PM office use the normal minister avatar size
+  - the leadership tier keeps the actual Prime Minister fixed in the visual center; alternate PM / deputy PMs / ministers in the PM office alternate between the physical left and right sides of the PM and bottom-align with the row
+  - leadership first row is capped at five people total (PM + four non-PM roles); any additional leadership members move to a second centered row to prevent overflow outside the panel
+  - leadership members use a fixed avatar slot and natural name/role rows so circle alignment stays stable while the text remains tightly stacked
+  - only actual PM avatars are largest; every other leadership role uses the normal minister avatar size
   - all remaining ministers appear together in a single `שרים` tier, with no `שרים נוספים` split
   - there is no bottom count caption under the diagram; only the top-right ministers + deputy ministers count is shown
   - skeleton rows display while data loads
   - staggered entrance animation respects `prefers-reduced-motion`
-- Office cards are rectangular cards with subtle borders, not rounded.
+- Office cards are rectangular cards with subtle borders, not rounded; deputy ministers are listed below the minister rows without a separate `סגני שרים` subtitle.
 - Person avatars use Knesset-style circular photos / initials and faction-color borders when faction data exists.
 - Desktop hover shows shared `Tooltip`; mobile hides tooltip.
 

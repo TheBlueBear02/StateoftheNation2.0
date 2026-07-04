@@ -1,0 +1,42 @@
+[
+  {
+    "raw_id": 6,
+    "raw_name": "בנימין נתניהו",
+    "party_id": 1,
+    "list_position": 1,
+    "best_match": "בנימין גנץ",
+    "best_match_id": 3380,
+    "score": 0.696,
+    "action": "pending"
+  },
+  {
+    "raw_id": 8,
+    "raw_name": "אביגדור ליברמן",
+    "party_id": 10,
+    "list_position": 1,
+    "best_match": "אביגדור קהלני",
+    "best_match_id": 3019,
+    "score": 0.741,
+    "action": "pending"
+  },
+  {
+    "raw_id": 9,
+    "raw_name": "יאיר לפיד",
+    "party_id": 4,
+    "list_position": 2,
+    "best_match": "יאיר לוי",
+    "best_match_id": 2870,
+    "score": 0.824,
+    "action": "pending"
+  },
+  {
+    "raw_id": 10,
+    "raw_name": "מירב כהן",
+    "party_id": 4,
+    "list_position": 5,
+    "best_match": "אלי כהן",
+    "best_match_id": 2505,
+    "score": 0.769,
+    "action": "pending"
+  }
+]

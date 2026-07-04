@@ -68,7 +68,7 @@ StateoftheNation2.0/
 | `pages/PiplinesPage.css` | Pipelines docs layout and typography |
 | `content/pipelines/` | Pipeline registry and per-pipeline doc content |
 | `components/SiteHeader.tsx` | Shared header with home logo, Israel-time civil/Hebrew-numeral date labels, and current government/Knesset context — used on all pages |
-| `components/SiteFooter.tsx` | Shared footer — primary blue background, brand + copyright |
+| `components/SiteFooter.tsx` | Shared footer — primary blue background, white logo, social links, and copyright |
 | `components/SiteLayout.tsx` | Header + `{children}` + footer shell for all routes |
 | `components/knesset/` | Hemicycle visualization subtree (see below) |
 | `components/government/` | Government hierarchy and office-list subtree |
