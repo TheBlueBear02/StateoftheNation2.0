@@ -14,6 +14,7 @@ The schema is split into four logical groups:
 | **Government** | `governments` · `offices` · `minister_appointments` | Seeded — powers the Government page |
 | **KPI data** | `indexes` · `index_data` | Seeded — dashboard page planned |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | In progress — elections page planned |
+| **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pollster_house_effects` | Live — `/elections/polls` |
 
 All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/`. The public site reads via the anon key. The password-gated editor at `/elections/edit` can also `UPDATE` `election_candidates` and `people` through the anon key once the UPDATE policies below are applied — this is a lightweight private-tool gate, not production auth.
 
@@ -32,6 +33,12 @@ people ──────────────────┬── knesset_m
                                           └── knesset_factions (post-election)
 
 raw_candidate_lists ──► election_candidates  (via pipeline)
+
+polls ── poll_results ── election_parties
+poll_aggregates ── election_parties
+raw_poll_rows ──► polls  (via pipeline)
+poll_party_aliases ── election_parties
+party_lineage ── election_parties
 
 offices ── indexes ── index_data
 ```
@@ -282,13 +289,19 @@ Parties running on the ballot in a given election. Separate from `knesset_factio
 | `knesset_faction_id` | bigint | FK → `knesset_factions.id` — **null before the election**, wired post-election by `link_factions.py` |
 | `name` | text | Full name, e.g. `"הליכוד בראשות בנימין נתניהו"` |
 | `short_name` | text | Short lookup key used by pipeline, e.g. `"הליכוד"` |
+| `party_status` | text | `'confirmed'` \| `'polled_only'` \| `'historical'` — default `'confirmed'` |
+| `bloc` | text | `'coalition'` \| `'opposition'` \| `'unaligned'` — for poll bloc totals |
+| `first_polled_date` | date | First fieldwork date this party appeared in polls |
+| `last_polled_date` | date | Most recent fieldwork date |
 | `color` | text | Hex color for UI |
 | `logo_url` | text | Party logo URL |
 | `ballot_letter` | text | Hebrew ballot symbol — null until Elections Committee certifies lists |
 | `description` | text | Party description |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** Manually inserted when parties are confirmed. `short_name` is critical — it is what `insert_raw_list.py` and the pipeline use to look up parties. Run `python insert_raw_list.py --list-parties` to see available keys.
+**Data source:** Manually inserted when parties are confirmed; extended by `seed_parties.py` for polls pipeline. `short_name` is critical — it is what `insert_raw_list.py` and the pipeline use to look up parties. Unique constraint on `(election_id, short_name)`.
+
+**Frontend filter:** Public elections pages query only `party_status = 'confirmed'`.
 
 ---
 
@@ -397,6 +410,134 @@ Staging table. The only place where data is inserted manually. The election pipe
 
 ---
 
+## Polls Group
+
+### `pipeline_sync_state`
+
+Revid cache for incremental Wikipedia fetches.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `pipeline` | text | Pipeline identifier, e.g. `'polls'` |
+| `resource` | text | Wiki page title |
+| `last_revid` | bigint | Last successfully parsed revision |
+| `last_run_at` | timestamptz | Last run timestamp |
+| `last_success_at` | timestamptz | Last successful fetch |
+
+---
+
+### `raw_poll_rows`
+
+Staging table for parsed Wikipedia poll rows.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `source_page` | text | Wikipedia page title |
+| `revid` | bigint | Source revision ID |
+| `section` | text | Section heading path |
+| `row_index` | integer | Row index within segment |
+| `payload` | jsonb | Parsed row including header map and party results |
+| `content_hash` | text | SHA-256 of payload |
+| `natural_key` | text | SHA-256 of raw fieldwork\|pollster\|publisher\|section |
+| `status` | text | `'pending'` \| `'processed'` \| `'superseded'` \| `'rejected'` |
+
+**Convention note:** Unlike `raw_candidate_lists.processed` (boolean), this table uses a four-state `status` text column because `superseded` and `rejected` are load-bearing states.
+
+---
+
+### `polls`
+
+Normalized poll header — one row per distinct poll.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `election_id` | bigint | FK → `elections.id` |
+| `natural_key` | text | Unique poll identity |
+| `pollster` | text | Normalized English pollster name |
+| `pollster_he` | text | Hebrew pollster name |
+| `publisher` | text | Media outlet |
+| `fieldwork_start` / `fieldwork_end` | date | Fieldwork date range |
+| `sample_size` | integer | Sample size |
+| `margin_of_error` | numeric | MOE |
+| `is_scenario` | boolean | Scenario poll flag |
+| `scenario_desc` | text | Scenario section label |
+| `source_url` | text | Original publication URL |
+| `source_revid` | bigint | Wikipedia revision |
+
+---
+
+### `poll_results`
+
+Per-party seat projection for one poll.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `poll_id` | bigint | FK → `polls.id` |
+| `party_id` | bigint | FK → `election_parties.id` |
+| `seats` | integer | Projected seats — null if below threshold |
+| `vote_share` | numeric | From `(N%)` notation |
+| `below_threshold` | boolean | true only from explicit `(N%)`; null = unknown |
+
+---
+
+### `poll_party_aliases`
+
+Time-scoped English Wikipedia label → `election_parties.id` mapping.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `raw_label` | text | English party column header |
+| `party_id` | bigint | FK → `election_parties.id` |
+| `valid_from` / `valid_to` | date | Validity window (null = open-ended) |
+
+Lookup uses poll `fieldwork_end` to select the correct alias window.
+
+---
+
+### `party_lineage`
+
+Merge/split/dissolve events for trend line breaks.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `predecessor_id` | bigint | FK → `election_parties.id` |
+| `successor_id` | bigint | FK → `election_parties.id` |
+| `event_date` | date | Event date |
+| `event_type` | text | `'merge'` \| `'split'` \| `'rename'` \| `'dissolve'` \| `'found'` |
+
+---
+
+### `poll_aggregates`
+
+Materialized weighted and last3 averages.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `election_id` | bigint | FK → `elections.id` |
+| `party_id` | bigint | FK → `election_parties.id` |
+| `as_of_date` | date | Aggregation date (Jerusalem) |
+| `method` | text | `'last3'` \| `'weighted'` |
+| `seats_avg` | numeric | Average seat projection (1 decimal) |
+| `poll_count` | integer | Polls contributing to average |
+
+---
+
+### `pollster_house_effects`
+
+Descriptive pollster bias vs cross-pollster average. Display only — not applied to headline numbers.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `pollster` | text | Pollster name |
+| `party_id` | bigint | FK → `election_parties.id` |
+| `as_of_date` | date | Computation date |
+| `delta` | numeric | Mean deviation from leave-one-out average |
+| `poll_count` | integer | Polls in window (min 5 required) |
+
+**RLS:** `polls`, `poll_results`, `poll_aggregates`, `pollster_house_effects` are anon-readable. Staging/alias/lineage/sync tables are service-role only.
+
+---
+
 ## Sync Scripts
 
 | Script | Tables updated | Trigger |
@@ -404,6 +545,7 @@ Staging table. The only place where data is inserted manually. The election pipe
 | `sync_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Weekly (GitHub Actions) |
 | `insert_raw_list.py` | `raw_candidate_lists` | Manual — when a party publishes their list |
 | `run_pipeline.py` | `election_candidates` · `people` (enrichment) | Manual — after each `insert_raw_list.py` run |
+| `run_polls_pipeline.py` | `polls` · `poll_results` · `poll_aggregates` · `raw_poll_rows` | Twice daily (GitHub Actions) |
 | `link_factions.py` | `election_parties.knesset_faction_id` | Post-election — once per election |
 
 All sync writes are upserts. No script deletes data except `insert_raw_list.py` which removes `processed=false` rows for a party when re-inserting an updated list.

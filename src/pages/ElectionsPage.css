@@ -4,9 +4,6 @@
 
 .elections-page__hero {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background:
-    linear-gradient(180deg, rgba(72, 144, 253, 0.12), rgba(72, 144, 253, 0)),
-    var(--color-white);
 }
 
 .elections-page__inner {
@@ -21,6 +18,141 @@
 
 .elections-page__parties .elections-page__inner {
   padding-block: clamp(32px, 5vw, 64px);
+}
+
+.elections-page__map {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.elections-page__map .elections-page__inner {
+  padding-block: clamp(32px, 5vw, 64px);
+}
+
+.elections-overview-map {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.elections-overview-map__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-block-end: clamp(18px, 3vw, 28px);
+}
+
+.elections-overview-map__filters-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.elections-overview-map__filters-label {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.elections-overview-map__filters-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.elections-overview-map__filters-action {
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: var(--color-white);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.elections-overview-map__filters-action:hover:not(:disabled),
+.elections-overview-map__filters-action:focus-visible {
+  border-color: var(--color-blue-dark);
+  color: var(--color-blue-dark);
+  outline: none;
+}
+
+.elections-overview-map__filters-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.elections-overview-map__party-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.elections-overview-map__party-option {
+  --party-color: var(--color-blue);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: var(--color-white);
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.elections-overview-map__party-option--selected {
+  border-color: color-mix(in srgb, var(--party-color) 55%, rgba(0, 0, 0, 0.12));
+  background:
+    radial-gradient(
+      circle at 100% 0,
+      color-mix(in srgb, var(--party-color) 14%, transparent),
+      transparent 70%
+    ),
+    var(--color-white);
+}
+
+.elections-overview-map__party-checkbox {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.elections-overview-map__party-swatch {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  background: var(--party-color);
+}
+
+.elections-overview-map__party-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.elections-overview-map__party-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.elections-overview-map__party-count {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.elections-overview-map__layout {
+  grid-template-columns: minmax(220px, 360px) 1fr;
+}
+
+.elections-overview-map__count {
+  color: var(--color-blue-dark);
 }
 
 .elections-page__header {
@@ -38,7 +170,7 @@
 
 .elections-page__title {
   margin: 0;
-  font-size: clamp(2.2rem, 6vw, 4.75rem);
+  font-size: clamp(1.9rem, 4.5vw, 3.25rem);
   font-weight: 800;
   color: var(--color-text);
 }
@@ -55,6 +187,20 @@
   margin-block-start: 20px;
   color: var(--color-text);
   font-weight: 700;
+}
+
+.elections-page__polls-link {
+  margin-block-start: 12px;
+}
+
+.elections-page__polls-link a {
+  color: var(--color-blue-dark);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.elections-page__polls-link a:hover {
+  text-decoration: underline;
 }
 
 .elections-page__section-header {
@@ -236,6 +382,12 @@
 @media (max-width: 900px) {
   .elections-page__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .elections-overview-map__layout {
+    grid-template-columns: 1fr;
   }
 }
 

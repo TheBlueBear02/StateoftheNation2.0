@@ -161,6 +161,7 @@ def get_party_map(sb: Client, election_id: int) -> dict[str, int]:
         sb.table("election_parties")
         .select("id, name, short_name")
         .eq("election_id", election_id)
+        .eq("party_status", "confirmed")
         .execute()
         .data
     )
@@ -400,6 +401,7 @@ def main():
             sb.table("election_parties")
             .select("name, short_name")
             .eq("election_id", election_id)
+            .eq("party_status", "confirmed")
             .execute()
             .data
         )

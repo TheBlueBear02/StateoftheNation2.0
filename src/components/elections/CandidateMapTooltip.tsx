@@ -4,6 +4,7 @@ import { formatTenureYears } from '../../lib/knessetTenure'
 type CandidateMapTooltipProps = {
   fullName: string
   city: string
+  partyName?: string | null
   imageUrl: string | null
   accentColor: string
   totalYearsInKnesset: number
@@ -14,6 +15,7 @@ type CandidateMapTooltipProps = {
 export function CandidateMapTooltip({
   fullName,
   city,
+  partyName = null,
   imageUrl,
   accentColor,
   totalYearsInKnesset,
@@ -51,7 +53,18 @@ export function CandidateMapTooltip({
 
           <div className="knesset-tooltip__identity">
             <div className="knesset-tooltip__name">{fullName}</div>
-            <div className="knesset-tooltip__faction">{city}</div>
+            {partyName ? (
+              <div className="knesset-tooltip__faction">{partyName}</div>
+            ) : null}
+            <div
+              className={
+                partyName
+                  ? 'knesset-tooltip__tenure'
+                  : 'knesset-tooltip__faction'
+              }
+            >
+              {city}
+            </div>
           </div>
         </div>
 

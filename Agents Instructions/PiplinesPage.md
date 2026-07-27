@@ -20,6 +20,7 @@ Documentation hub for data pipelines that feed the project database. Layout mimi
 | `src/content/pipelines/types.ts` | `PipelineDoc`, `PipelineSection`, `PipelineTable` types |
 | `src/content/pipelines/knesset.ts` | Knesset OData → project database pipeline content |
 | `src/content/pipelines/electionsCandidates.ts` | Elections candidate-list → project database pipeline content |
+| `src/content/pipelines/elections2026Polls.ts` | Wikipedia polls → weighted averages pipeline content |
 
 ## Adding a New Pipeline
 
@@ -36,10 +37,12 @@ Documentation hub for data pipelines that feed the project database. Layout mimi
 
 ## Knesset Pipeline (live)
 
-- **Script:** `Layer 1 - Gathering Data/knesset/sync_knesset_data.py`
+- **Script:** `Layer 1 - Gathering Data/knesset/load_all_knesset_data.py` (also referenced as `sync_knesset_data.py` in script headers)
+- **API wrapper:** `Layer 1 - Gathering Data/knesset/run_knesset_pipeline_api.py` — used by `/knesset/edit` in dev
+- **Dev UI:** `/knesset/edit` — password-gated pipeline runner + faction metadata editor (`VITE_KNESSET_EDIT_SECRET`)
 - **Source:** `http://knesset.gov.il/Odata/ParliamentInfo.svc`
 - **Tables:** `knessets`, `people`, `knesset_factions`, `offices`, `governments`, `knesset_memberships`, `minister_appointments`
-- **Related scripts:** `km_images.py`, `fix_faction_links*.py`, `check.py` in the same folder
+- **Related scripts:** `km_images.py`, `fix_faction_links_all.py` in the same folder
 
 ## Elections Candidates Pipeline (live)
 
@@ -49,6 +52,16 @@ Documentation hub for data pipelines that feed the project database. Layout mimi
 - **Tables:** `elections`, `election_parties`, `raw_candidate_lists`, `election_candidates`, `people`
 - **Workflow:** prepare a `.txt` or `.csv` party-list file (plain names or numbered lines like `1. name`), preview it with `insert_raw_list.py --dry-run`, insert it into `raw_candidate_lists`, run `run_pipeline.py`, resolve `review_queue.json` if created, then verify `election_candidates`.
 - **Behavior:** starts from `raw_candidate_lists.processed = false`, resolves candidate identity, enriches missing factual fields, generates a one-sentence Hebrew role summary (`[name] כיהן כ[roles]`), geocodes cities, retries missing birth dates and Wikipedia URLs from Wikidata, supports repeated list updates, and leaves party stats/map data to be computed from `election_candidates` at page load.
+
+## Polls Pipeline (live)
+
+- **Script:** `Layer 1 - Gathering Data/Polls/run_polls_pipeline.py`
+- **API wrapper:** `Layer 1 - Gathering Data/Polls/run_polls_pipeline_api.py` — used by `/elections/polls/edit` in dev
+- **Dev UI:** `/elections/polls/edit` — password-gated pipeline runner (`VITE_ELECTIONS_EDIT_SECRET`)
+- **Schedule:** `.github/workflows/polls-pipeline.yml` — twice daily UTC
+- **Source:** Wikipedia MediaWiki API (English opinion polling pages)
+- **Frontend:** `/elections/polls` — last-5 averages, bloc bar, bloc trend
+- **Docs:** [PollsPage.md](./PollsPage.md)
 
 ## Design
 

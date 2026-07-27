@@ -2,9 +2,7 @@
   --party-color: var(--color-blue);
 
   padding-block: clamp(24px, 4vw, 56px);
-  background:
-    linear-gradient(180deg, rgba(72, 144, 253, 0.08), rgba(72, 144, 253, 0) 280px),
-    var(--color-white);
+  background: var(--color-white);
 }
 
 .election-party-page__inner {
@@ -124,9 +122,7 @@
   grid-template-columns: minmax(150px, 0.5fr) 1fr;
   gap: clamp(18px, 4vw, 42px);
   align-items: center;
-  background:
-    linear-gradient(90deg, rgba(72, 144, 253, 0.1), rgba(72, 144, 253, 0)),
-    var(--color-white);
+  background: var(--color-white);
 }
 
 .party-hero .seats-trend {
@@ -181,10 +177,28 @@
   font-weight: 700;
 }
 
+.seats-trend__link {
+  margin-top: 6px;
+  color: var(--party-color);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.seats-trend__link:hover {
+  opacity: 0.85;
+}
+
 .seats-trend__chart {
   width: 100%;
   min-height: 140px;
   overflow: visible;
+}
+
+.seats-trend__chart-wrap {
+  position: relative;
+  width: 100%;
 }
 
 .seats-trend__grid {
@@ -205,6 +219,56 @@
   fill: var(--color-white);
   stroke: var(--party-color);
   stroke-width: 2;
+  pointer-events: none;
+}
+
+.seats-trend__dot--active {
+  fill: var(--party-color);
+}
+
+.seats-trend__hit {
+  fill: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.seats-trend-tooltip {
+  position: fixed;
+  z-index: 40;
+  min-width: 160px;
+  max-width: 240px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: var(--color-white);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  direction: rtl;
+  text-align: start;
+}
+
+.seats-trend-tooltip__seats {
+  color: var(--party-color);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.seats-trend-tooltip__date {
+  margin-block-start: 4px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.seats-trend-tooltip__pollster {
+  margin-block-start: 2px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.seats-trend-tooltip__publisher,
+.seats-trend-tooltip__sample {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
 }
 
 .stats-bar__grid {

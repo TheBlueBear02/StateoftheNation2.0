@@ -20,6 +20,16 @@ type ElectionCandidateEditInput = {
   siblingPositions: Array<{ candidateId: number; listPosition: number }>
 }
 
+type ElectionPartyEditInput = {
+  partyId: number
+  name: string
+  shortName: string | null
+  color: string | null
+  logoUrl: string | null
+  ballotLetter: string | null
+  description: string | null
+}
+
 type UpdateResult = { ok: true } | { ok: false; error: string }
 
 type EnrichCandidateInput = {
@@ -144,6 +154,43 @@ async function updateWithClient(
 
   if (!candidateData?.length) {
     return { ok: false, error: 'לא ניתן לעדכן את המועמד' }
+  }
+
+  return { ok: true }
+}
+
+async function updatePartyWithClient(
+  client: SupabaseClient,
+  input: ElectionPartyEditInput,
+): Promise<UpdateResult> {
+  if (!Number.isInteger(input.partyId) || input.partyId < 1) {
+    return { ok: false, error: 'מזהה מפלגה לא תקין' }
+  }
+
+  const name = input.name.trim()
+  if (!name) {
+    return { ok: false, error: 'יש להזין שם מפלגה' }
+  }
+
+  const { data, error } = await client
+    .from('election_parties')
+    .update({
+      name,
+      short_name: emptyToNull(input.shortName ?? ''),
+      color: emptyToNull(input.color ?? ''),
+      logo_url: emptyToNull(input.logoUrl ?? ''),
+      ballot_letter: emptyToNull(input.ballotLetter ?? ''),
+      description: emptyToNull(input.description ?? ''),
+    })
+    .eq('id', input.partyId)
+    .select('id')
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  if (!data?.length) {
+    return { ok: false, error: 'לא ניתן לעדכן את המפלגה' }
   }
 
   return { ok: true }
@@ -536,6 +583,21 @@ export function electionsEditApiPlugin(env: Record<string, string>): Plugin {
           try {
             const body = (await readJsonBody(req)) as ElectionCandidateEditInput
             const result = await updateWithClient(admin, body)
+            sendJson(res, result.ok ? 200 : 400, result)
+          } catch {
+            sendJson(res, 500, { ok: false, error: 'שגיאת שרת בעת השמירה' })
+          }
+          return
+        }
+
+        if (url === '/api/elections/update-party') {
+          if (!checkEditSecret(req, res, editSecret)) {
+            return
+          }
+
+          try {
+            const body = (await readJsonBody(req)) as ElectionPartyEditInput
+            const result = await updatePartyWithClient(admin, body)
             sendJson(res, result.ok ? 200 : 400, result)
           } catch {
             sendJson(res, 500, { ok: false, error: 'שגיאת שרת בעת השמירה' })

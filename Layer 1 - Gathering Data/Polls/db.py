@@ -1,0 +1,67 @@
+"""Shared Supabase helpers for the polls pipeline."""
+
+from __future__ import annotations
+
+import os
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
+from dotenv import load_dotenv
+from supabase import Client, create_client
+
+load_dotenv()
+
+JERUSALEM = ZoneInfo("Asia/Jerusalem")
+PIPELINE_NAME = "polls"
+ELECTION_YEAR = 2026
+FALLBACK_ELECTION_DATE = date(2026, 10, 27)
+
+WIKI_PAGES = [
+    "Opinion_polling_for_the_2026_Israeli_legislative_election",
+    "2025_opinion_polling_for_the_2026_Israeli_legislative_election",
+    "2024_opinion_polling_for_the_2026_Israeli_legislative_election",
+    "2022–2023_opinion_polling_for_the_2026_Israeli_legislative_election",
+]
+
+MAIN_WIKI_PAGE = WIKI_PAGES[0]
+
+USER_AGENT = (
+    "StateOfTheNationPollsBot/1.0 "
+    "(https://github.com/stateofthenation; contact: polls@stateofthenation.org)"
+)
+
+
+def get_supabase() -> Client:
+    return create_client(
+        os.environ["SUPABASE_URL"],
+        os.environ["SUPABASE_SERVICE_KEY"],
+    )
+
+
+def get_election_id(sb: Client, year: int = ELECTION_YEAR) -> int:
+    rows = sb.table("elections").select("id, date").eq("year", year).execute().data
+    if not rows:
+        raise ValueError(f"No election row for year={year}")
+    return rows[0]["id"]
+
+
+def get_election_date(sb: Client, year: int = ELECTION_YEAR) -> date:
+    rows = sb.table("elections").select("date").eq("year", year).execute().data
+    if rows and rows[0].get("date"):
+        return date.fromisoformat(rows[0]["date"][:10])
+    return FALLBACK_ELECTION_DATE
+
+
+def today_jerusalem() -> date:
+    return datetime.now(JERUSALEM).date()
+
+
+def party_id_by_short_name(sb: Client, election_id: int) -> dict[str, int]:
+    rows = (
+        sb.table("election_parties")
+        .select("id, short_name")
+        .eq("election_id", election_id)
+        .execute()
+        .data
+    )
+    return {r["short_name"]: r["id"] for r in rows if r.get("short_name")}

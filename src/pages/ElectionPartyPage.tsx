@@ -77,7 +77,7 @@ export function ElectionPartyPage() {
                   ) : null}
                 </div>
 
-                <SeatsTrend color={party.color} />
+                <SeatsTrend partyId={party.id} color={party.color} />
               </header>
 
               <StatsBar stats={stats} />

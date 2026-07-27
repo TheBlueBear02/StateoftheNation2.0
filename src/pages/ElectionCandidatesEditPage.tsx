@@ -20,6 +20,7 @@ import {
   type CandidateEnrichmentUpdates,
 } from '../lib/enrichElectionCandidate'
 import { PartyPipelinePanel } from '../components/elections/PartyPipelinePanel'
+import { EditablePartyPanel } from '../components/elections/EditablePartyPanel'
 import { geocodeElectionMap } from '../lib/geocodeElectionMap'
 import './ElectionPartyPage.css'
 import './ElectionCandidatesEditPage.css'
@@ -633,6 +634,7 @@ export function ElectionCandidatesEditPage() {
     parties,
     loading: partiesLoading,
     error: partiesError,
+    refetch: refetchParties,
   } = useElectionParties()
   const {
     candidates,
@@ -916,6 +918,13 @@ export function ElectionCandidatesEditPage() {
 
                 {!partiesError && !candidatesError ? (
                   <>
+                    {selectedParty ? (
+                      <EditablePartyPanel
+                        party={selectedParty}
+                        onSaved={refetchParties}
+                      />
+                    ) : null}
+
                     {showPartyPipeline && selectedParty ? (
                       <PartyPipelinePanel
                         party={selectedParty}

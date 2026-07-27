@@ -1,0 +1,42 @@
+name: polls-pipeline
+
+on:
+  schedule:
+    - cron: '0 5,17 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: polls-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: 'Layer 1 - Gathering Data/Polls'
+
+      - name: Run polls pipeline
+        run: python run_polls_pipeline.py
+        working-directory: 'Layer 1 - Gathering Data/Polls'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Alert on review queue
+        if: always()
+        working-directory: 'Layer 1 - Gathering Data/Polls'
+        run: |
+          if [ -s review_queue.json ] && [ "$(jq 'length' review_queue.json)" -gt 0 ]; then
+            gh issue create --title "Polls pipeline: unmapped party labels" \
+              --body-file review_queue.json --label polls-pipeline
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

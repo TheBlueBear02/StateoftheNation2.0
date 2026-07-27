@@ -1,26 +1,12 @@
 import { useEffect, useState, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
 import type { CandidateMapPin } from '../../hooks/useElectionCandidates'
+import {
+  MAP_IMAGE_SRC,
+  MAP_VIEWBOX,
+  buildProjectedPins,
+  type ProjectedPin,
+} from '../../lib/candidateMapProjection'
 import { CandidateMapTooltip } from './CandidateMapTooltip'
-
-const MAP_VIEWBOX = {
-  width: 213,
-  height: 598,
-  padX: 6,
-  padY: 6,
-} as const
-
-const MAP_IMAGE_SRC = '/images/elections%20page/israel%20map.svg'
-
-const LATITUDE_BOUNDS = {
-  minLat: 29.45,
-  maxLat: 33.35,
-} as const
-
-const X_CALIBRATION = {
-  lonScale: 135.315883,
-  latScale: 2.768261,
-  offset: -4725.09223,
-} as const
 
 type CandidateMapProps = {
   pins: CandidateMapPin[]
@@ -30,70 +16,7 @@ type CandidateMapProps = {
   loading: boolean
 }
 
-type ProjectedPoint = {
-  x: number
-  y: number
-}
-
-type ProjectedPin = CandidateMapPin &
-  ProjectedPoint & {
-    offsetIndex: number
-  }
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
-}
-
-function project(latitude: number, longitude: number): ProjectedPoint {
-  // The map asset is visually slanted, so x needs latitude-aware calibration.
-  const x =
-    longitude * X_CALIBRATION.lonScale +
-    latitude * X_CALIBRATION.latScale +
-    X_CALIBRATION.offset
-  const y =
-    (1 -
-      (latitude - LATITUDE_BOUNDS.minLat) /
-        (LATITUDE_BOUNDS.maxLat - LATITUDE_BOUNDS.minLat)) *
-    MAP_VIEWBOX.height
-
-  return {
-    x: clamp(x, MAP_VIEWBOX.padX, MAP_VIEWBOX.width - MAP_VIEWBOX.padX),
-    y: clamp(y, MAP_VIEWBOX.padY, MAP_VIEWBOX.height - MAP_VIEWBOX.padY),
-  }
-}
-
-function buildProjectedPins(pins: CandidateMapPin[]): ProjectedPin[] {
-  const seenByCoordinate = new Map<string, number>()
-
-  return pins.map((pin) => {
-    const coordinateKey = `${pin.latitude.toFixed(3)}:${pin.longitude.toFixed(3)}`
-    const offsetIndex = seenByCoordinate.get(coordinateKey) ?? 0
-    seenByCoordinate.set(coordinateKey, offsetIndex + 1)
-
-    const projected = project(pin.latitude, pin.longitude)
-    const radius = offsetIndex === 0 ? 0 : 4 + Math.floor(offsetIndex / 6) * 3
-    const angle = offsetIndex * 2.399963229728653
-
-    const point = {
-      x: clamp(
-        projected.x + Math.cos(angle) * radius,
-        MAP_VIEWBOX.padX,
-        MAP_VIEWBOX.width - MAP_VIEWBOX.padX,
-      ),
-      y: clamp(
-        projected.y + Math.sin(angle) * radius,
-        MAP_VIEWBOX.padY,
-        MAP_VIEWBOX.height - MAP_VIEWBOX.padY,
-      ),
-    }
-
-    return {
-      ...pin,
-      ...point,
-      offsetIndex,
-    }
-  })
-}
+type PartyProjectedPin = ProjectedPin<CandidateMapPin>
 
 export function CandidateMap({
   pins,
@@ -105,7 +28,7 @@ export function CandidateMap({
   const accentColor = partyColor ?? '#4890fd'
   const style = { '--party-color': accentColor } as CSSProperties
   const projectedPins = buildProjectedPins(pins)
-  const [hoveredPin, setHoveredPin] = useState<ProjectedPin | null>(null)
+  const [hoveredPin, setHoveredPin] = useState<PartyProjectedPin | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
@@ -118,7 +41,7 @@ export function CandidateMap({
     setTooltipPosition({ x: event.clientX, y: event.clientY })
   }
 
-  function handleFocus(event: FocusEvent<SVGGElement>, pin: ProjectedPin) {
+  function handleFocus(event: FocusEvent<SVGGElement>, pin: PartyProjectedPin) {
     setHoveredPin(pin)
     const rect = event.currentTarget.getBoundingClientRect()
     setTooltipPosition({

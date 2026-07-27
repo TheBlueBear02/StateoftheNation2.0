@@ -83,9 +83,7 @@
   padding: clamp(20px, 4vw, 36px);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 0;
-  background:
-    linear-gradient(180deg, rgba(72, 144, 253, 0.08), rgba(72, 144, 253, 0)),
-    var(--color-white);
+  background: var(--color-white);
 }
 
 .government-pyramid__meta {

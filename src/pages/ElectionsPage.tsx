@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { SiteLayout } from '../components/SiteLayout'
+import { ElectionsOverviewMap } from '../components/elections/ElectionsOverviewMap'
 import { PartyCard, PartyCardSkeleton } from '../components/elections/PartyCard'
+import { useAllElectionMapPins } from '../hooks/useAllElectionMapPins'
 import {
   formatElectionDate,
   useElectionParties,
 } from '../hooks/useElectionParties'
+import './ElectionPartyPage.css'
 import './ElectionsPage.css'
 
 const SKELETON_CARDS = Array.from({ length: 8 }, (_, index) => index)
@@ -85,6 +89,11 @@ function useCurrentTime() {
 
 export function ElectionsPage() {
   const { election, parties, loading, error } = useElectionParties()
+  const {
+    pins: mapPins,
+    loading: mapLoading,
+    error: mapError,
+  } = useAllElectionMapPins(parties)
   const now = useCurrentTime()
   const title = election?.name ?? 'בחירות 2026'
   const dateLabel = formatElectionDate(election?.date ?? null)
@@ -108,6 +117,9 @@ export function ElectionsPage() {
               {dateLabel ? (
                 <p className="elections-page__date">מועד הבחירות: {dateLabel}</p>
               ) : null}
+              <p className="elections-page__polls-link">
+                <Link to="/elections/polls">לצפייה בסקרי המנדטים לקראת הבחירות</Link>
+              </p>
             </header>
           </div>
         </section>
@@ -142,6 +154,24 @@ export function ElectionsPage() {
             ) : null}
           </div>
         </section>
+
+        {!error ? (
+          <section className="elections-page__map">
+            <div className="elections-page__inner container">
+              {mapError ? (
+                <p className="elections-page__error" role="alert">
+                  לא ניתן לטעון את נתוני המפה
+                </p>
+              ) : (
+                <ElectionsOverviewMap
+                  parties={parties}
+                  pins={mapPins}
+                  loading={loading || mapLoading}
+                />
+              )}
+            </div>
+          </section>
+        ) : null}
       </main>
     </SiteLayout>
   )

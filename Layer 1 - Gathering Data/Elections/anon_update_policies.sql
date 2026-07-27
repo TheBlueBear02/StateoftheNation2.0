@@ -3,6 +3,7 @@
 
 grant update on public.election_candidates to anon;
 grant update on public.people to anon;
+grant update on public.election_parties to anon;
 
 create policy "Anon update election candidates"
 on public.election_candidates
@@ -13,6 +14,13 @@ with check (true);
 
 create policy "Anon update people"
 on public.people
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Anon update election parties"
+on public.election_parties
 for update
 to anon
 using (true)

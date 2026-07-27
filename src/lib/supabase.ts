@@ -85,6 +85,9 @@ export type ElectionRow = {
   knesset_number: number | null
 }
 
+export type PartyStatus = 'confirmed' | 'polled_only' | 'historical'
+export type PartyBloc = 'coalition' | 'opposition' | 'unaligned'
+
 export type ElectionPartyRow = {
   id: number
   election_id: number
@@ -95,6 +98,59 @@ export type ElectionPartyRow = {
   logo_url: string | null
   ballot_letter: string | null
   description: string | null
+  party_status?: PartyStatus
+  bloc?: PartyBloc | null
+  first_polled_date?: string | null
+  last_polled_date?: string | null
+}
+
+export type PollRow = {
+  id: number
+  election_id: number
+  natural_key: string
+  pollster: string
+  pollster_he: string | null
+  publisher: string
+  publisher_he: string | null
+  fieldwork_start: string
+  fieldwork_end: string
+  sample_size: number | null
+  margin_of_error: number | null
+  is_scenario: boolean
+  scenario_desc: string | null
+  source_url: string | null
+  source_revid: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type PollResultRow = {
+  id: number
+  poll_id: number
+  party_id: number
+  seats: number | null
+  vote_share: number | null
+  below_threshold: boolean | null
+}
+
+export type PollAggregateRow = {
+  id: number
+  election_id: number
+  party_id: number
+  as_of_date: string
+  method: 'last3' | 'weighted'
+  seats_avg: number
+  poll_count: number
+  created_at: string
+}
+
+export type PartyLineageRow = {
+  id: number
+  predecessor_id: number | null
+  successor_id: number | null
+  event_date: string
+  event_type: 'merge' | 'split' | 'rename' | 'dissolve' | 'found'
+  note: string | null
 }
 
 export type KnessetFaction = {

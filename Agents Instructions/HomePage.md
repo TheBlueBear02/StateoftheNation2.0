@@ -65,7 +65,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 |-------|-------|---------|
 | `--container-max` | `1120px` | Max width of centered content shell |
 | `--container-pad` | `clamp(20px, 6vw, 80px)` | Fluid horizontal inset on both sides |
-| `--hero-text-max` | `460px` | Inner cap for hero title/subtitle/buttons |
+| `--hero-text-max` | `580px` | Inner cap for hero title/subtitle/buttons |
 
 ## Sections
 
@@ -86,16 +86,16 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 - Bear column: `justify-content: flex-start` (faces toward center).
 - **Title:** מצב האומה
 - **Subtitle:** להבין מה באמת המצב של ישראל באמצעות טכנולוגיה
-- **Nav buttons** (`HERO_BUTTONS` in `App.tsx`):
+- **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): 2×2 grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (580px) so buttons read wider.
 
 | Label | Destination |
 |-------|--------|
 | בחירות 2026 | `/elections` (route) |
 | הממשלה | `/government` (route) |
-| מיפוי סוגיות פוליטיות | `#political-issues` |
+| סקרי מנדטים | `/elections/polls` (route) |
 | הכנסת | `/knesset` (route) |
 
-Buttons with `#` anchors are placeholders until dedicated routes exist. **בחירות 2026** links to the live Elections page, **הממשלה** links to the live Government page, and **הכנסת** links to the live Knesset hemicycle page.
+**בחירות 2026** links to the live Elections page, **סקרי מנדטים** links to weighted poll averages, **הממשלה** links to the live Government page, and **הכנסת** links to the live Knesset hemicycle page.
 
 ### 3. News strip (`news-strip`)
 

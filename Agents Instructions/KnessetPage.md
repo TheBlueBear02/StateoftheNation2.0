@@ -201,12 +201,69 @@ Fixed `SEAT_GRID` in `src/lib/hemicycle.ts`: 15 rows × 17 columns. Each cell is
 | Loading | standard hemicycle shimmer panel + faction skeletons while the Knesset list loads, member data loads, or the selected term does not match `loadedTermId` |
 | Error | Hebrew message: `לא ניתן לטעון את נתוני הכנסת` |
 
+## Edit Page (`/knesset/edit`)
+
+Password-gated private tool for running the Knesset OData sync pipeline and editing manually curated faction metadata. Register `/knesset/edit` **before** `/knesset` in `src/main.tsx`.
+
+### Routes & files
+
+| Route | File | Role |
+|-------|------|------|
+| `/knesset/edit` | `src/pages/KnessetPipelineEditPage.tsx` | Password gate, status panel, pipeline runner, faction editor |
+| | `src/pages/KnessetPipelineEditPage.css` | Status grid, pipeline stage rows, faction edit styles |
+| | `src/components/knesset/KnessetPipelinePanel.tsx` | Dev-only sync stages 1–6 + post-sync scripts |
+| | `src/hooks/useKnessetFactions.ts` | Faction list for selected Knesset term |
+| | `src/lib/runKnessetPipeline.ts` | Dev API client for status, stages, faction links, images |
+| | `src/lib/updateKnessetFaction.ts` | Dev API client for faction metadata saves |
+| | `vite-plugins/knessetEditApi.ts` | Dev middleware spawning Python in `Layer 1 - Gathering Data/knesset/` |
+| | `Layer 1 - Gathering Data/knesset/run_knesset_pipeline_api.py` | JSON API for pipeline subcommands |
+
+### Auth
+
+- Env: `VITE_KNESSET_EDIT_SECRET` (injected via `vite.config.ts`)
+- Client compares password in-browser; unlock stored in `sessionStorage` under `knesset-edit-unlocked`
+- API calls send header `X-Knesset-Edit-Secret`
+- Lightweight private-tool gate — not production auth
+
+### Status panel
+
+On unlock, loads table row counts, `membershipsMissingFaction`, last pipeline run time, and **last run summary** (inserted vs updated per stage/table) via `GET /api/knesset/status`. Summary is persisted in `pipeline_last_run.json` when sync stages, faction-link apply, or image sync complete. **רענן סטטוס** refetches after pipeline runs.
+
+### Pipeline panel (dev only)
+
+When `import.meta.env.DEV` is true, the **צינור נתונים** panel runs OData sync:
+
+| Stage | Label | Script step |
+|-------|-------|-------------|
+| 1 | כנסות | `sync_knessets` |
+| 2 | אנשים | `sync_people` |
+| 3 | סיעות | `sync_factions` |
+| 4 | משרדים | `sync_offices` |
+| 5 | ממשלות | `sync_governments` (DB only) |
+| 6 | חברויות ומינויים | `sync_positions` |
+
+- **התחל סנכרון מלא** runs stages 1–6 sequentially via `POST /api/knesset/pipeline/stage`
+- Per-stage **הרץ** buttons run a single stage
+- Post-sync: **בדוק קישורי סיעות** / **החל קישורי סיעות** (`fix_faction_links_all` logic)
+- **עדכן תמונות** runs `km_images` logic (hardcoded to `public/images/KM Images/הכנסת ה25`)
+
+Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `VITE_KNESSET_EDIT_SECRET` in `.env`.
+
+### Faction editor
+
+After unlock, pick a Knesset term (same `<select>` as public page). Each faction card edits **manually curated** fields only:
+
+- `short_name`, `color`, `is_coalition`, `logo_url`
+
+OData-synced `name` and dates are display-only. Saves via `POST /api/knesset/update-faction` (service key). Active term cards highlight missing `color` or `is_coalition`.
+
 ## Verification
 
 ```bash
 npm run lint
 npm run build
 npm run dev   # visit /knesset — switch Knesset terms in the header dropdown
+npm run dev   # visit /knesset/edit — pipeline + faction editing (dev + secret)
 ```
 
-Ensure `VITE_SUPABASE_ANON_KEY` is set in `.env` before testing live data.
+Ensure `VITE_SUPABASE_ANON_KEY` is set in `.env` before testing live data. For `/knesset/edit`, also set `VITE_KNESSET_EDIT_SECRET` and `SUPABASE_SERVICE_KEY`.

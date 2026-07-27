@@ -14,7 +14,7 @@
   --header-height: 56px;
   --container-max: 1120px;
   --container-pad: clamp(20px, 6vw, 80px);
-  --hero-text-max: 460px;
+  --hero-text-max: 580px;
 
   font-family: var(--font-sans);
   font-size: 18px;

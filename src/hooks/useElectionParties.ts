@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ACTIVE_ELECTION_YEAR,
   supabase,
@@ -16,6 +16,7 @@ export type UseElectionPartiesResult = {
   parties: ElectionParty[]
   loading: boolean
   error: string | null
+  refetch: () => Promise<void>
 }
 
 function normalizeElection(row: ElectionRow): ElectionOption {
@@ -75,6 +76,7 @@ async function fetchPartyRows(electionId: number | null) {
     .select(
       'id, election_id, name, short_name, color, logo_url, ballot_letter, description',
     )
+    .eq('party_status', 'confirmed')
     .order('id', { ascending: true })
 
   if (electionId !== null) {
@@ -131,103 +133,77 @@ export function useElectionParties(): UseElectionPartiesResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
+  const fetchParties = useCallback(async () => {
+    setLoading(true)
+    setError(null)
 
-    async function fetchParties() {
-      setLoading(true)
-      setError(null)
-
-      if (supabaseConfigError || !supabase) {
-        setError(supabaseConfigError ?? 'Supabase client is not configured')
-        setElection(null)
-        setParties([])
-        setLoading(false)
-        return
-      }
-
-      const { data: electionData, error: electionError } = await supabase
-        .from('elections')
-        .select('id, year, date, name, knesset_number')
-        .eq('year', ACTIVE_ELECTION_YEAR)
-        .maybeSingle()
-
-      if (cancelled) {
-        return
-      }
-
-      const electionRow =
-        !electionError && electionData ? (electionData as ElectionRow) : null
-      const partyResult = await fetchPartyRows(electionRow?.id ?? null)
-
-      if (!partyResult) {
-        setError('Supabase client is not configured')
-        setElection(electionRow ? normalizeElection(electionRow) : null)
-        setParties([])
-        setLoading(false)
-        return
-      }
-
-      let { data: partyData, error: partyError } = partyResult
-
-      if (
-        !partyError &&
-        electionRow &&
-        (partyData?.length ?? 0) === 0
-      ) {
-        const fallbackPartyResult = await fetchPartyRows(null)
-
-        if (cancelled) {
-          return
-        }
-
-        if (!fallbackPartyResult) {
-          setError('Supabase client is not configured')
-          setElection(normalizeElection(electionRow))
-          setParties([])
-          setLoading(false)
-          return
-        }
-
-        const fallbackRows = await fallbackPartyResult
-        partyData = fallbackRows.data
-        partyError = fallbackRows.error
-      }
-
-      if (cancelled) {
-        return
-      }
-
-      if (partyError) {
-        setError(partyError.message)
-        setElection(electionRow ? normalizeElection(electionRow) : null)
-        setParties([])
-        setLoading(false)
-        return
-      }
-
-      const partyRows = (partyData ?? []) as ElectionPartyRow[]
-      const leadersByPartyId = await fetchPartyLeaders(
-        partyRows.map((party) => party.id),
-      )
-
-      if (cancelled) {
-        return
-      }
-
-      setElection(electionRow ? normalizeElection(electionRow) : null)
-      setParties(
-        partyRows.map((party) => normalizeParty(party, leadersByPartyId)),
-      )
+    if (supabaseConfigError || !supabase) {
+      setError(supabaseConfigError ?? 'Supabase client is not configured')
+      setElection(null)
+      setParties([])
       setLoading(false)
+      return
     }
 
-    void fetchParties()
+    const { data: electionData, error: electionError } = await supabase
+      .from('elections')
+      .select('id, year, date, name, knesset_number')
+      .eq('year', ACTIVE_ELECTION_YEAR)
+      .maybeSingle()
 
-    return () => {
-      cancelled = true
+    const electionRow =
+      !electionError && electionData ? (electionData as ElectionRow) : null
+    const partyResult = await fetchPartyRows(electionRow?.id ?? null)
+
+    if (!partyResult) {
+      setError('Supabase client is not configured')
+      setElection(electionRow ? normalizeElection(electionRow) : null)
+      setParties([])
+      setLoading(false)
+      return
     }
+
+    let { data: partyData, error: partyError } = partyResult
+
+    if (!partyError && electionRow && (partyData?.length ?? 0) === 0) {
+      const fallbackPartyResult = await fetchPartyRows(null)
+
+      if (!fallbackPartyResult) {
+        setError('Supabase client is not configured')
+        setElection(normalizeElection(electionRow))
+        setParties([])
+        setLoading(false)
+        return
+      }
+
+      const fallbackRows = await fallbackPartyResult
+      partyData = fallbackRows.data
+      partyError = fallbackRows.error
+    }
+
+    if (partyError) {
+      setError(partyError.message)
+      setElection(electionRow ? normalizeElection(electionRow) : null)
+      setParties([])
+      setLoading(false)
+      return
+    }
+
+    const partyRows = (partyData ?? []) as ElectionPartyRow[]
+    const leadersByPartyId = await fetchPartyLeaders(
+      partyRows.map((party) => party.id),
+    )
+
+    setElection(electionRow ? normalizeElection(electionRow) : null)
+    setParties(
+      partyRows.map((party) => normalizeParty(party, leadersByPartyId)),
+    )
+    setLoading(false)
   }, [])
 
-  return { election, parties, loading, error }
+  useEffect(() => {
+    void fetchParties()
+  }, [fetchParties])
+
+  return { election, parties, loading, error, refetch: fetchParties }
 }

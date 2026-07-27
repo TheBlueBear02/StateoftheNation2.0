@@ -12,9 +12,10 @@ Central reference for agents working on this repository. Use this file to unders
 | הכנסת — Knesset hemicycle | `/knesset` | Live |
 | צינורות נתונים — Data pipelines docs | `/piplines` | Live |
 | דשבורד ממשלה — Government dashboard | `/government` | Live |
-| בחירות 2026 — Elections 2026 | `#elections-2026` | Planned |
+| בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls` | Live |
+| סקרי מנדטים — Poll averages (hero) | `/elections/polls` | Live |
+| עדכון סקרים (dev) | `/elections/polls/edit` | Live (password-gated) |
 | ציר זמן — Timeline | `#timeline` | Planned |
-| מיפוי סוגיות פוליטיות — Political issues map | `#political-issues` | Planned |
 
 Live pages fetch parliamentary data from **Supabase** (backed by the official Knesset OData API, seeded via Python scripts). Static homepage content (news ticker, hero copy) is hard-coded until APIs are wired.
 
@@ -125,6 +126,9 @@ These scripts use `SUPABASE_SERVICE_KEY` (service role). The frontend uses only 
 │         ├─ /           → App.tsx (static homepage)          │
 │         ├─ /government → GovernmentPage.tsx                 │
 │         ├─ /knesset    → KnessetPage.tsx                    │
+│         ├─ /elections → ElectionsPage.tsx
+│         ├─ /elections/polls/edit → ElectionsPollsEditPage.tsx
+│         ├─ /elections/polls → ElectionsPollsPage.tsx
 │         └─ /piplines/* → PiplinesPage.tsx                   │
 │              ├─ SiteLayout (header + footer)              │
 │              ├─ useKnessetList → Supabase knessets          │
@@ -192,5 +196,7 @@ Read the overview first, then the doc for the area you are changing:
 | [HomePage.md](./HomePage.md) | `/` — hero, news strip, dashboard teaser, `.container`, routing |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` — hemicycle grid, coalition layout, hooks, animations |
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` — data pipeline documentation hub |
+| [ElectionsPage.md](./ElectionsPage.md) | `/elections` — party index, candidates, map |
+| [PollsPage.md](./PollsPage.md) | `/elections/polls` — Wikipedia poll averages and trend; `/elections/polls/edit` pipeline runner |
 
 When adding a new major page or module, create a matching `Agents Instructions/{Feature}.md` and link it from this index.

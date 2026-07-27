@@ -11,6 +11,13 @@ Read this file before building new pages, shared components, cards, buttons, or 
 - Prefer clear hierarchy, readable spacing, and strong alignment over visual ornament.
 - The product is Hebrew and RTL-first; layouts should feel natural in RTL.
 
+## Page And Section Backgrounds
+
+- Page mains, heroes, and full-bleed sections use a flat white background (`var(--color-white)`).
+- **Do not** add soft blue gradient washes on pages, heroes, or panels (e.g. `linear-gradient(... rgba(72, 144, 253, …) …)` fading into white).
+- Blue is reserved for accents, CTAs, selected states, and links — not page-level atmospheric backgrounds.
+- Adjacent panels may use `#fafafa` when a light neutral surface is needed; keep it flat (no blue tint gradient).
+
 ## Color Palette
 
 Use the existing CSS variables in `src/index.css` whenever possible.
@@ -97,6 +104,7 @@ Approved neutral tints:
 Before finishing a UI change:
 
 - Confirm new cards/buttons have `border-radius: 0`.
+- Confirm page/hero backgrounds are flat white (no soft blue gradient washes).
 - Confirm colors come from the approved palette or a justified local neutral.
 - Confirm the layout works in RTL and mobile widths.
 - Confirm affected agent docs are updated.

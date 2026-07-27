@@ -281,13 +281,51 @@ def run_probe() -> None:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def upsert(sb: Client, table: str, rows: list[dict], conflict_col: str) -> None:
+def upsert(
+    sb: Client,
+    table: str,
+    rows: list[dict],
+    conflict_col: str,
+    existing_keys: set | None = None,
+) -> dict:
     if not rows:
         log.info("  → %s: nothing to upsert", table)
-        return
+        return {
+            "table": table,
+            "upserted": 0,
+            "inserted": 0,
+            "updated": 0,
+        }
+
+    if existing_keys is None:
+        existing_keys = set(load_id_map(sb, table, conflict_col).keys())
+
+    inserted = 0
+    updated = 0
+    for row in rows:
+        key = row.get(conflict_col)
+        if key is None:
+            continue
+        if key in existing_keys:
+            updated += 1
+        else:
+            inserted += 1
+
     for i in range(0, len(rows), 500):
         sb.table(table).upsert(rows[i:i + 500], on_conflict=conflict_col).execute()
-    log.info("  → %s: upserted %d rows", table, len(rows))
+    log.info(
+        "  → %s: upserted %d rows (%d new, %d updated)",
+        table,
+        len(rows),
+        inserted,
+        updated,
+    )
+    return {
+        "table": table,
+        "upserted": len(rows),
+        "inserted": inserted,
+        "updated": updated,
+    }
 
 
 def load_id_map(sb: Client, table: str, key_col: str) -> dict:
@@ -355,8 +393,9 @@ def sync_knessets(sb: Client) -> dict[int, int]:
         })
 
     log.info("  aggregated into %d knesset rows", len(rows))
-    upsert(sb, "knessets", rows, "knesset_number")
-    return load_id_map(sb, "knessets", "knesset_number")
+    existing_keys = set(load_id_map(sb, "knessets", "knesset_number").keys())
+    stats = upsert(sb, "knessets", rows, "knesset_number", existing_keys)
+    return load_id_map(sb, "knessets", "knesset_number"), stats
 
 
 def sync_people(sb: Client) -> dict[int, int]:
@@ -382,8 +421,9 @@ def sync_people(sb: Client) -> dict[int, int]:
         if r.get("PersonID") is not None
     ]
 
-    upsert(sb, "people", rows, "knesset_person_id")
-    return load_id_map(sb, "people", "knesset_person_id")
+    existing_keys = set(load_id_map(sb, "people", "knesset_person_id").keys())
+    stats = upsert(sb, "people", rows, "knesset_person_id", existing_keys)
+    return load_id_map(sb, "people", "knesset_person_id"), stats
 
 
 def sync_factions(sb: Client, knesset_map: dict[int, int]) -> dict[int, int]:
@@ -415,8 +455,9 @@ def sync_factions(sb: Client, knesset_map: dict[int, int]) -> dict[int, int]:
     if skipped:
         log.warning("  knesset_factions: skipped %d rows (unknown KnessetNum)", skipped)
 
-    upsert(sb, "knesset_factions", rows, "knesset_faction_id")
-    return load_id_map(sb, "knesset_factions", "knesset_faction_id")
+    existing_keys = set(load_id_map(sb, "knesset_factions", "knesset_faction_id").keys())
+    stats = upsert(sb, "knesset_factions", rows, "knesset_faction_id", existing_keys)
+    return load_id_map(sb, "knesset_factions", "knesset_faction_id"), stats
 
 
 def sync_offices(sb: Client) -> dict[int, int]:
@@ -439,8 +480,9 @@ def sync_offices(sb: Client) -> dict[int, int]:
         if r.get("GovMinistryID") is not None
     ]
 
-    upsert(sb, "offices", rows, "knesset_category_id")
-    return load_id_map(sb, "offices", "knesset_category_id")
+    existing_keys = set(load_id_map(sb, "offices", "knesset_category_id").keys())
+    stats = upsert(sb, "offices", rows, "knesset_category_id", existing_keys)
+    return load_id_map(sb, "offices", "knesset_category_id"), stats
 
 
 def sync_governments(sb: Client) -> dict[int, int]:
@@ -524,11 +566,33 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
         log.warning("  knesset_memberships: skipped %d unmapped rows", skipped)
 
     # Pass 1: upsert all base data (person, knesset, dates) — faction_id untouched
-    upsert(sb, "knesset_memberships", membership_rows, "knesset_position_id")
+    membership_existing = set(
+        load_id_map(sb, "knesset_memberships", "knesset_position_id").keys()
+    )
+    membership_stats = upsert(
+        sb,
+        "knesset_memberships",
+        membership_rows,
+        "knesset_position_id",
+        membership_existing,
+    )
 
     # Pass 2: upsert faction links only where OData has a value
+    faction_stats = {
+        "table": "knesset_memberships.faction_id",
+        "upserted": 0,
+        "inserted": 0,
+        "updated": 0,
+    }
     if faction_updates:
-        upsert(sb, "knesset_memberships", faction_updates, "knesset_position_id")
+        faction_stats = upsert(
+            sb,
+            "knesset_memberships",
+            faction_updates,
+            "knesset_position_id",
+            membership_existing,
+        )
+        faction_stats["table"] = "knesset_memberships.faction_id"
         log.info("  → faction_id updated for %d rows", len(faction_updates))
     else:
         log.warning("  OData returned no FactionID values — faction links unchanged")
@@ -562,7 +626,22 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
         })
     if skipped:
         log.warning("  minister_appointments: skipped %d unmapped rows", skipped)
-    upsert(sb, "minister_appointments", appointment_rows, "knesset_position_id")
+    appointment_existing = set(
+        load_id_map(sb, "minister_appointments", "knesset_position_id").keys()
+    )
+    appointment_stats = upsert(
+        sb,
+        "minister_appointments",
+        appointment_rows,
+        "knesset_position_id",
+        appointment_existing,
+    )
+
+    return {
+        "knesset_memberships": membership_stats,
+        "knesset_memberships_faction_id": faction_stats,
+        "minister_appointments": appointment_stats,
+    }
 
 
 # ── Full sync ─────────────────────────────────────────────────────────────────
@@ -571,11 +650,11 @@ def sync_all(sb: Client) -> None:
     start = datetime.now()
     log.info("═══ Knesset OData full sync — %s ═══", start.strftime("%Y-%m-%d %H:%M"))
 
-    knesset_map = sync_knessets(sb)
-    people_map  = sync_people(sb)
-    faction_map = sync_factions(sb, knesset_map)
-    office_map  = sync_offices(sb)
-    gov_map     = sync_governments(sb)
+    knesset_map, _ = sync_knessets(sb)
+    people_map, _ = sync_people(sb)
+    faction_map, _ = sync_factions(sb, knesset_map)
+    office_map, _ = sync_offices(sb)
+    gov_map = sync_governments(sb)
     sync_positions(sb, people_map, knesset_map, faction_map, gov_map, office_map)
 
     elapsed = (datetime.now() - start).seconds

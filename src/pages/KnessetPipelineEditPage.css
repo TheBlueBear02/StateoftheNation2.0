@@ -1,0 +1,152 @@
+.knesset-pipeline-panel__stages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.knesset-pipeline-panel__stage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.knesset-pipeline-panel__stage-label {
+  font-weight: 600;
+}
+
+.knesset-pipeline-panel__post-sync {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.knesset-pipeline-panel__subheading {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.knesset-run-summary {
+  margin-top: 16px;
+}
+
+.knesset-run-summary__title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.knesset-run-summary__table {
+  margin-top: 0;
+}
+
+.knesset-run-summary__totals td {
+  font-weight: 800;
+  background: rgba(72, 144, 253, 0.08);
+}
+
+.knesset-run-summary__note {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.knesset-status-panel__last-run {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.knesset-status-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.knesset-status-panel__item {
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.knesset-status-panel__label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.knesset-status-panel__value {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.knesset-status-panel__alert {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 120, 0, 0.1);
+  color: var(--color-text);
+}
+
+.faction-edit-card__swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+
+.faction-edit-card__badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(72, 144, 253, 0.15);
+  color: var(--color-blue-dark);
+}
+
+.faction-edit-card__badge--coalition {
+  background: rgba(34, 139, 34, 0.15);
+  color: #1a6b1a;
+}
+
+.faction-edit-card__full-name {
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.faction-edit-card__color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.faction-edit-card__color-row input[type='color'] {
+  width: 40px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.faction-edit-card__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.faction-edit-card__checkbox input {
+  width: 18px;
+  height: 18px;
+}

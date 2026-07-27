@@ -1,0 +1,29 @@
+.polls-pipeline-panel__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.polls-pipeline-panel__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.polls-pipeline-panel__checkbox input {
+  margin-top: 3px;
+}
+
+.polls-sync-resources {
+  margin-top: 20px;
+}
+
+.polls-sync-resources__title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+}
