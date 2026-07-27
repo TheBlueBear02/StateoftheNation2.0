@@ -50,6 +50,7 @@ Requirements:
 import os
 import re
 import csv
+import io
 import logging
 import argparse
 from pathlib import Path
@@ -141,58 +142,64 @@ def validate_list_positions(candidates: list[dict]) -> None:
             )
 
 
-def parse_txt(path: Path) -> list[dict]:
+CSV_HEADER_VALUES = {"name", "שם", "מועמד", "שם מועמד", "שם מלא"}
+
+
+def parse_text_lines(text: str) -> list[dict]:
     """
-    Parse a plain text file — one candidate per line.
+    Parse pasted plain text — one candidate per line.
     Empty lines and lines starting with # are skipped.
-    Numbered lines (1. name / 1) name) use the embedded position;
-    plain lines get list_position from file order at insert time.
     """
     candidates = []
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            list_position, name = parse_numbered_line(line)
-            if name:
-                entry: dict = {"name": name, "city": None}
-                if list_position is not None:
-                    entry["list_position"] = list_position
-                candidates.append(entry)
-
-    validate_list_positions(candidates)
-    return candidates
-
-
-def parse_csv(path: Path) -> list[dict]:
-    """
-    Parse a CSV file with columns: name[,city]
-    Auto-detects and skips a header row.
-    Handles Excel-exported files (UTF-8 BOM).
-    """
-    HEADER_VALUES = {"name", "שם", "מועמד", "שם מועמד", "שם מלא"}
-    candidates = []
-    with open(path, encoding="utf-8-sig") as f:
-        reader = csv.reader(f)
-        for i, row in enumerate(reader):
-            if not row:
-                continue
-            name_raw = row[0].strip()
-            # Skip header row
-            if i == 0 and name_raw.lower() in HEADER_VALUES:
-                continue
-            list_position, name = parse_numbered_line(name_raw)
-            if not name:
-                continue
-            city = row[1].strip() if len(row) > 1 and row[1].strip() else None
-            entry: dict = {"name": name, "city": city}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        list_position, name = parse_numbered_line(line)
+        if name:
+            entry: dict = {"name": name, "city": None}
             if list_position is not None:
                 entry["list_position"] = list_position
             candidates.append(entry)
 
     validate_list_positions(candidates)
     return candidates
+
+
+def parse_csv_text(text: str) -> list[dict]:
+    """
+    Parse pasted CSV with columns: name[,city]
+    Auto-detects and skips a header row.
+    """
+    candidates = []
+    reader = csv.reader(io.StringIO(text.lstrip("\ufeff")))
+    for i, row in enumerate(reader):
+        if not row:
+            continue
+        name_raw = row[0].strip()
+        if i == 0 and name_raw.lower() in CSV_HEADER_VALUES:
+            continue
+        list_position, name = parse_numbered_line(name_raw)
+        if not name:
+            continue
+        city = row[1].strip() if len(row) > 1 and row[1].strip() else None
+        entry: dict = {"name": name, "city": city}
+        if list_position is not None:
+            entry["list_position"] = list_position
+        candidates.append(entry)
+
+    validate_list_positions(candidates)
+    return candidates
+
+
+def parse_txt(path: Path) -> list[dict]:
+    with open(path, encoding="utf-8") as f:
+        return parse_text_lines(f.read())
+
+
+def parse_csv(path: Path) -> list[dict]:
+    with open(path, encoding="utf-8-sig") as f:
+        return parse_csv_text(f.read())
 
 
 def parse_file(path: Path) -> list[dict]:
@@ -203,47 +210,12 @@ def parse_file(path: Path) -> list[dict]:
 
 # ── Insert ────────────────────────────────────────────────────────────────────
 
-def insert_list(
-    sb:          Client,
+def build_raw_rows(
     election_id: int,
     party_id:    int,
-    party_key:   str,
     candidates:  list[dict],
-    dry_run:     bool,
-) -> None:
-
-    # Check state of existing rows for this party
-    existing = (
-        sb.table("raw_candidate_lists")
-        .select("id, processed")
-        .eq("party_id", party_id)
-        .execute()
-        .data
-    )
-    already_processed = [r for r in existing if r["processed"]]
-    unprocessed       = [r for r in existing if not r["processed"]]
-
-    # Delete existing unprocessed rows — safe to replace with updated list
-    if unprocessed:
-        log.info(
-            "  Replacing %d existing unprocessed rows for '%s'",
-            len(unprocessed), party_key,
-        )
-        if not dry_run:
-            ids = [r["id"] for r in unprocessed]
-            sb.table("raw_candidate_lists").delete().in_("id", ids).execute()
-
-    # Warn about already-processed rows
-    if already_processed:
-        log.warning(
-            "  %d rows already processed (committed to election_candidates).\n"
-            "  After re-running the pipeline, use the cleanup SQL in the docstring\n"
-            "  to remove any candidates who dropped off the list.",
-            len(already_processed),
-        )
-
-    # Build rows — numbered lines keep their file position; plain lines use file order
-    rows = [
+) -> list[dict]:
+    return [
         {
             "election_id":   election_id,
             "party_id":      party_id,
@@ -255,7 +227,43 @@ def insert_list(
         for i, c in enumerate(candidates)
     ]
 
-    # Preview first 5
+
+def insert_list_from_candidates(
+    sb:          Client,
+    election_id: int,
+    party_id:    int,
+    party_key:   str,
+    candidates:  list[dict],
+    dry_run:     bool,
+) -> dict:
+    existing = (
+        sb.table("raw_candidate_lists")
+        .select("id, processed")
+        .eq("party_id", party_id)
+        .execute()
+        .data
+    )
+    already_processed = [r for r in existing if r["processed"]]
+    unprocessed       = [r for r in existing if not r["processed"]]
+    replaced          = len(unprocessed)
+
+    if unprocessed:
+        log.info(
+            "  Replacing %d existing unprocessed rows for '%s'",
+            len(unprocessed), party_key,
+        )
+        if not dry_run:
+            ids = [r["id"] for r in unprocessed]
+            sb.table("raw_candidate_lists").delete().in_("id", ids).execute()
+
+    if already_processed:
+        log.warning(
+            "  %d rows already processed (committed to election_candidates).",
+            len(already_processed),
+        )
+
+    rows = build_raw_rows(election_id, party_id, candidates)
+
     log.info("  Preview:")
     for r in rows[:5]:
         city_str = f"  ({r['raw_city']})" if r["raw_city"] else ""
@@ -265,11 +273,34 @@ def insert_list(
 
     if dry_run:
         log.info("  [DRY RUN] would insert %d rows — no changes made", len(rows))
-        return
+        return {
+            "inserted": len(rows),
+            "replaced": replaced,
+            "alreadyProcessed": len(already_processed),
+        }
 
     sb.table("raw_candidate_lists").insert(rows).execute()
     log.info("  ✓ Inserted %d candidates for '%s'", len(rows), party_key)
-    log.info("  Next step: python run_pipeline.py")
+    return {
+        "inserted": len(rows),
+        "replaced": replaced,
+        "alreadyProcessed": len(already_processed),
+    }
+
+
+def insert_list(
+    sb:          Client,
+    election_id: int,
+    party_id:    int,
+    party_key:   str,
+    candidates:  list[dict],
+    dry_run:     bool,
+) -> None:
+    insert_list_from_candidates(
+        sb, election_id, party_id, party_key, candidates, dry_run,
+    )
+    if not dry_run:
+        log.info("  Next step: python run_pipeline.py")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

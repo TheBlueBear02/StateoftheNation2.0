@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
+import { ElectionCandidatesEditPage } from './pages/ElectionCandidatesEditPage.tsx'
 import { ElectionsPage } from './pages/ElectionsPage.tsx'
 import { ElectionPartyPage } from './pages/ElectionPartyPage.tsx'
 import { GovernmentPage } from './pages/GovernmentPage.tsx'
@@ -15,6 +16,7 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/elections" element={<ElectionsPage />} />
+        <Route path="/elections/edit" element={<ElectionCandidatesEditPage />} />
         <Route path="/elections/:partyId" element={<ElectionPartyPage />} />
         <Route path="/government" element={<GovernmentPage />} />
         <Route path="/knesset" element={<KnessetPage />} />

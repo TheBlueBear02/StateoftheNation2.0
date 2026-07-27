@@ -41,6 +41,30 @@ log = logging.getLogger(__name__)
 WIKI_API  = "https://he.wikipedia.org/api/rest_v1/page/summary/{}"
 OPENAI_MODEL = "gpt-4o"
 REQUEST_DELAY = 0.5   # seconds between OpenAI calls
+WIKI_HEADERS = {
+    "Accept": "application/json",
+    "User-Agent": "MatzavHaUma/1.0 (elections-pipeline)",
+}
+
+
+def name_variants(full_name: str) -> list[str]:
+    """Return name variants to try, longest first (handles middle names)."""
+    name = full_name.strip()
+    if not name:
+        return []
+
+    variants: list[str] = [name]
+    parts = name.split()
+    if len(parts) >= 3:
+        variants.append(f"{parts[0]} {parts[-1]}")
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for variant in variants:
+        if variant not in seen:
+            seen.add(variant)
+            ordered.append(variant)
+    return ordered
 
 
 def get_supabase() -> Client:
@@ -66,17 +90,47 @@ def fetch_wikipedia_intro(name: str) -> str | None:
     Fetch the opening paragraph of the Hebrew Wikipedia article for a person.
     Returns plain text intro or None if not found.
     """
+    for variant in name_variants(name):
+        intro = _fetch_wikipedia_intro_once(variant)
+        if intro:
+            return intro
+    return None
+
+
+def fetch_wikipedia_url(name: str) -> str | None:
+    """Return the Hebrew Wikipedia article URL for a person, if found."""
+    for variant in name_variants(name):
+        url = _fetch_wikipedia_url_once(variant)
+        if url:
+            return url
+    return None
+
+
+def _fetch_wikipedia_intro_once(name: str) -> str | None:
     url = WIKI_API.format(requests.utils.quote(name))
     try:
-        resp = requests.get(url, timeout=10, headers={"Accept": "application/json"})
+        resp = requests.get(url, timeout=10, headers=WIKI_HEADERS)
         if resp.status_code == 200:
             data    = resp.json()
             extract = data.get("extract", "").strip()
             if extract:
-                # Take only the first 500 chars to keep the prompt tight
                 return extract[:500]
     except Exception as exc:
         log.warning("    Wikipedia fetch failed for '%s': %s", name, exc)
+    return None
+
+
+def _fetch_wikipedia_url_once(name: str) -> str | None:
+    url = WIKI_API.format(requests.utils.quote(name))
+    try:
+        resp = requests.get(url, timeout=10, headers=WIKI_HEADERS)
+        if resp.status_code == 200:
+            data = resp.json()
+            page = data.get("content_urls", {}).get("desktop", {}).get("page")
+            if page:
+                return page
+    except Exception as exc:
+        log.warning("    Wikipedia URL fetch failed for '%s': %s", name, exc)
     return None
 
 

@@ -175,16 +175,13 @@ def normalize_gender(raw: str | None) -> str | None:
 
 # ── Apply enrichment ──────────────────────────────────────────────────────────
 
-def apply_enrichment(
-    sb:        Client,
-    candidate: dict,
-    wikidata:  dict,
-    dry_run:   bool,
-) -> None:
+def collect_enrichment_updates(candidate: dict, wikidata: dict) -> tuple[dict, dict]:
+    """
+    Return (person_updates, ec_updates) for NULL fields only — no DB writes.
+    """
     person_updates = {}
     ec_updates     = {}
 
-    # Only fill NULL fields — never overwrite
     if not candidate["birth_date"] and wikidata.get("birth_date"):
         person_updates["birth_date"] = wikidata["birth_date"]
 
@@ -198,6 +195,17 @@ def apply_enrichment(
 
     if not candidate["ec_city"] and wikidata.get("city"):
         ec_updates["city"] = wikidata["city"]
+
+    return person_updates, ec_updates
+
+
+def apply_enrichment(
+    sb:        Client,
+    candidate: dict,
+    wikidata:  dict,
+    dry_run:   bool,
+) -> None:
+    person_updates, ec_updates = collect_enrichment_updates(candidate, wikidata)
 
     if person_updates:
         log.info(

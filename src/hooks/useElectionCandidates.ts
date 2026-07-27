@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   supabase,
   supabaseConfigError,
@@ -57,6 +57,7 @@ export type UseElectionCandidatesResult = {
   mapPins: CandidateMapPin[]
   loading: boolean
   error: string | null
+  refetch: () => Promise<void>
 }
 
 const EMPTY_STATS: ElectionCandidateStats = {
@@ -254,96 +255,82 @@ export function useElectionCandidates(
   const [loading, setLoading] = useState(Boolean(partyId))
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
+  const fetchCandidates = useCallback(async () => {
+    setLoading(true)
+    setError(null)
 
-    async function fetchCandidates() {
-      setLoading(true)
-      setError(null)
-
-      if (!partyId) {
-        setCandidates([])
-        setLoading(false)
-        return
-      }
-
-      if (supabaseConfigError || !supabase) {
-        setError(supabaseConfigError ?? 'Supabase client is not configured')
-        setCandidates([])
-        setLoading(false)
-        return
-      }
-
-      const { data, error: queryError } = await supabase
-        .from('election_candidates')
-        .select(
-          'id, election_id, party_id, person_id, list_position, description, city, latitude, longitude, person:people(full_name, image_url, birth_date, gender, wikipedia_url)',
-        )
-        .eq('party_id', partyId)
-        .order('list_position', { ascending: true })
-
-      if (cancelled) {
-        return
-      }
-
-      if (queryError) {
-        setError(queryError.message)
-        setCandidates([])
-        setLoading(false)
-        return
-      }
-
-      const rows = (data ?? []) as unknown as ElectionCandidateRow[]
-      const personIds = [
-        ...new Set(rows.map((row) => row.person_id).filter(Boolean)),
-      ]
-
-      if (personIds.length === 0) {
-        setCandidates([])
-        setLoading(false)
-        return
-      }
-
-      const { data: membershipData, error: membershipError } = await supabase
-        .from('knesset_memberships')
-        .select('person_id, start_date, end_date, knesset:knessets(knesset_number)')
-        .in('person_id', personIds)
-
-      if (cancelled) {
-        return
-      }
-
-      if (membershipError) {
-        setError(membershipError.message)
-        setCandidates([])
-        setLoading(false)
-        return
-      }
-
-      const servedPersonIds = new Set(
-        ((membershipData ?? []) as KnessetMembershipTenureRow[]).map(
-          (row) => row.person_id,
-        ),
-      )
-      const tenureMap = buildTenureMap(
-        (membershipData ?? []) as unknown as KnessetMembershipTenureRow[],
-      )
-
-      setCandidates(
-        rows.map((row) => normalizeCandidate(row, servedPersonIds, tenureMap)),
-      )
+    if (!partyId) {
+      setCandidates([])
       setLoading(false)
+      return
     }
 
-    void fetchCandidates()
-
-    return () => {
-      cancelled = true
+    if (supabaseConfigError || !supabase) {
+      setError(supabaseConfigError ?? 'Supabase client is not configured')
+      setCandidates([])
+      setLoading(false)
+      return
     }
+
+    const { data, error: queryError } = await supabase
+      .from('election_candidates')
+      .select(
+        'id, election_id, party_id, person_id, list_position, description, city, latitude, longitude, person:people(full_name, image_url, birth_date, gender, wikipedia_url)',
+      )
+      .eq('party_id', partyId)
+      .order('list_position', { ascending: true })
+
+    if (queryError) {
+      setError(queryError.message)
+      setCandidates([])
+      setLoading(false)
+      return
+    }
+
+    const rows = (data ?? []) as unknown as ElectionCandidateRow[]
+    const personIds = [
+      ...new Set(rows.map((row) => row.person_id).filter(Boolean)),
+    ]
+
+    if (personIds.length === 0) {
+      setCandidates([])
+      setLoading(false)
+      return
+    }
+
+    const { data: membershipData, error: membershipError } = await supabase
+      .from('knesset_memberships')
+      .select('person_id, start_date, end_date, knesset:knessets(knesset_number)')
+      .in('person_id', personIds)
+
+    if (membershipError) {
+      setError(membershipError.message)
+      setCandidates([])
+      setLoading(false)
+      return
+    }
+
+    const servedPersonIds = new Set(
+      ((membershipData ?? []) as KnessetMembershipTenureRow[]).map(
+        (row) => row.person_id,
+      ),
+    )
+    const tenureMap = buildTenureMap(
+      (membershipData ?? []) as unknown as KnessetMembershipTenureRow[],
+    )
+
+    setCandidates(
+      rows.map((row) => normalizeCandidate(row, servedPersonIds, tenureMap)),
+    )
+    setLoading(false)
   }, [partyId])
+
+  useEffect(() => {
+    void fetchCandidates()
+  }, [fetchCandidates])
 
   const stats = useMemo(() => buildStats(candidates), [candidates])
   const mapPins = useMemo(() => buildMapPins(candidates), [candidates])
 
-  return { candidates, stats, mapPins, loading, error }
+  return { candidates, stats, mapPins, loading, error, refetch: fetchCandidates }
 }

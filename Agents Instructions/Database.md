@@ -15,7 +15,7 @@ The schema is split into four logical groups:
 | **KPI data** | `indexes` · `index_data` | Seeded — dashboard page planned |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | In progress — elections page planned |
 
-All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/`. The frontend uses only the public Supabase anon key and never writes to the DB.
+All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/`. The public site reads via the anon key. The password-gated editor at `/elections/edit` can also `UPDATE` `election_candidates` and `people` through the anon key once the UPDATE policies below are applied — this is a lightweight private-tool gate, not production auth.
 
 ---
 
@@ -313,7 +313,7 @@ Ordered candidate list per party. One row per candidate per party.
 - `UNIQUE (party_id, list_position)` — no duplicate positions within a party
 - `UNIQUE (party_id, person_id)` — same person can't appear twice on one list
 
-**Data source:** Written by `resolve_candidates.py` (Stage 1 of the election pipeline). Enriched by `enrich_wikidata.py`, `generate_descriptions.py`, `geocode_cities.py`, `fetch_candidate_birthdates.py` for any remaining null `people.birth_date` values, and `fetch_candidate_wiki_urls.py` for any remaining null `people.wikipedia_url` values. Never written directly.
+**Data source:** Written by `resolve_candidates.py` (Stage 1 of the election pipeline). Enriched by `enrich_wikidata.py`, `generate_descriptions.py`, `geocode_cities.py`, `fetch_candidate_birthdates.py` for any remaining null `people.birth_date` values, and `fetch_candidate_wiki_urls.py` for any remaining null `people.wikipedia_url` values. Can also be updated from `/elections/edit` via the anon client.
 
 **Stats computed at query time from this table:**
 
@@ -324,9 +324,9 @@ Ordered candidate list per party. One row per candidate per party.
 | % new MKs | `COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM knesset_memberships WHERE person_id = ec.person_id))` / total |
 | Map pins | `ec.latitude`, `ec.longitude` |
 
-**Frontend read access:**
+**Frontend access:**
 
-The elections frontend uses the public anon key. `elections`, `election_parties`, and `election_candidates` must be selectable by `anon`; otherwise the service-role pipeline can see rows while `/elections` renders an empty list.
+The elections frontend uses the public anon key. `elections`, `election_parties`, and `election_candidates` must be selectable by `anon`; otherwise the service-role pipeline can see rows while `/elections` renders an empty list. The edit page also needs anon `UPDATE` on `election_candidates` and `people`.
 
 ```sql
 alter table public.elections enable row level security;
@@ -354,6 +354,24 @@ on public.election_candidates
 for select
 to anon
 using (true);
+
+-- Required for /elections/edit (lightweight private tool; not production auth)
+grant update on public.election_candidates to anon;
+grant update on public.people to anon;
+
+create policy "Anon update election candidates"
+on public.election_candidates
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Anon update people"
+on public.people
+for update
+to anon
+using (true)
+with check (true);
 ```
 
 ---
