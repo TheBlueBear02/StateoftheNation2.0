@@ -72,7 +72,7 @@ Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `VITE_ELECTIONS_EDIT_SECRET`
 
 Vertical stack (RTL), matching the reference design:
 
-1. **ממוצע 5 הסקרים האחרונים** — vertical bars colored by display bloc (`DISPLAY_BLOC_COLORS`: קואליציה blue, רע״ם green, חד״ש-תע״ל dark red, אופוזיציה red), seat count in white on each bar, party name below in a fixed-height label row. Under the chart: collapsible list (**closed by default**; click title to expand) of the 5 source polls (date, pollster, publisher, sample size, source link). Publisher labels strip Wikipedia footnotes via `cleanPollPublisher` (e.g. `Kan 11 [20]` → `Kan 11`).
+1. **ממוצע N הסקרים האחרונים** — header row with title (start) and a dropdown (physical top-left / `margin-inline-start: auto`) to choose **3 / 5 / 7 / 10 / 15** latest polls (options capped by available regular polls; default **5**). Vertical bars colored by display bloc (`DISPLAY_BLOC_COLORS`: קואליציה blue, רע״ם green, חד״ש-תע״ל dark red, אופוזיציה red), seat count in white on each bar, party name below in a fixed-height label row. Under the chart: collapsible list (**closed by default**; click title to expand) of the N source polls (date, pollster, publisher, sample size, source link). Publisher labels strip Wikipedia footnotes via `cleanPollPublisher` (e.g. `Kan 11 [20]` → `Kan 11`).
 2. **ממוצע החלוקה לגושים** — single horizontal bar (LTR direction): blue = קואליציה, green = רע״ם, red = חד״ש-תע״ל, light red = אופוזיציה (excluding רע״ם and חד״ש-תע״ל). Seat totals shown in each segment. חד״ש-תע״ל label stacks as two lines (`חד״ש` / `תע״ל`) so it fits narrow segments. Rendered in the **same section** as (1) — no horizontal rule between them.
 3. **חלוקה לגושים לאורך זמן** — horizontal stacked bars for the **30 most recent** non-scenario polls whose seat projections **sum to 120** (**newest at top**) on a fixed **0–120** seat scale (so 50% = **60 מנדטים**). Incomplete polls (seat total ≠ 120) are hidden. Y-axis dates as `D.M` (e.g. `17.7`) with left margin so labels stay clear of the bars. All parties map into the four blocs (קואליציה / רע״ם / חד״ש-תע״ל / אופוזיציה); below-threshold parties are included in poll data with 0 seats. Sibling Wikipedia columns that resolve to the same party (e.g. RZP + Zionist Home) have seats **summed** in normalize. Hover tooltip shows fieldwork date, pollster, publisher, sample size, and bloc seats.
 4. Wikipedia CC BY-SA 4.0 provenance footer.
@@ -94,13 +94,14 @@ All existing elections queries filter `election_parties.party_status = 'confirme
 
 ## Aggregation Notes
 
-- **Header bar chart:** client-side mean of the 5 most recent non-scenario polls with `fieldwork_end` on or before today (Jerusalem). If that filter would leave no rows (e.g. device clock behind the dataset), falls back to the latest regular polls. Average divides each party's seat total by the number of polls where that party appeared (not always 5).
-- **Bloc bar:** sums party averages from the last-5 snapshot by `election_parties.bloc`
-- **Historical charts:** one column/row per individual poll (`fieldwork_end`), seat share = seats ÷ 120
+- **Header bar chart:** client-side mean of the N most recent non-scenario polls (`LAST_N_POLL_OPTIONS`: 3/5/7/10/15, default 5; user-selectable dropdown) with `fieldwork_end` on or before today (Jerusalem). If that filter would leave no rows (e.g. device clock behind the dataset), falls back to the latest regular polls. Average divides each party's seat total by the number of polls where that party appeared (not always N). Polls are deduped by logical identity (date + pollster + publisher + sample) so Wikipedia footnote renumbers do not double-count.
+- **Bloc bar:** sums party averages from the last-N snapshot by `election_parties.bloc`
+- **Historical charts:** one column/row per individual poll (`fieldwork_end`), seat share = seats ÷ 120; same identity dedupe as last-N
 - Pipeline also computes **weighted** (14-day window) and **last3** in `poll_aggregates` — available via `usePollAggregates` but not shown on this page
 - Scenario polls stored but excluded from averages and charts
 - Seat averages are **not** forced to sum to 120 — documented on page and in pipeline docs
 - House effects (`pollster_house_effects`) — schema exists; compute/UI deferred post-MVP
+- **Natural key:** `parse_poll_tables` strips Wikipedia footnote markers (`[20]`) before hashing; regular seat tables share a stable section bucket. `normalize_polls` merges by identity and runs `dedupe_polls` after each normalize pass.
 
 ## Licensing
 

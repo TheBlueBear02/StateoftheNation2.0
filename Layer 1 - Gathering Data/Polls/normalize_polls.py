@@ -83,7 +83,171 @@ def parse_fieldwork(fieldwork_raw: str, page_year_hint: int) -> tuple[date, date
 
 
 def _normalize_pollster(name: str) -> str:
-    return re.sub(r"\s+", " ", name.strip())
+    cleaned = re.sub(r"\s*\[[^\]]*\]\s*", " ", name or "")
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _poll_identity_key(
+    *,
+    fieldwork_end: str,
+    pollster: str,
+    publisher: str,
+    sample_size: int | None,
+    is_scenario: bool,
+    scenario_desc: str | None,
+) -> str:
+    return "|".join(
+        [
+            fieldwork_end,
+            _normalize_pollster(pollster),
+            _normalize_pollster(publisher),
+            str(sample_size if sample_size is not None else ""),
+            "1" if is_scenario else "0",
+            (scenario_desc or "") if is_scenario else "",
+        ]
+    )
+
+
+def find_existing_poll(
+    sb: Client,
+    *,
+    natural_key: str,
+    fieldwork_end: str,
+    pollster: str,
+    publisher: str,
+    sample_size: int | None,
+    is_scenario: bool,
+    scenario_desc: str | None,
+) -> dict | None:
+    by_key = (
+        sb.table("polls")
+        .select("id, raw_poll_row_id, natural_key, source_revid, publisher")
+        .eq("natural_key", natural_key)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if by_key:
+        return by_key[0]
+
+    # Legacy rows may still carry footnote markers in publisher / old natural_keys.
+    candidates = (
+        sb.table("polls")
+        .select(
+            "id, raw_poll_row_id, natural_key, source_revid, publisher, "
+            "pollster, sample_size, is_scenario, scenario_desc, fieldwork_end"
+        )
+        .eq("fieldwork_end", fieldwork_end)
+        .eq("is_scenario", is_scenario)
+        .execute()
+        .data
+    ) or []
+
+    target = _poll_identity_key(
+        fieldwork_end=fieldwork_end,
+        pollster=pollster,
+        publisher=publisher,
+        sample_size=sample_size,
+        is_scenario=is_scenario,
+        scenario_desc=scenario_desc,
+    )
+    for row in candidates:
+        if (
+            _poll_identity_key(
+                fieldwork_end=row["fieldwork_end"],
+                pollster=row.get("pollster") or "",
+                publisher=row.get("publisher") or "",
+                sample_size=row.get("sample_size"),
+                is_scenario=bool(row.get("is_scenario")),
+                scenario_desc=row.get("scenario_desc"),
+            )
+            == target
+        ):
+            return row
+    return None
+
+
+def dedupe_polls(sb: Client, election_id: int) -> int:
+    """Keep newest poll per logical identity; delete footnote-renumber duplicates."""
+    rows = (
+        sb.table("polls")
+        .select(
+            "id, natural_key, pollster, publisher, fieldwork_end, sample_size, "
+            "is_scenario, scenario_desc, source_revid, raw_poll_row_id, created_at"
+        )
+        .eq("election_id", election_id)
+        .execute()
+        .data
+    ) or []
+
+    groups: dict[str, list[dict]] = {}
+    for row in rows:
+        key = _poll_identity_key(
+            fieldwork_end=row["fieldwork_end"],
+            pollster=row.get("pollster") or "",
+            publisher=row.get("publisher") or "",
+            sample_size=row.get("sample_size"),
+            is_scenario=bool(row.get("is_scenario")),
+            scenario_desc=row.get("scenario_desc"),
+        )
+        groups.setdefault(key, []).append(row)
+
+    deleted = 0
+    for group in groups.values():
+        if len(group) < 2:
+            # Still scrub footnote markers from kept singleton publishers.
+            keep = group[0]
+            cleaned_publisher = _normalize_pollster(keep.get("publisher") or "")
+            cleaned_pollster = _normalize_pollster(keep.get("pollster") or "")
+            updates = {}
+            if cleaned_publisher != (keep.get("publisher") or ""):
+                updates["publisher"] = cleaned_publisher
+            if cleaned_pollster != (keep.get("pollster") or ""):
+                updates["pollster"] = cleaned_pollster
+            if updates:
+                sb.table("polls").update(updates).eq("id", keep["id"]).execute()
+            continue
+
+        group.sort(
+            key=lambda r: (
+                r.get("source_revid") or 0,
+                r.get("created_at") or "",
+                r.get("id") or 0,
+            ),
+            reverse=True,
+        )
+        keep = group[0]
+        cleaned_publisher = _normalize_pollster(keep.get("publisher") or "")
+        cleaned_pollster = _normalize_pollster(keep.get("pollster") or "")
+        keep_updates = {}
+        if cleaned_publisher != (keep.get("publisher") or ""):
+            keep_updates["publisher"] = cleaned_publisher
+        if cleaned_pollster != (keep.get("pollster") or ""):
+            keep_updates["pollster"] = cleaned_pollster
+        if keep_updates:
+            sb.table("polls").update(keep_updates).eq("id", keep["id"]).execute()
+
+        for dup in group[1:]:
+            raw_id = dup.get("raw_poll_row_id")
+            if raw_id:
+                sb.table("raw_poll_rows").update({"status": "superseded"}).eq(
+                    "id", raw_id
+                ).execute()
+            sb.table("poll_results").delete().eq("poll_id", dup["id"]).execute()
+            sb.table("polls").delete().eq("id", dup["id"]).execute()
+            deleted += 1
+            log.info(
+                "Deduped poll %s (kept %s) — %s / %s / %s",
+                dup["id"],
+                keep["id"],
+                dup.get("fieldwork_end"),
+                dup.get("pollster"),
+                dup.get("publisher"),
+            )
+
+    if deleted:
+        log.info("Removed %d duplicate polls", deleted)
+    return deleted
 
 
 POLLSTER_HE = {
@@ -138,6 +302,9 @@ def run(sb: Client, dry_run: bool = False) -> int:
         pollster = _normalize_pollster(payload.get("pollster", ""))
         publisher = _normalize_pollster(payload.get("publisher", ""))
         natural_key = row["natural_key"]
+        sample_size = _parse_int(payload.get("sample_raw", ""))
+        is_scenario = bool(payload.get("is_scenario", False))
+        scenario_desc = payload.get("scenario_desc")
 
         poll_row = {
             "election_id": election_id,
@@ -148,10 +315,10 @@ def run(sb: Client, dry_run: bool = False) -> int:
             "publisher": publisher,
             "fieldwork_start": fw_start.isoformat(),
             "fieldwork_end": fw_end.isoformat(),
-            "sample_size": _parse_int(payload.get("sample_raw", "")),
+            "sample_size": sample_size,
             "margin_of_error": _parse_margin(payload.get("margin_raw", "")),
-            "is_scenario": payload.get("is_scenario", False),
-            "scenario_desc": payload.get("scenario_desc"),
+            "is_scenario": is_scenario,
+            "scenario_desc": scenario_desc,
             "source_revid": row["revid"],
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -160,19 +327,24 @@ def run(sb: Client, dry_run: bool = False) -> int:
             processed += 1
             continue
 
-        existing = (
-            sb.table("polls")
-            .select("id, raw_poll_row_id")
-            .eq("natural_key", natural_key)
-            .execute()
-            .data
+        existing = find_existing_poll(
+            sb,
+            natural_key=natural_key,
+            fieldwork_end=fw_end.isoformat(),
+            pollster=pollster,
+            publisher=publisher,
+            sample_size=sample_size,
+            is_scenario=is_scenario,
+            scenario_desc=scenario_desc,
         )
 
         if existing:
-            poll_id = existing[0]["id"]
-            old_raw_id = existing[0].get("raw_poll_row_id")
+            poll_id = existing["id"]
+            old_raw_id = existing.get("raw_poll_row_id")
             if old_raw_id and old_raw_id != row["id"]:
-                sb.table("raw_poll_rows").update({"status": "superseded"}).eq("id", old_raw_id).execute()
+                sb.table("raw_poll_rows").update({"status": "superseded"}).eq(
+                    "id", old_raw_id
+                ).execute()
             sb.table("poll_results").delete().eq("poll_id", poll_id).execute()
             sb.table("polls").update(poll_row).eq("id", poll_id).execute()
         else:
@@ -246,6 +418,9 @@ def run(sb: Client, dry_run: bool = False) -> int:
 
         sb.table("raw_poll_rows").update({"status": "processed"}).eq("id", row["id"]).execute()
         processed += 1
+
+    if not dry_run:
+        dedupe_polls(sb, election_id)
 
     log.info("Normalized %d poll rows", processed)
     return processed

@@ -6,9 +6,14 @@ import {
   type PartySeatAverage,
 } from '../../lib/pollChartData'
 
+export const LAST_N_POLL_OPTIONS = [3, 5, 7, 10, 15] as const
+
 type LastPollsBarChartProps = {
   parties: PartySeatAverage[]
   pollCount: number
+  lastN: number
+  lastNOptions: readonly number[]
+  onLastNChange: (n: number) => void
   sourcePolls: PollWithResults[]
 }
 
@@ -18,6 +23,9 @@ const MIN_BAR_HEIGHT = 48
 export function LastPollsBarChart({
   parties,
   pollCount,
+  lastN,
+  lastNOptions,
+  onLastNChange,
   sourcePolls,
 }: LastPollsBarChartProps) {
   const [sourcesOpen, setSourcesOpen] = useState(false)
@@ -26,9 +34,27 @@ export function LastPollsBarChart({
 
   return (
     <section className="polls-chart polls-chart--bars" aria-labelledby="last-polls-title">
-      <h2 id="last-polls-title" className="polls-chart__title">
-        ממוצע {pollCount} הסקרים האחרונים
-      </h2>
+      <div className="polls-chart__header">
+        <h2 id="last-polls-title" className="polls-chart__title">
+          ממוצע {pollCount} הסקרים האחרונים
+        </h2>
+
+        <label className="polls-chart__n-picker">
+          <span className="visually-hidden">מספר סקרים לממוצע</span>
+          <select
+            className="polls-chart__n-select"
+            value={lastN}
+            onChange={(event) => onLastNChange(Number(event.target.value))}
+            aria-label="מספר סקרים לחישוב הממוצע"
+          >
+            {lastNOptions.map((n) => (
+              <option key={n} value={n}>
+                {n} סקרים אחרונים
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <div className="polls-bar-chart-wrap">
         <div className="polls-bar-chart" role="img" aria-label="ממוצע מנדטים לפי מפלגה">

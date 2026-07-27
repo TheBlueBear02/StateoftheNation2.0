@@ -5,7 +5,7 @@
     "fieldwork_raw": "12 Jul",
     "pollster": "Kantar",
     "publisher": "Kan 11 [ 37 ]",
-    "seen_count": 2
+    "seen_count": 3
   },
   {
     "raw_label": "Tropper",
@@ -13,7 +13,7 @@
     "fieldwork_raw": "13 Jul",
     "pollster": "Midgam",
     "publisher": "HaHadashot 12 [ 36 ]",
-    "seen_count": 4
+    "seen_count": 6
   },
   {
     "raw_label": "Netanyahu",
@@ -21,6 +21,6 @@
     "fieldwork_raw": "28 Dec 23",
     "pollster": "Camil Fuchs",
     "publisher": "Channel 13 [ 216 ]",
-    "seen_count": 4
+    "seen_count": 6
   }
 ]

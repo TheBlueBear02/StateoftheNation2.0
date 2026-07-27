@@ -47,13 +47,33 @@ SKIP_PARTY_LABELS = re.compile(
 FOOTNOTE = re.compile(r"\s*\[[^\]]*\]\s*")
 
 
+def _strip_footnotes(text: str) -> str:
+    """Remove Wikipedia footnote markers like [20] / [ 21 ] and collapse whitespace."""
+    return re.sub(r"\s+", " ", FOOTNOTE.sub(" ", text or "")).strip()
+
+
 def _content_hash(payload: dict) -> str:
     canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def _natural_key(fieldwork_raw: str, pollster: str, publisher: str, section: str) -> str:
-    raw = f"{fieldwork_raw}|{pollster}|{publisher}|{section}"
+    # Footnote renumbering between wiki revisions must not create a new poll identity.
+    # Scenario sections keep their path; regular seat tables share one bucket so heading
+    # renames do not duplicate the same poll.
+    section_key = (
+        section
+        if "scenario" in (section or "").lower()
+        else "seat_projections"
+    )
+    raw = "|".join(
+        [
+            _strip_footnotes(fieldwork_raw),
+            _strip_footnotes(pollster),
+            _strip_footnotes(publisher),
+            section_key,
+        ]
+    )
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -332,9 +352,21 @@ def _parse_table(
         if not _is_data_row(tr):
             continue
 
-        fieldwork_raw = cells[meta["fieldwork"]] if meta["fieldwork"] is not None and meta["fieldwork"] < len(cells) else cells[0]
-        pollster = cells[meta["pollster"]] if meta["pollster"] is not None and meta["pollster"] < len(cells) else ""
-        publisher = cells[meta["publisher"]] if meta["publisher"] is not None and meta["publisher"] < len(cells) else ""
+        fieldwork_raw = _strip_footnotes(
+            cells[meta["fieldwork"]]
+            if meta["fieldwork"] is not None and meta["fieldwork"] < len(cells)
+            else cells[0]
+        )
+        pollster = _strip_footnotes(
+            cells[meta["pollster"]]
+            if meta["pollster"] is not None and meta["pollster"] < len(cells)
+            else ""
+        )
+        publisher = _strip_footnotes(
+            cells[meta["publisher"]]
+            if meta["publisher"] is not None and meta["publisher"] < len(cells)
+            else ""
+        )
         sample_raw = cells[meta["sample"]] if meta["sample"] is not None and meta["sample"] < len(cells) else ""
         margin_raw = cells[meta["margin"]] if meta["margin"] is not None and meta["margin"] < len(cells) else ""
 

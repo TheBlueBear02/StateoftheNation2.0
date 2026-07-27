@@ -159,7 +159,34 @@ export function selectRecentRegularPolls(
   // If the device clock is behind the dataset (or all rows look "future"),
   // fall back to the latest regular polls so the page is never empty.
   const pool = onOrBefore.length > 0 ? onOrBefore : regular
-  return pool.slice(0, n)
+  return dedupePollsByIdentity(pool).slice(0, n)
+}
+
+/** Drop footnote-renumber / re-parse duplicates (same poll, different wiki refs). */
+export function dedupePollsByIdentity(
+  polls: PollWithResults[],
+): PollWithResults[] {
+  const seen = new Set<string>()
+  const unique: PollWithResults[] = []
+
+  for (const poll of polls) {
+    const key = [
+      poll.fieldworkEnd,
+      cleanPollPublisher(poll.pollster),
+      cleanPollPublisher(poll.publisher),
+      poll.sampleSize ?? '',
+      poll.isScenario ? '1' : '0',
+      poll.isScenario ? (poll.scenarioDesc ?? '') : '',
+    ].join('|')
+
+    if (seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    unique.push(poll)
+  }
+
+  return unique
 }
 
 export type PartySeatsTrendPoint = {
@@ -342,10 +369,12 @@ export function buildPollSnapshots(
   partyBlocs: Map<number, PartyBloc | null>,
   asOfDate = todayJerusalem(),
 ): PollSnapshot[] {
-  const regular = [...polls].filter((p) => !p.isScenario)
+  const regular = dedupePollsByIdentity(polls.filter((p) => !p.isScenario))
   const onOrBefore = regular.filter((p) => p.fieldworkEnd <= asOfDate)
   const pool = onOrBefore.length > 0 ? onOrBefore : regular
-  const sorted = pool.sort((a, b) => a.fieldworkEnd.localeCompare(b.fieldworkEnd))
+  const sorted = [...pool].sort((a, b) =>
+    a.fieldworkEnd.localeCompare(b.fieldworkEnd),
+  )
 
   return sorted.map((poll) => {
     const parties: PartySnapshot[] = poll.results
