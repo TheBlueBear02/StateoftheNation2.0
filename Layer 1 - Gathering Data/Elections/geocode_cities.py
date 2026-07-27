@@ -92,23 +92,25 @@ def geocode_city(geocode: RateLimiter, city: str) -> tuple[float, float] | None:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def run(sb: Client, dry_run: bool) -> None:
+def run(sb: Client, dry_run: bool, party_id: int | None = None) -> dict:
     election_id = get_election_id(sb)
 
     # Load candidates with city but no coordinates
-    rows = (
+    query = (
         sb.table("election_candidates")
         .select("id, city, latitude, longitude")
         .eq("election_id", election_id)
         .not_.is_("city", "null")
         .is_("latitude", "null")
-        .execute()
-        .data
     )
+    if party_id is not None:
+        query = query.eq("party_id", party_id)
+
+    rows = query.execute().data
 
     if not rows:
         log.info("No candidates need geocoding.")
-        return
+        return {"geocoded": 0, "failed": 0, "total": 0, "uniqueCities": 0}
 
     log.info("Geocoding %d candidates (Nominatim, 1 req/sec)…", len(rows))
 
@@ -151,14 +153,22 @@ def run(sb: Client, dry_run: bool) -> None:
         success, failed, len(cache),
     )
 
+    return {
+        "geocoded": success,
+        "failed": failed,
+        "total": len(rows),
+        "uniqueCities": len(cache),
+    }
+
 
 def main():
     parser = argparse.ArgumentParser(description="Stage 4 — geocode candidate cities")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--party-id", type=int, help="Geocode only candidates for this party")
     args = parser.parse_args()
 
     sb = get_supabase()
-    run(sb, args.dry_run)
+    run(sb, args.dry_run, party_id=args.party_id)
 
 
 if __name__ == "__main__":

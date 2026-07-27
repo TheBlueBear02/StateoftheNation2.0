@@ -27,7 +27,8 @@ The homepage hero button **בחירות 2026** links to `/elections`.
 | `src/lib/updateElectionCandidate.ts` | Anon-key updates to `people` + `election_candidates` with list-position conflict checks |
 | `src/lib/enrichElectionCandidate.ts` | Dev-only client for per-card pipeline preview (`/api/elections/enrich-candidate`) |
 | `src/lib/runElectionPartyPipeline.ts` | Dev-only client for party-level pipeline (`/api/elections/pipeline/*`) |
-| `vite-plugins/electionsEditApi.ts` | Dev middleware: `update-candidate`, `enrich-candidate`, and party pipeline endpoints |
+| `src/lib/geocodeElectionMap.ts` | Dev-only client for party-scoped map geocode (`/api/elections/geocode-map`) |
+| `vite-plugins/electionsEditApi.ts` | Dev middleware: `update-candidate`, `enrich-candidate`, party pipeline, and geocode-map endpoints |
 | `src/components/elections/PartyCard.tsx` | Clickable card with the top-candidate portrait on the right and the party logo pinned to the top-left corner |
 | `src/components/elections/SeatsTrend.tsx` | Temporary mock seats average and decorative trend line |
 | `src/components/elections/StatsBar.tsx` | Average age, % new MKs, and % women stat blocks |
@@ -126,6 +127,21 @@ Stages 2–6 process all 2026 candidates with null target fields (not party-scop
 
 Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, `OPENAI_API_KEY`, and `VITE_ELECTIONS_EDIT_SECRET` in `.env`.
 
+### Party map geocode (dev only)
+
+After selecting a party, the toolbar shows **עדכן מפה** when `import.meta.env.DEV` is true. One click runs pipeline Stage 4 (`geocode_cities.py`) scoped to that party's candidates with a non-null `city` and null `latitude` — the same rows that appear as pins on `/elections/:partyId`.
+
+| Step | UI | Backend |
+|------|-----|---------|
+| Status hint | Count of candidates with city but missing coordinates | — |
+| Geocode | **עדכן מפה** | `POST /api/elections/geocode-map` → `run_party_pipeline_api.py geocode-map --party-id N` |
+
+Unlike the full party pipeline, this only geocodes the selected party (not all 2026 candidates). Nominatim rate-limits to ~1 city/second; the UI shows a live seconds counter while running. Timeout: 15 minutes (same as pipeline stage 4).
+
+When a candidate's `city` is edited and saved, `latitude` / `longitude` are cleared so stale pins are not shown; run **עדכן מפה** after saving city changes.
+
+Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `VITE_ELECTIONS_EDIT_SECRET` in `.env`.
+
 **Dev saves:** `npm run dev` routes writes through `/api/elections/update-candidate`, a local Vite middleware that uses `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). **Production saves** use the anon client and require the UPDATE policies in `Layer 1 - Gathering Data/Elections/anon_update_policies.sql`.
 
 ## Seats Placeholder
@@ -156,7 +172,7 @@ The module follows [DesignLanguage.md](./DesignLanguage.md):
 - The party index grid renders three cards per row on desktop, two on narrower tablet widths, and one on mobile.
 - Party cards show the top-candidate portrait section only when an image exists in `people.image_url`; the portrait is flush to the right edge and fills the card height, while an enlarged party logo is pinned to the top-left corner. Cards do not render a per-party color accent line.
 - Party color is passed through CSS custom property `--party-color` and appears as a subtle left-side background wash plus hover border treatment.
-- The `/elections/:partyId` party detail sections are borderless; section separation comes from spacing and white backgrounds rather than boxed outlines or hero side accents. The party hero uses three desktop columns: logo, party copy, and the seats placeholder on the visual left. Stats blocks are centered within their cells and have no border.
+- The `/elections/:partyId` party detail sections are borderless; section separation comes from spacing and white backgrounds rather than boxed outlines or hero side accents. The party hero uses three desktop columns: logo, party copy, and the seats placeholder on the visual left. The hero title is capped at `4rem`, wraps within the middle column (`min-width: 0` + `overflow-wrap: anywhere`), and must not overlap the seats column; the compact seats block keeps an opaque white background and sits above adjacent content when columns are tight. Stats blocks are centered within their cells and have no border.
 - Candidate list cards use larger borderless full-height portrait/initial columns that sit flush against the card side with no edge padding; the list position number sits as an overlay in the visual top-left corner. Former MKs also show tenure under the city line in smaller muted text (`0.8rem`, e.g. `3.4 שנים בכנסת`). When `election_candidates.city` is null, the city line shows **לא ידוע מקום מגורים**. When a candidate has both a generated description and `people.wikipedia_url`, the description ends with an external **קרא עוד** link to the Hebrew Wikipedia article.
 - Mobile layouts collapse to one column.
 
@@ -175,3 +191,4 @@ Manual checks:
 - `/elections/edit` requires `VITE_ELECTIONS_EDIT_SECRET`, unlocks with the password, and can save a candidate field change after anon UPDATE policies are applied.
 - In dev, **השלם מידע** on a card with missing fields fills the form from pipeline preview; save persists to Supabase.
 - In dev, for a party with 0–2 candidates, the party pipeline panel can paste a list, preview it, run all six stages, resolve review-queue items, and load candidate cards.
+- In dev, **עדכן מפה** geocodes candidates with city but missing coordinates for the selected party; pins appear on `/elections/:partyId` after a successful run.

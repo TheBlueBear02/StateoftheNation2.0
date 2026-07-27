@@ -227,6 +227,44 @@ def cmd_review_queue(args) -> None:
     }, args.json)
 
 
+def cmd_geocode_map(args) -> None:
+    sb = insert_raw_list.get_supabase()
+    party = get_party(sb, args.party_id)
+    if not party:
+        fail(f"מפלגה {args.party_id} לא נמצאה", args.json)
+        return
+
+    try:
+        stats = geocode_cities.run(sb, dry_run=False, party_id=args.party_id)
+    except Exception as exc:
+        fail(str(exc), args.json)
+        return
+
+    geocoded = stats.get("geocoded", 0)
+    failed = stats.get("failed", 0)
+    total = stats.get("total", 0)
+
+    if total == 0:
+        emit({
+            "ok": True,
+            "message": "כל המועמדים עם עיר כבר ממופים",
+            "geocoded": 0,
+            "failed": 0,
+            "total": 0,
+            "uniqueCities": 0,
+        }, args.json)
+        return
+
+    emit({
+        "ok": True,
+        "message": f"ממפו {geocoded} מתוך {total} מועמדים",
+        "geocoded": geocoded,
+        "failed": failed,
+        "total": total,
+        "uniqueCities": stats.get("uniqueCities", 0),
+    }, args.json)
+
+
 def cmd_resolve_review(args) -> None:
     sb = insert_raw_list.get_supabase()
     party_id = args.party_id
@@ -320,6 +358,13 @@ def main() -> None:
     resolve_cmd.add_argument("--actions", required=True, help="JSON array of review actions")
     resolve_cmd.add_argument("--json", **json_flag)
 
+    geocode_cmd = subparsers.add_parser(
+        "geocode-map",
+        help="Geocode cities for one party (stage 4, party-scoped)",
+    )
+    geocode_cmd.add_argument("--party-id", type=int, required=True)
+    geocode_cmd.add_argument("--json", **json_flag)
+
     args = parser.parse_args()
 
     if not os.environ.get("SUPABASE_URL") or not os.environ.get("SUPABASE_SERVICE_KEY"):
@@ -331,6 +376,7 @@ def main() -> None:
         "stage": cmd_stage,
         "review-queue": cmd_review_queue,
         "resolve-review": cmd_resolve_review,
+        "geocode-map": cmd_geocode_map,
     }
     handlers[args.command](args)
 

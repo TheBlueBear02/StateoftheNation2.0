@@ -78,6 +78,30 @@
   max-width: 480px;
 }
 
+.election-edit-page__map-geocode {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.election-edit-page__map-geocode-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.election-edit-page__map-geocode-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.election-edit-page__map-geocode-spinner {
+  flex-shrink: 0;
+}
+
 .election-edit-page__picker-select {
   min-width: min(100%, 320px);
   padding: 8px 12px;

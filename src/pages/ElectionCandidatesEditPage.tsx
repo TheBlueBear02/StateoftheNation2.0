@@ -20,6 +20,7 @@ import {
   type CandidateEnrichmentUpdates,
 } from '../lib/enrichElectionCandidate'
 import { PartyPipelinePanel } from '../components/elections/PartyPipelinePanel'
+import { geocodeElectionMap } from '../lib/geocodeElectionMap'
 import './ElectionPartyPage.css'
 import './ElectionCandidatesEditPage.css'
 
@@ -163,6 +164,16 @@ function formatPipelineRunningShort(elapsedSeconds: number): string {
     return 'מתחיל…'
   }
   return `${elapsedSeconds} שנ'`
+}
+
+function formatGeocodeRunningMessage(elapsedSeconds: number): string {
+  if (elapsedSeconds <= 0) {
+    return 'מתחיל מיפוי…'
+  }
+  if (elapsedSeconds === 1) {
+    return 'ממפה ערים… שנייה אחת (Nominatim, ~1 עיר/שנייה)'
+  }
+  return `ממפה ערים… ${elapsedSeconds} שניות (Nominatim, ~1 עיר/שנייה)`
 }
 
 function isUnlockedInSession(): boolean {
@@ -612,6 +623,11 @@ export function ElectionCandidatesEditPage() {
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [selectedPartyId, setSelectedPartyId] = useState<number | null>(null)
+  const [mapGeocodeState, setMapGeocodeState] = useState<PipelineState>({
+    status: 'idle',
+    message: null,
+  })
+  const [mapGeocodeElapsedSeconds, setMapGeocodeElapsedSeconds] = useState(0)
 
   const {
     parties,
@@ -631,6 +647,25 @@ export function ElectionCandidatesEditPage() {
     }
     setSelectedPartyId(parties[0].id)
   }, [parties, selectedPartyId])
+
+  useEffect(() => {
+    setMapGeocodeState({ status: 'idle', message: null })
+    setMapGeocodeElapsedSeconds(0)
+  }, [selectedPartyId])
+
+  useEffect(() => {
+    if (mapGeocodeState.status !== 'running') {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      setMapGeocodeElapsedSeconds((current) => current + 1)
+    }, 1000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [mapGeocodeState.status])
 
   const selectedParty =
     selectedPartyId === null
@@ -656,6 +691,70 @@ export function ElectionCandidatesEditPage() {
     selectedParty !== null &&
     !candidatesLoading &&
     candidates.length <= 2
+
+  const candidatesNeedingGeocode = useMemo(
+    () =>
+      candidates.filter(
+        (candidate) =>
+          candidate.city?.trim() &&
+          (candidate.latitude === null || candidate.longitude === null),
+      ),
+    [candidates],
+  )
+
+  const showMapGeocodeButton =
+    import.meta.env.DEV &&
+    secretConfigured &&
+    unlocked &&
+    selectedParty !== null &&
+    !candidatesLoading
+
+  const mapGeocodeRunning = mapGeocodeState.status === 'running'
+  const canClickMapGeocode =
+    showMapGeocodeButton &&
+    !mapGeocodeRunning &&
+    candidatesNeedingGeocode.length > 0
+
+  async function handleGeocodeMap() {
+    if (!selectedPartyId || !canClickMapGeocode) {
+      return
+    }
+
+    setMapGeocodeElapsedSeconds(0)
+    setMapGeocodeState({ status: 'running', message: null })
+
+    try {
+      const result = await geocodeElectionMap(selectedPartyId)
+
+      if (!result.ok) {
+        setMapGeocodeState({ status: 'error', message: result.error })
+        return
+      }
+
+      await refetch()
+
+      if (result.total === 0) {
+        setMapGeocodeState({
+          status: 'success',
+          message: result.message ?? 'כל המועמדים עם עיר כבר ממופים',
+        })
+        return
+      }
+
+      const failedSuffix =
+        result.failed > 0 ? ` · ${result.failed} ערים לא נמצאו` : ''
+
+      setMapGeocodeState({
+        status: result.failed > 0 && result.geocoded === 0 ? 'warning' : 'success',
+        message: `${result.message ?? `ממפו ${result.geocoded} מועמדים`}${failedSuffix}`,
+      })
+    } catch {
+      setMapGeocodeState({
+        status: 'error',
+        message: 'שגיאה בתקשורת עם שרת הפיתוח — בדקו ש-npm run dev פעיל',
+      })
+    }
+  }
 
   function handleUnlock(event: FormEvent) {
     event.preventDefault()
@@ -762,6 +861,51 @@ export function ElectionCandidatesEditPage() {
                       ))}
                     </select>
                   </label>
+
+                  {showMapGeocodeButton ? (
+                    <div className="election-edit-page__map-geocode">
+                      <p className="election-edit-page__map-geocode-hint">
+                        {candidatesNeedingGeocode.length > 0
+                          ? `${candidatesNeedingGeocode.length} מועמדים עם עיר ללא קואורדינטות — יופיעו במפה אחרי עדכון`
+                          : 'כל המועמדים עם עיר כבר ממופים'}
+                      </p>
+                      <div className="election-edit-page__map-geocode-actions">
+                        <button
+                          type="button"
+                          className="candidate-edit-card__enrich"
+                          onClick={handleGeocodeMap}
+                          disabled={!canClickMapGeocode}
+                          aria-busy={mapGeocodeRunning}
+                        >
+                          {mapGeocodeRunning
+                            ? formatGeocodeRunningMessage(mapGeocodeElapsedSeconds)
+                            : 'עדכן מפה'}
+                        </button>
+                        {mapGeocodeRunning ? (
+                          <span
+                            className="candidate-edit-card__pipeline-spinner election-edit-page__map-geocode-spinner"
+                            aria-hidden="true"
+                          />
+                        ) : null}
+                      </div>
+                      {mapGeocodeState.message ? (
+                        <p
+                          className={
+                            mapGeocodeState.status === 'error'
+                              ? 'candidate-edit-card__pipeline-status candidate-edit-card__pipeline-status--error'
+                              : mapGeocodeState.status === 'warning'
+                                ? 'candidate-edit-card__pipeline-status candidate-edit-card__pipeline-status--warning'
+                                : 'candidate-edit-card__pipeline-status'
+                          }
+                          role={
+                            mapGeocodeState.status === 'error' ? 'alert' : undefined
+                          }
+                        >
+                          {mapGeocodeState.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 {partiesError || candidatesError ? (

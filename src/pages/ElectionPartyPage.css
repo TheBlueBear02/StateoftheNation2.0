@@ -67,14 +67,18 @@
 }
 
 .party-hero__content {
-  max-width: 760px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .party-hero__title {
   margin: 0;
-  font-size: clamp(2.4rem, 6vw, 5rem);
+  max-width: 100%;
+  font-size: clamp(2.4rem, 5vw, 4rem);
   font-weight: 800;
+  line-height: 1.08;
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .party-hero__subtitle {
@@ -126,12 +130,14 @@
 }
 
 .party-hero .seats-trend {
+  position: relative;
+  z-index: 1;
   align-self: center;
   grid-template-columns: 1fr;
   gap: 8px;
   min-width: 0;
   padding: 0;
-  background: transparent;
+  background: var(--color-white);
 }
 
 .party-hero .seats-trend__chart {

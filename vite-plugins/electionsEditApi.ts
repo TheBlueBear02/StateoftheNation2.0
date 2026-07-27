@@ -571,6 +571,41 @@ export function electionsEditApiPlugin(env: Record<string, string>): Plugin {
           return
         }
 
+        if (url === '/api/elections/geocode-map') {
+          if (!checkEditSecret(req, res, editSecret)) {
+            return
+          }
+
+          try {
+            const body = (await readJsonBody(req)) as { partyId?: number }
+            const partyId = Number(body?.partyId)
+
+            if (!Number.isInteger(partyId) || partyId < 1) {
+              sendJson(res, 400, { ok: false, error: 'מזהה מפלגה לא תקין' })
+              return
+            }
+
+            const result = await runPythonScript(
+              [
+                'run_party_pipeline_api.py',
+                'geocode-map',
+                '--party-id',
+                String(partyId),
+                '--json',
+              ],
+              env,
+              { timeoutMs: STAGE_TIMEOUT_MS[4] },
+            )
+            sendJson(res, result.ok ? 200 : 400, result)
+          } catch {
+            sendJson(res, 500, {
+              ok: false,
+              error: 'שגיאת שרת בעת עדכון המפה',
+            })
+          }
+          return
+        }
+
         next()
       })
     },
