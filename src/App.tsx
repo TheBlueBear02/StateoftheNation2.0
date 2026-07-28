@@ -77,8 +77,59 @@ function App() {
         </aside>
 
         <section
-          id="government-dashboard"
+          id="lists-game"
           className="project-section"
+          aria-labelledby="lists-game-title"
+        >
+          <div className="project-section__inner container">
+            <div className="project-section__content">
+              <h2 id="lists-game-title" className="project-section__title">
+                משחק הרשימות
+              </h2>
+              <p className="project-section__description">
+                בחרו מפלגה, דרגו כל מועמד ברשימה בירוק / כתום / אדום, וגלו עד
+                כמה הרשימה מתאימה לכם — עם סימון טווח המנדטים הריאלי לפי הסקרים.
+              </p>
+              <Link to="/elections/lists" className="project-section__cta">
+                למשחק &gt;&gt;
+              </Link>
+            </div>
+
+            <div className="lists-game-preview" aria-hidden="true">
+              <div className="lists-game-preview__header">
+                <span className="lists-game-preview__logo" />
+                <span className="lists-game-preview__title-bar" />
+              </div>
+              <div className="lists-game-preview__rows">
+                {(['green', 'orange', 'red', 'green', 'orange'] as const).map(
+                  (tone, index) => (
+                    <div
+                      key={`${tone}-${index}`}
+                      className={`lists-game-preview__row lists-game-preview__row--${tone}`}
+                    >
+                      <span className="lists-game-preview__pos">{index + 1}</span>
+                      <span className="lists-game-preview__face" />
+                      <span className="lists-game-preview__lines">
+                        <span className="lists-game-preview__line" />
+                        <span className="lists-game-preview__line lists-game-preview__line--short" />
+                      </span>
+                      <span className="lists-game-preview__dots">
+                        <span className="lists-game-preview__dot lists-game-preview__dot--green" />
+                        <span className="lists-game-preview__dot lists-game-preview__dot--orange" />
+                        <span className="lists-game-preview__dot lists-game-preview__dot--red" />
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
+              <div className="lists-game-preview__band">טווח מנדטים ריאלי</div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="government-dashboard"
+          className="project-section project-section--alt"
           aria-labelledby="dashboard-title"
         >
           <div className="project-section__inner container">

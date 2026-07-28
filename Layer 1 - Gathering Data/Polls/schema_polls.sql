@@ -165,6 +165,30 @@ create table if not exists public.poll_aggregates (
 create index if not exists poll_aggregates_lookup_idx
   on public.poll_aggregates (election_id, method, as_of_date desc);
 
+-- ── Poll media channels (publishers) ──────────────────────────────────────────
+create table if not exists public.poll_publishers (
+  id bigint generated always as identity not null,
+  name text not null,
+  name_he text,
+  logo_url text,
+  created_at timestamp with time zone default now(),
+  constraint poll_publishers_pkey primary key (id),
+  constraint poll_publishers_name_key unique (name)
+);
+
+alter table public.polls
+  add column if not exists publisher_id bigint;
+
+alter table public.polls
+  drop constraint if exists polls_publisher_id_fkey;
+
+alter table public.polls
+  add constraint polls_publisher_id_fkey
+  foreign key (publisher_id) references public.poll_publishers(id);
+
+create index if not exists polls_publisher_id_idx
+  on public.polls (publisher_id);
+
 -- ── House effects (display only) ──────────────────────────────────────────────
 create table if not exists public.pollster_house_effects (
   id bigint generated always as identity not null,
@@ -185,11 +209,13 @@ alter table public.polls enable row level security;
 alter table public.poll_results enable row level security;
 alter table public.poll_aggregates enable row level security;
 alter table public.pollster_house_effects enable row level security;
+alter table public.poll_publishers enable row level security;
 
 grant select on public.polls to anon;
 grant select on public.poll_results to anon;
 grant select on public.poll_aggregates to anon;
 grant select on public.pollster_house_effects to anon;
+grant select on public.poll_publishers to anon;
 
 drop policy if exists "Public read polls" on public.polls;
 create policy "Public read polls" on public.polls for select to anon using (true);
@@ -202,3 +228,6 @@ create policy "Public read poll aggregates" on public.poll_aggregates for select
 
 drop policy if exists "Public read house effects" on public.pollster_house_effects;
 create policy "Public read house effects" on public.pollster_house_effects for select to anon using (true);
+
+drop policy if exists "Public read poll publishers" on public.poll_publishers;
+create policy "Public read poll publishers" on public.poll_publishers for select to anon using (true);

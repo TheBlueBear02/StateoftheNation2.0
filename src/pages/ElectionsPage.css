@@ -159,8 +159,7 @@
   max-width: 720px;
 }
 
-.elections-page__eyebrow,
-.election-party-page__eyebrow {
+.elections-page__eyebrow {
   margin: 0 0 8px;
   font-size: 0.9rem;
   font-weight: 800;

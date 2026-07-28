@@ -1,16 +1,18 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { SiteLayout } from '../components/SiteLayout'
+import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { BlocDistributionBar } from '../components/polls/BlocDistributionBar'
 import { BlocTrendChart } from '../components/polls/BlocTrendChart'
 import {
   LAST_N_POLL_OPTIONS,
   LastPollsBarChart,
 } from '../components/polls/LastPollsBarChart'
+import { PartyTrendChart } from '../components/polls/PartyTrendChart'
 import { usePolls } from '../hooks/usePolls'
 import {
   buildPollSnapshots,
   computeLastNAverage,
+  computePollPartySeats,
   selectRecentCompleteSnapshots,
   selectRecentRegularPolls,
   sumDisplayBlocTotals,
@@ -27,6 +29,7 @@ const TREND_POLLS = 30
 export function ElectionsPollsPage() {
   const { polls, loading, error } = usePolls(120)
   const [lastN, setLastN] = useState(DEFAULT_LAST_N)
+  const [selectedPollId, setSelectedPollId] = useState<number | null>(null)
 
   const partyBlocs = useMemo(() => {
     const map = new Map<number, PartyBloc | null>()
@@ -59,17 +62,37 @@ export function ElectionsPollsPage() {
 
   const pollCountForAverage = Math.min(effectiveLastN, regularPollCount)
 
-  const lastAverage = useMemo(
-    () => computeLastNAverage(polls, effectiveLastN, partyBlocs),
-    [polls, effectiveLastN, partyBlocs],
-  )
-
   const lastPollsForAverage = useMemo(
     () => selectRecentRegularPolls(polls, effectiveLastN),
     [polls, effectiveLastN],
   )
 
-  const blocTotals = useMemo(() => sumDisplayBlocTotals(lastAverage), [lastAverage])
+  const selectedPoll = useMemo(
+    () => lastPollsForAverage.find((poll) => poll.id === selectedPollId) ?? null,
+    [lastPollsForAverage, selectedPollId],
+  )
+
+  useEffect(() => {
+    if (
+      selectedPollId !== null &&
+      !lastPollsForAverage.some((poll) => poll.id === selectedPollId)
+    ) {
+      setSelectedPollId(null)
+    }
+  }, [lastPollsForAverage, selectedPollId])
+
+  const displayedParties = useMemo(() => {
+    if (selectedPoll) {
+      return computePollPartySeats(selectedPoll, partyBlocs)
+    }
+
+    return computeLastNAverage(polls, effectiveLastN, partyBlocs)
+  }, [selectedPoll, polls, effectiveLastN, partyBlocs])
+
+  const blocTotals = useMemo(
+    () => sumDisplayBlocTotals(displayedParties),
+    [displayedParties],
+  )
 
   const snapshots = useMemo(
     () => buildPollSnapshots(polls, partyBlocs),
@@ -81,67 +104,69 @@ export function ElectionsPollsPage() {
     [snapshots],
   )
 
+  const handleLastNChange = (n: number) => {
+    setLastN(n)
+    setSelectedPollId(null)
+  }
+
+  const handlePollSelect = (pollId: number) => {
+    setSelectedPollId((current) => (current === pollId ? null : pollId))
+  }
+
   return (
     <SiteLayout>
       <main className="polls-page">
         <section className="polls-page__hero">
           <div className="container polls-page__inner">
-            <p className="polls-page__eyebrow">
-              <Link to="/elections">בחירות 2026</Link> / סקרי מנדטים
-            </p>
+            <PageBreadcrumb
+              items={[
+                { label: 'בחירות 2026', to: '/elections' },
+                { label: 'סקרי מנדטים' },
+              ]}
+            />
             <h1 className="polls-page__title">סקרי מנדטים לבחירות 2026</h1>
-            <p className="polls-page__subtitle">
-              ממוצע סקרי המנדטים והמגמות שלהם לקראת הבחירות
-            </p>
-          </div>
-        </section>
 
-        {loading && (
-          <section className="polls-page__section">
-            <div className="container">
-              <p className="polls-empty">טוען נתוני סקרים…</p>
-            </div>
-          </section>
-        )}
+            {loading && <p className="polls-empty">טוען נתוני סקרים…</p>}
+            {error && <p className="polls-error">{error}</p>}
 
-        {error && (
-          <section className="polls-page__section">
-            <div className="container">
-              <p className="polls-error">{error}</p>
-            </div>
-          </section>
-        )}
-
-        {!loading && !error && lastAverage.length > 0 && (
-          <>
-            <section className="polls-page__section">
-              <div className="container polls-page__inner">
+            {!loading && !error && displayedParties.length > 0 && (
+              <div className="polls-top-charts">
                 <LastPollsBarChart
-                  parties={lastAverage}
+                  parties={displayedParties}
                   pollCount={pollCountForAverage}
                   lastN={effectiveLastN}
                   lastNOptions={lastNOptions}
-                  onLastNChange={setLastN}
+                  onLastNChange={handleLastNChange}
                   sourcePolls={lastPollsForAverage}
+                  selectedPoll={selectedPoll}
+                  selectedPollId={selectedPollId}
+                  onPollSelect={handlePollSelect}
                 />
-                <BlocDistributionBar totals={blocTotals} />
+                <BlocDistributionBar
+                  totals={blocTotals}
+                  selectedPoll={selectedPoll}
+                />
               </div>
-            </section>
-
-            {recentSnapshots.length > 0 && (
-              <section className="polls-page__section polls-page__section--chart">
-                <div className="container polls-page__inner">
-                  <BlocTrendChart snapshots={recentSnapshots} />
-                </div>
-              </section>
             )}
-          </>
+
+            {!loading && !error && displayedParties.length === 0 && (
+              <p className="polls-empty">אין סקרים זמינים עדיין</p>
+            )}
+          </div>
+        </section>
+
+        {!loading && !error && polls.length > 0 && (
+          <section className="polls-page__section polls-page__section--chart">
+            <div className="container polls-page__inner">
+              <PartyTrendChart polls={polls} />
+            </div>
+          </section>
         )}
 
-        {!loading && !error && lastAverage.length === 0 && (
-          <section className="polls-page__section">
-            <div className="container">
-              <p className="polls-empty">אין סקרים זמינים עדיין</p>
+        {!loading && !error && recentSnapshots.length > 0 && (
+          <section className="polls-page__section polls-page__section--chart">
+            <div className="container polls-page__inner">
+              <BlocTrendChart snapshots={snapshots} />
             </div>
           </section>
         )}

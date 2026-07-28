@@ -51,13 +51,52 @@ Approved neutral tints:
 - If an existing component already has rounded corners, do not refactor it only for this rule unless the user asks for a site-wide cleanup.
 - If modifying an existing rounded component for functional reasons, consider removing the radius only when it is local, low-risk, and visually consistent with the surrounding page.
 
-## Layout
+## Page Breadcrumb (required on new pages)
 
-- Use `.container` for standard centered page content unless a page needs a dedicated docs/dashboard layout.
-- Keep full-page sections generous and uncluttered.
-- Use clear two-column layouts for documentation, dashboards, and detail pages when helpful.
-- For RTL pages, the primary reading/content column should feel dominant on the right unless the page pattern clearly calls for another structure.
-- Preserve responsive behavior: single-column layout on narrow screens, with navigation stacked above content when needed.
+Every new content page under a section must open with the shared **page breadcrumb** (“URL path”) at the top of the page content — RTL start / visual top-right in the content column.
+
+**Component:** `src/components/PageBreadcrumb.tsx` (+ `PageBreadcrumb.css`)
+
+### Pattern
+
+```
+Parent section / Current page
+Parent section / Section page / Current item
+```
+
+- Ancestor segments are **links** (`to`) using `--color-blue-dark`.
+- The current leaf is plain muted text (no link).
+- Separator is ` / ` (spaces around the slash).
+- Place it above the page `<h1>` / hero title (or as the sole top chrome when the title is visually hidden).
+- Do **not** invent a separate back-link row when the breadcrumb already links to the parent.
+
+### Examples in the product
+
+| Page | Breadcrumb |
+|------|------------|
+| `/elections/polls` | `בחירות 2026` → `/elections` / סקרי מנדטים |
+| `/elections/lists` | `בחירות 2026` → `/elections` / `משחק הרשימות` → `/elections/lists` |
+| `/elections/lists` (party selected) | … / משחק הרשימות / {party} |
+| `/elections/:partyId` | `בחירות 2026` → `/elections` / {party} |
+
+### Usage
+
+```tsx
+import { PageBreadcrumb } from '../components/PageBreadcrumb'
+
+<PageBreadcrumb
+  items={[
+    { label: 'בחירות 2026', to: '/elections' },
+    { label: 'שם העמוד' },
+  ]}
+/>
+```
+
+Optional `onClick` on a linked item is allowed when staying on the same route but resetting client state (e.g. returning from a sub-step to a picker).
+
+### Agent rule
+
+When creating a **new page**, always include `PageBreadcrumb` with at least the parent section link and the current page label. Prefer this component over one-off eyebrow markup.
 
 ## Typography
 
@@ -106,5 +145,6 @@ Before finishing a UI change:
 - Confirm new cards/buttons have `border-radius: 0`.
 - Confirm page/hero backgrounds are flat white (no soft blue gradient washes).
 - Confirm colors come from the approved palette or a justified local neutral.
+- Confirm new content pages include `PageBreadcrumb` (`Parent / Current`).
 - Confirm the layout works in RTL and mobile widths.
 - Confirm affected agent docs are updated.

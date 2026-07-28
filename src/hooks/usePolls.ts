@@ -4,6 +4,7 @@ import {
   supabase,
   supabaseConfigError,
   type PartyBloc,
+  type PollPublisherRow,
   type PollResultRow,
   type PollRow,
 } from '../lib/supabase'
@@ -11,6 +12,7 @@ import {
 export type PollPartyResult = {
   partyId: number
   partyName: string
+  partyShortName: string | null
   partyColor: string | null
   bloc: PartyBloc | null
   seats: number | null
@@ -23,6 +25,8 @@ export type PollWithResults = {
   pollster: string
   pollsterHe: string | null
   publisher: string
+  publisherHe: string | null
+  publisherLogoUrl: string | null
   fieldworkStart: string
   fieldworkEnd: string
   sampleSize: number | null
@@ -121,24 +125,45 @@ export function usePolls(limit = 30): UsePollsResult {
       return
     }
 
+    const publisherLogoById = new Map<number, string | null>()
+    const publisherLogoByName = new Map<string, string | null>()
+    const publisherHeById = new Map<number, string | null>()
+    const publisherHeByName = new Map<string, string | null>()
+    const { data: publisherRows } = await supabase
+      .from('poll_publishers')
+      .select('id, name, name_he, logo_url')
+
+    for (const row of (publisherRows ?? []) as PollPublisherRow[]) {
+      publisherLogoById.set(row.id, row.logo_url)
+      publisherLogoByName.set(row.name, row.logo_url)
+      publisherHeById.set(row.id, row.name_he)
+      publisherHeByName.set(row.name, row.name_he)
+    }
+
     const partyIds = [
       ...new Set((resultRows ?? []).map((r) => (r as PollResultRow).party_id)),
     ]
 
     const partyMap = new Map<
       number,
-      { name: string; color: string | null; bloc: PartyBloc | null }
+      {
+        name: string
+        shortName: string | null
+        color: string | null
+        bloc: PartyBloc | null
+      }
     >()
 
     if (partyIds.length > 0) {
       const { data: partyRows } = await supabase
         .from('election_parties')
-        .select('id, name, color, bloc')
+        .select('id, name, short_name, color, bloc')
         .in('id', partyIds)
 
       for (const p of partyRows ?? []) {
         partyMap.set(p.id, {
           name: p.name,
+          shortName: p.short_name,
           color: p.color,
           bloc: (p.bloc as PartyBloc | null) ?? null,
         })
@@ -152,6 +177,7 @@ export function usePolls(limit = 30): UsePollsResult {
       list.push({
         partyId: row.party_id,
         partyName: party?.name ?? `#${row.party_id}`,
+        partyShortName: party?.shortName ?? null,
         partyColor: party?.color ?? null,
         bloc: party?.bloc ?? null,
         seats: row.seats,
@@ -167,6 +193,19 @@ export function usePolls(limit = 30): UsePollsResult {
         pollster: poll.pollster,
         pollsterHe: poll.pollster_he,
         publisher: poll.publisher,
+        publisherHe:
+          poll.publisher_he?.trim() ||
+          (poll.publisher_id !== null
+            ? publisherHeById.get(poll.publisher_id)
+            : undefined) ||
+          publisherHeByName.get(poll.publisher) ||
+          null,
+        publisherLogoUrl:
+          (poll.publisher_id !== null
+            ? publisherLogoById.get(poll.publisher_id)
+            : undefined) ??
+          publisherLogoByName.get(poll.publisher) ??
+          null,
         fieldworkStart: poll.fieldwork_start,
         fieldworkEnd: poll.fieldwork_end,
         sampleSize: poll.sample_size,

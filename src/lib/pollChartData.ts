@@ -60,6 +60,19 @@ export function displayBlocColorForParty(party: {
   return DISPLAY_BLOC_COLORS[classifyDisplayBloc(party)]
 }
 
+/** Vertical fill: darker shade near the bottom → base color higher up. */
+export function displayBlocBarGradient(color: string): string {
+  return `linear-gradient(to top, color-mix(in srgb, ${color} 55%, black) 0%, ${color} 65%)`
+}
+
+/** Party bar fill using that party's display-bloc color. */
+export function displayBlocBarGradientForParty(party: {
+  partyName: string
+  bloc: PartyBloc | null
+}): string {
+  return displayBlocBarGradient(displayBlocColorForParty(party))
+}
+
 function buildDisplayBlocShares(totals: DisplayBlocTotals): DisplayBlocTotals {
   return {
     coalition: (totals.coalition / KNESSET_SEATS) * 100,
@@ -102,6 +115,7 @@ function sumDisplayBlocTotalsFromParties(
 export type PartySeatAverage = {
   partyId: number
   partyName: string
+  partyShortName: string | null
   partyColor: string | null
   bloc: PartyBloc | null
   seatsAvg: number
@@ -130,6 +144,7 @@ export type PollSnapshot = {
   pollster: string
   pollsterHe: string | null
   publisher: string
+  publisherLogoUrl: string | null
   sampleSize: number | null
   fieldworkStart: string
   fieldworkEnd: string
@@ -160,6 +175,84 @@ export function selectRecentRegularPolls(
   // fall back to the latest regular polls so the page is never empty.
   const pool = onOrBefore.length > 0 ? onOrBefore : regular
   return dedupePollsByIdentity(pool).slice(0, n)
+}
+
+/** Most recent N regular polls for a single publisher (cleaned name match). */
+export function selectRecentRegularPollsForPublisher(
+  polls: PollWithResults[],
+  publisherKey: string,
+  n: number,
+  asOfDate = todayJerusalem(),
+): PollWithResults[] {
+  const regular = polls.filter((p) => !p.isScenario)
+  const onOrBefore = regular.filter((p) => p.fieldworkEnd <= asOfDate)
+  const pool = onOrBefore.length > 0 ? onOrBefore : regular
+  return dedupePollsByIdentity(pool)
+    .filter((p) => cleanPollPublisher(p.publisher) === publisherKey)
+    .slice(0, n)
+}
+
+export type PartyTrendLine = {
+  partyId: number
+  partyName: string
+  partyShortName: string | null
+  partyColor: string | null
+  seatsAvg: number
+  /** Chronological seat values aligned with `polls` (oldest → newest). */
+  seats: number[]
+}
+
+/** Multi-party seat series + averages for the given newest-first poll window. */
+export function buildPartyTrendLines(
+  pollsNewestFirst: PollWithResults[],
+): PartyTrendLine[] {
+  if (pollsNewestFirst.length === 0) return []
+
+  const chronological = [...pollsNewestFirst].reverse()
+  const sums = new Map<
+    number,
+    {
+      total: number
+      appearances: number
+      name: string
+      shortName: string | null
+      color: string | null
+    }
+  >()
+
+  for (const poll of chronological) {
+    for (const result of poll.results) {
+      if (result.seats === null) continue
+      const existing = sums.get(result.partyId)
+      if (existing) {
+        existing.total += result.seats
+        existing.appearances += 1
+      } else {
+        sums.set(result.partyId, {
+          total: result.seats,
+          appearances: 1,
+          name: result.partyName,
+          shortName: result.partyShortName,
+          color: result.partyColor,
+        })
+      }
+    }
+  }
+
+  return [...sums.entries()]
+    .map(([partyId, meta]) => ({
+      partyId,
+      partyName: meta.name,
+      partyShortName: meta.shortName,
+      partyColor: meta.color,
+      seatsAvg: meta.total / meta.appearances,
+      seats: chronological.map((poll) => {
+        const result = poll.results.find((r) => r.partyId === partyId)
+        return result?.seats ?? 0
+      }),
+    }))
+    .filter((line) => line.seatsAvg >= 0.5)
+    .sort((a, b) => b.seatsAvg - a.seatsAvg)
 }
 
 /** Drop footnote-renumber / re-parse duplicates (same poll, different wiki refs). */
@@ -266,7 +359,15 @@ export function computeLastNAverage(
   const regular = selectRecentRegularPolls(polls, n, asOfDate)
   if (regular.length === 0) return []
 
-  const sums = new Map<number, { total: number; name: string; color: string | null }>()
+  const sums = new Map<
+    number,
+    {
+      total: number
+      name: string
+      shortName: string | null
+      color: string | null
+    }
+  >()
   const appearances = new Map<number, number>()
 
   for (const poll of regular) {
@@ -279,6 +380,7 @@ export function computeLastNAverage(
         sums.set(result.partyId, {
           total: result.seats,
           name: result.partyName,
+          shortName: result.partyShortName,
           color: result.partyColor,
         })
       }
@@ -287,12 +389,30 @@ export function computeLastNAverage(
   }
 
   return [...sums.entries()]
-    .map(([partyId, { total, name, color }]) => ({
+    .map(([partyId, { total, name, shortName, color }]) => ({
       partyId,
       partyName: name,
+      partyShortName: shortName,
       partyColor: color,
       bloc: partyBlocs.get(partyId) ?? null,
       seatsAvg: total / (appearances.get(partyId) ?? 1),
+    }))
+    .sort((a, b) => b.seatsAvg - a.seatsAvg)
+}
+
+export function computePollPartySeats(
+  poll: PollWithResults,
+  partyBlocs: Map<number, PartyBloc | null>,
+): PartySeatAverage[] {
+  return poll.results
+    .filter((result) => result.seats !== null)
+    .map((result) => ({
+      partyId: result.partyId,
+      partyName: result.partyName,
+      partyShortName: result.partyShortName,
+      partyColor: result.partyColor,
+      bloc: partyBlocs.get(result.partyId) ?? result.bloc ?? null,
+      seatsAvg: result.seats ?? 0,
     }))
     .sort((a, b) => b.seatsAvg - a.seatsAvg)
 }
@@ -342,6 +462,19 @@ export function cleanPollPublisher(publisher: string): string {
   return publisher.replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+/** Hebrew publisher label when available; otherwise cleaned English name. */
+export function formatPollPublisher(publisher: {
+  publisher: string
+  publisherHe: string | null
+}): string {
+  const hebrew = publisher.publisherHe?.trim()
+  if (hebrew) {
+    return hebrew
+  }
+
+  return cleanPollPublisher(publisher.publisher)
+}
+
 export function snapshotSeatTotal(snapshot: PollSnapshot): number {
   return snapshot.parties.reduce((sum, party) => sum + party.seats, 0)
 }
@@ -353,6 +486,18 @@ export function selectRecentCompleteSnapshots(
 ): PollSnapshot[] {
   return snapshots
     .filter((s) => Math.round(snapshotSeatTotal(s)) === KNESSET_SEATS)
+    .slice(-n)
+}
+
+/** Most recent N complete polls for a single publisher (cleaned name match). */
+export function selectRecentCompleteSnapshotsForPublisher(
+  snapshots: PollSnapshot[],
+  publisherKey: string,
+  n: number,
+): PollSnapshot[] {
+  return snapshots
+    .filter((s) => Math.round(snapshotSeatTotal(s)) === KNESSET_SEATS)
+    .filter((s) => cleanPollPublisher(s.publisher) === publisherKey)
     .slice(-n)
 }
 
@@ -409,6 +554,7 @@ export function buildPollSnapshots(
       pollster: poll.pollster,
       pollsterHe: poll.pollsterHe,
       publisher: poll.publisher,
+      publisherLogoUrl: poll.publisherLogoUrl,
       sampleSize: poll.sampleSize,
       fieldworkStart: poll.fieldworkStart,
       fieldworkEnd: poll.fieldworkEnd,

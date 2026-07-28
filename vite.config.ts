@@ -18,6 +18,10 @@ export default defineConfig(({ mode }) => {
       knessetEditApiPlugin(env),
       pollsEditApiPlugin(env),
     ],
+    server: {
+      // Listen on all interfaces so phones/other devices on the same Wi‑Fi can open the site
+      host: true,
+    },
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),

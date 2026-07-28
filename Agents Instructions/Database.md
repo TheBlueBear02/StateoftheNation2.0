@@ -14,7 +14,7 @@ The schema is split into four logical groups:
 | **Government** | `governments` · `offices` · `minister_appointments` | Seeded — powers the Government page |
 | **KPI data** | `indexes` · `index_data` | Seeded — dashboard page planned |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | In progress — elections page planned |
-| **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pollster_house_effects` | Live — `/elections/polls` |
+| **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pollster_house_effects` · `poll_publishers` | Live — `/elections/polls` |
 
 All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/`. The public site reads via the anon key. The password-gated editor at `/elections/edit` can also `UPDATE` `election_candidates` and `people` through the anon key once the UPDATE policies below are applied — this is a lightweight private-tool gate, not production auth.
 
@@ -445,6 +445,22 @@ Staging table for parsed Wikipedia poll rows.
 
 ---
 
+### `poll_publishers`
+
+Media channels that publish polls (Kan 11, Channel 13, etc.). Logos maintained manually.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | text | Canonical English name — must match `polls.publisher` |
+| `name_he` | text | Hebrew display name (optional) |
+| `logo_url` | text | Channel logo URL — manually set |
+
+**Data source:** `seed_poll_publishers.sql` seeds rows from distinct `polls.publisher` values. Re-run safe; does not overwrite existing `logo_url`.
+
+**Used by:** `polls.publisher_id` FK (backfilled by seed script).
+
+---
+
 ### `polls`
 
 Normalized poll header — one row per distinct poll.
@@ -455,7 +471,8 @@ Normalized poll header — one row per distinct poll.
 | `natural_key` | text | Unique poll identity |
 | `pollster` | text | Normalized English pollster name |
 | `pollster_he` | text | Hebrew pollster name |
-| `publisher` | text | Media outlet |
+| `publisher` | text | Media outlet (English) |
+| `publisher_id` | bigint | FK → `poll_publishers.id` — optional link for channel logo |
 | `fieldwork_start` / `fieldwork_end` | date | Fieldwork date range |
 | `sample_size` | integer | Sample size |
 | `margin_of_error` | numeric | MOE |

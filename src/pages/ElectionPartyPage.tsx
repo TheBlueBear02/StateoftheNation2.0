@@ -1,5 +1,6 @@
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import type { CSSProperties } from 'react'
+import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
 import { CandidateList } from '../components/elections/CandidateList'
 import { CandidateMap } from '../components/elections/CandidateMap'
@@ -40,9 +41,12 @@ export function ElectionPartyPage() {
     <SiteLayout className="election-party-page">
       <main className="election-party-page__main" style={style}>
         <div className="election-party-page__inner container">
-          <Link to="/elections" className="election-party-page__back">
-            חזרה לכל המפלגות
-          </Link>
+          <PageBreadcrumb
+            items={[
+              { label: 'בחירות 2026', to: '/elections' },
+              { label: partyName },
+            ]}
+          />
 
           {error ? (
             <p className="election-party-page__error" role="alert">
@@ -69,7 +73,6 @@ export function ElectionPartyPage() {
                 </div>
 
                 <div className="party-hero__content">
-                  <p className="election-party-page__eyebrow">בחירות 2026</p>
                   <h1 className="party-hero__title">{partyName}</h1>
                   <p className="party-hero__subtitle">{party.name}</p>
                   {party.description ? (

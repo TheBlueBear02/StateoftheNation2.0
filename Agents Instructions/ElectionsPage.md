@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md), [DesignLanguage.md](./DesignLanguage.md), and [Database.md](./Database.md) for shared conventions and schema details.
 
-Frontend module for the 2026 elections. It has a party index at `/elections`, a party detail page at `/elections/:partyId`, and a password-gated candidate editor at `/elections/edit`.
+Frontend module for the 2026 elections. It has a party index at `/elections`, a party detail page at `/elections/:partyId`, a list rating game at `/elections/lists`, and a password-gated candidate editor at `/elections/edit`.
 
 ## Routes
 
@@ -10,12 +10,13 @@ Frontend module for the 2026 elections. It has a party index at `/elections`, a 
 |-------|-----------|---------|
 | `/elections` | `src/pages/ElectionsPage.tsx` | Cards for confirmed parties (`party_status = 'confirmed'`) |
 | `/elections/polls` | `src/pages/ElectionsPollsPage.tsx` | Weighted poll averages, trend chart, poll table |
+| `/elections/lists` | `src/pages/ElectionListsGamePage.tsx` | Client-only list rating game (green / orange / red) with fit score and share image |
 | `/elections/edit` | `src/pages/ElectionCandidatesEditPage.tsx` | Password-gated editor for existing candidate + person fields |
 | `/elections/:partyId` | `src/pages/ElectionPartyPage.tsx` | Detail page for one party, keyed by `election_parties.id` |
 
-Register `/elections/edit` **before** `/elections/:partyId` in `src/main.tsx` so `edit` is not parsed as a party id.
+Register `/elections/edit`, `/elections/lists`, and `/elections/polls` **before** `/elections/:partyId` in `src/main.tsx` so those path segments are not parsed as a party id.
 
-The homepage hero button **בחירות 2026** links to `/elections`.
+The homepage hero button **בחירות 2026** links to `/elections`. The homepage project section **משחק הרשימות** links to `/elections/lists`.
 
 ## Files
 
@@ -23,7 +24,14 @@ The homepage hero button **בחירות 2026** links to `/elections`.
 |------|------|
 | `src/pages/ElectionsPage.tsx` / `.css` | Party index page, party-card grid, and all-parties residence map |
 | `src/pages/ElectionPartyPage.tsx` / `.css` | Party detail layout and section styles |
+| `src/pages/ElectionListsGamePage.tsx` / `.css` | List rating game: pick party → rate candidates → fit report + share PNG |
 | `src/pages/ElectionCandidatesEditPage.tsx` / `.css` | Password gate, party picker, per-candidate edit forms, and party pipeline panel |
+| `src/components/elections/lists/ListPartyPicker.tsx` | Confirmed-party picker with full-bleed list-leader photo cards |
+| `src/components/elections/lists/ListRatingStep.tsx` | Tinder-style one-card rating deck with progress and action buttons |
+| `src/components/elections/lists/CandidateRateCard.tsx` | Full-bleed candidate swipe card (overlay details + pointer swipe) |
+| `src/components/elections/lists/ListFitReport.tsx` | Fit score report + download/share actions |
+| `src/components/elections/lists/ShareableListReport.tsx` | Fixed-size offscreen card for `html-to-image` PNG export |
+| `src/lib/listFitScore.ts` | Position-weighted fit score and `realisticSeatBand` helpers |
 | `src/components/elections/PartyPipelinePanel.tsx` | Dev-only full pipeline UI for parties with 0–2 candidates |
 | `src/components/elections/EditablePartyPanel.tsx` | Collapsible party metadata editor on `/elections/edit` |
 | `src/lib/updateElectionCandidate.ts` | Anon-key updates to `people` + `election_candidates` with list-position conflict checks |
@@ -63,6 +71,19 @@ Null source data is displayed honestly with coverage labels or empty states; the
 The election data pipeline runs six stages: resolve candidates, general Wikidata enrichment, generate descriptions, geocode cities, `fetch_candidate_birthdates.py` for any remaining null `people.birth_date` values, then `fetch_candidate_wiki_urls.py` for any remaining null `people.wikipedia_url` values. Those final two stages update only their target field on `people`, so frontend age coverage and **קרא עוד** links improve without changing candidate descriptions, cities, map coordinates, gender, or images.
 
 The frontend uses `VITE_SUPABASE_ANON_KEY`, not the service key. If service-role scripts can see parties but `/elections` shows an empty list, check public `select` policies for `elections`, `election_parties`, and `election_candidates` (see [Database.md](./Database.md)).
+
+## List Rating Game (`/elections/lists`)
+
+Client-only game (no DB writes). Flow: **pick party → rate every candidate → fit report**. Ratings live in React state for the session; choosing another party resets them. There is no multi-party comparison board.
+
+1. **Party picker** — confirmed parties from `useElectionParties`. Parties without a list leader (no `list_position = 1`) are disabled. Each card is a full-bleed list-leader portrait with a black bottom gradient, white party name + leader name overlaid at the bottom, and the party logo pinned to the top corner. Breadcrumb is `בחירות 2026 / משחק הרשימות` (both linked: `/elections` and `/elections/lists`). After a party is chosen, the breadcrumb becomes `בחירות 2026 / משחק הרשימות / {party}`; clicking **משחק הרשימות** returns to the picker.
+2. **Rating deck (Tinder-style)** — one candidate at a time from `useElectionCandidates`, in list order. Each card is a full-bleed portrait with a black bottom gradient and overlaid details: list-position badge (top-right), name, description, city, age, new-MK / tenure chips, and Wikipedia link when available. Gender is not shown on the card. Candidates in the realistic seats band show a “בטווח המנדטים הריאלי” badge.
+3. **Desktop actions** — three buttons under the card: green (רוצה לראות בכנסת), orange (לא יודע / לא אכפת), red (לא רוצה לראות בכנסת).
+4. **Mobile swipe** — pointer drag on the card: right = green, left = red, up = orange (physical screen directions). Drag tints the card border to the choice color; releasing past the threshold flies the card out.
+5. **Progress** — `X/N` in white at the top-left of the current card; after the last rating the game advances automatically to the fit report.
+6. **Realistic seats band** — `E = round(seatsAvg)` from the last 5 regular polls. Positions `E−1`, `E`, and `E+1` (clamped to `1…N`) mark the realistic zone on cards with a badge. No separate band summary text is shown above the deck.
+7. **Fit score** — position-weighted: green=1, orange=0.5, red=0; weight for position `p` is `N − p + 1`. Score = `round(100 × Σ(rating×weight) / Σ(weight))`.
+8. **Report / share** — score out of 100, rating counts, party name/logo, site logo, and candidate faces with colored borders. **הורד תמונה לשיתוף** exports a PNG from an offscreen `ShareableListReport` via `html-to-image` (`toPng`); uses Web Share with a file when available, otherwise downloads. **בחר מפלגה אחרת** returns to the picker.
 
 ## Candidate Edit Page (`/elections/edit`)
 
@@ -215,7 +236,7 @@ npm run build
 Manual checks:
 
 - `/elections` loads all parties and card links, plus the all-parties residence map with party filter.
-- `/elections/:partyId` renders the party header, live seats trend from last 5 polls, stats, candidate list, and map.
+- `/elections/:partyId` renders a breadcrumb (`בחירות 2026 / {party}` linking back to `/elections`), the party header, live seats trend from last 5 polls, stats, candidate list, and map.
 - Parties without candidate rows show empty candidate/map states.
 - `/elections/edit` requires `VITE_ELECTIONS_EDIT_SECRET`, unlocks with the password, and can save a candidate field change after anon UPDATE policies are applied.
 - `/elections/edit` party panel can save party name, color, logo, ballot letter, and description for the selected party.

@@ -1,0 +1,19 @@
+.page-breadcrumb {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.page-breadcrumb a {
+  color: var(--color-blue-dark);
+  text-decoration: none;
+}
+
+.page-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.page-breadcrumb__sep {
+  color: var(--color-text-muted);
+}

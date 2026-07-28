@@ -104,6 +104,13 @@ export type ElectionPartyRow = {
   last_polled_date?: string | null
 }
 
+export type PollPublisherRow = {
+  id: number
+  name: string
+  name_he: string | null
+  logo_url: string | null
+}
+
 export type PollRow = {
   id: number
   election_id: number
@@ -112,6 +119,7 @@ export type PollRow = {
   pollster_he: string | null
   publisher: string
   publisher_he: string | null
+  publisher_id: number | null
   fieldwork_start: string
   fieldwork_end: string
   sample_size: number | null

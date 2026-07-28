@@ -12,8 +12,9 @@ Central reference for agents working on this repository. Use this file to unders
 | הכנסת — Knesset hemicycle | `/knesset` | Live |
 | צינורות נתונים — Data pipelines docs | `/piplines` | Live |
 | דשבורד ממשלה — Government dashboard | `/government` | Live |
-| בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls` | Live |
+| בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls`, `/elections/lists` | Live |
 | סקרי מנדטים — Poll averages (hero) | `/elections/polls` | Live |
+| משחק הרשימות — List rating game | `/elections/lists` | Live |
 | עדכון סקרים (dev) | `/elections/polls/edit` | Live (password-gated) |
 | ציר זמן — Timeline | `#timeline` | Planned |
 
@@ -60,8 +61,8 @@ StateoftheNation2.0/
 
 | Path | Role |
 |------|------|
-| `main.tsx` | `BrowserRouter`, route table (`/` → `App`, `/government` → `GovernmentPage`, `/knesset` → `KnessetPage`, `/piplines/*` → `PiplinesPage`) |
-| `App.tsx` | Homepage sections: hero, news strip, government-dashboard teaser |
+| `main.tsx` | `BrowserRouter`, route table (`/` → `App`, `/government` → `GovernmentPage`, `/knesset` → `KnessetPage`, `/elections/lists` → `ElectionListsGamePage`, `/piplines/*` → `PiplinesPage`) |
+| `App.tsx` | Homepage sections: hero, news strip, lists-game teaser, government-dashboard teaser |
 | `pages/GovernmentPage.tsx` | Government picker, hierarchy pyramid, office list |
 | `pages/KnessetPage.tsx` | Knesset term picker, hemicycle, faction list |
 | `pages/KnessetPage.css` | Knesset-specific layout, tooltip, MK dot animation |
@@ -71,6 +72,7 @@ StateoftheNation2.0/
 | `components/SiteHeader.tsx` | Shared header with home logo, Israel-time civil/Hebrew-numeral date labels, and current government/Knesset context — used on all pages |
 | `components/SiteFooter.tsx` | Shared footer — primary blue background, white logo, social links, and copyright |
 | `components/SiteLayout.tsx` | Header + `{children}` + footer shell for all routes |
+| `components/PageBreadcrumb.tsx` | Shared page path breadcrumb (`Parent / Current`) — required on new content pages; see [DesignLanguage.md](./DesignLanguage.md) |
 | `components/knesset/` | Hemicycle visualization subtree (see below) |
 | `components/government/` | Government hierarchy and office-list subtree |
 | `hooks/useKnessetList.ts` | Loads all Knesset terms for the picker dropdown |
@@ -129,6 +131,7 @@ These scripts use `SUPABASE_SERVICE_KEY` (service role). The frontend uses only 
 │         ├─ /elections → ElectionsPage.tsx
 │         ├─ /elections/polls/edit → ElectionsPollsEditPage.tsx
 │         ├─ /elections/polls → ElectionsPollsPage.tsx
+│         ├─ /elections/lists → ElectionListsGamePage.tsx
 │         └─ /piplines/* → PiplinesPage.tsx                   │
 │              ├─ SiteLayout (header + footer)              │
 │              ├─ useKnessetList → Supabase knessets          │
@@ -168,7 +171,7 @@ VITE_SUPABASE_ANON_KEY=...
 
 ## Design Conventions
 
-- **Design language source:** read [DesignLanguage.md](./DesignLanguage.md) before creating or updating UI. New cards and buttons must use square corners (`border-radius: 0`).
+- **Design language source:** read [DesignLanguage.md](./DesignLanguage.md) before creating or updating UI. New cards and buttons must use square corners (`border-radius: 0`). New content pages must use `PageBreadcrumb` for the top path (`Parent / Current`).
 - **RTL first:** `dir="rtl"` on `<html>` and `.site`; grid DOM order places primary content in the right column.
 - **Layout primitive:** `.container` (`max-width: 1120px`, fluid `clamp()` padding) centers section content; section backgrounds are full-bleed.
 - **CSS variables** in `index.css` (`--color-blue`, `--container-max`, etc.).
@@ -179,10 +182,12 @@ VITE_SUPABASE_ANON_KEY=...
 
 ```bash
 npm install
-npm run dev      # local dev server
+npm run dev      # local + LAN (phone) — Vite listens on 0.0.0.0 via server.host
 npm run build    # tsc + vite production build
 npm run lint     # oxlint
 ```
+
+Dev server (`vite.config.ts` `server.host: true`) binds to all interfaces. On the same Wi‑Fi, open `http://<PC-LAN-IP>:5173` from a phone (Vite prints Network URLs on start). PC firewall may need to allow Node/Vite inbound on port 5173.
 
 ## Agent Documentation Index
 
@@ -196,7 +201,7 @@ Read the overview first, then the doc for the area you are changing:
 | [HomePage.md](./HomePage.md) | `/` — hero, news strip, dashboard teaser, `.container`, routing |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` — hemicycle grid, coalition layout, hooks, animations |
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` — data pipeline documentation hub |
-| [ElectionsPage.md](./ElectionsPage.md) | `/elections` — party index, candidates, map |
+| [ElectionsPage.md](./ElectionsPage.md) | `/elections` — party index, candidates, map; `/elections/lists` — list rating game |
 | [PollsPage.md](./PollsPage.md) | `/elections/polls` — Wikipedia poll averages and trend; `/elections/polls/edit` pipeline runner |
 
 When adding a new major page or module, create a matching `Agents Instructions/{Feature}.md` and link it from this index.

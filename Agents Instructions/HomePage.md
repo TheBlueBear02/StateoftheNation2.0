@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and shared conventions.
 
-Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with four visible sections.
+Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with five visible sections.
 
 ## Page Structure
 
@@ -16,7 +16,10 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 ├─────────────────────────────────────────────────────────┤
 │  News strip (black, full-bleed) — edge-to-edge ticker   │
 ├─────────────────────────────────────────────────────────┤
-│  Project: דשבורד ממשלה (white, full-bleed)             │
+│  Project: משחק הרשימות (white, full-bleed)             │
+│    └─ .container — 2-col grid: text | lists preview     │
+├─────────────────────────────────────────────────────────┤
+│  Project: דשבורד ממשלה (#fafafa, full-bleed)           │
 │    └─ .container — 2-col grid: text | dashboard preview │
 ├─────────────────────────────────────────────────────────┤
 │  Footer (blue, full-bleed) — logo + social + copyright│
@@ -29,7 +32,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | File | Role |
 |------|------|
 | `src/App.tsx` | Section markup and static content arrays |
-| `src/main.tsx` | React Router — `/` homepage, `/elections` Elections page, `/elections/:partyId` party detail page, `/government` Government page, `/knesset` Knesset page |
+| `src/main.tsx` | React Router — `/` homepage, `/elections` Elections page, `/elections/lists` list rating game, `/elections/:partyId` party detail page, `/government` Government page, `/knesset` Knesset page |
 | `src/components/SiteHeader.tsx` | Shared header with logo link home, Israel-time Hebrew-numeral/civil date labels, and current government/Knesset context |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue background) |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
@@ -105,13 +108,21 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
 - CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
 
-### 4. Government Dashboard project (`#government-dashboard`)
+### 4. Lists game project (`#lists-game`)
 
-- White section with title, description, and CTA **לדשבורד >>**.
+- White section placed **above** the government dashboard teaser.
+- Title **משחק הרשימות**, description about rating candidates green/orange/red and seeing realistic poll seat range.
+- CTA **למשחק >>** links to `/elections/lists`.
+- Preview (`.lists-game-preview`): CSS mock of rated list rows with traffic-light accents and a “טווח מנדטים ריאלי” band label.
+
+### 5. Government Dashboard project (`#government-dashboard`)
+
+- Uses `.project-section--alt` (`#fafafa`) so it sits visually below the lists teaser.
+- Title, description, and CTA **לדשבורד >>**.
 - `.project-section__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, preview second — text right, dashboard preview left in RTL.
 - CTA links to `/government`.
 
-### 5. Footer (`site-footer`)
+### 6. Footer (`site-footer`)
 
 - Blue background (`--color-blue: #4890FD`), white text.
 - Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: white logo brand (RTL start), centered social links, copyright (RTL end).
@@ -143,7 +154,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 
 ## Responsive Behavior
 
-- **≤900px:** Hero and project 2-col grids collapse to single column; container padding remains fluid via `clamp()`.
+- **≤900px:** Hero collapses to a single centered column — bear image is hidden (`display: none` on `.hero__visual`); title, subtitle, and button grid are centered (`align-items: center`, `text-align: center`). Content capped at `--hero-text-max`. Project 2-col grids collapse to single column; container padding remains fluid via `clamp()`.
 - **≤480px:** Hero buttons become single column; header height, logo, and date text scale down.
 
 ## Future Work
