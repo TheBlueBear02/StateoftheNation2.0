@@ -1,3 +1,5 @@
+import { isDev, getKnessetEditSecret } from './runtimeEnv'
+
 export type KnessetFactionEditInput = {
   factionId: number
   shortName: string | null
@@ -13,14 +15,14 @@ export type UpdateKnessetFactionResult =
 export async function updateKnessetFaction(
   input: KnessetFactionEditInput,
 ): Promise<UpdateKnessetFactionResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return {
       ok: false,
       error: 'זמין רק בסביבת פיתוח (npm run dev)',
     }
   }
 
-  const secret = import.meta.env.VITE_KNESSET_EDIT_SECRET as string | undefined
+  const secret = getKnessetEditSecret()
 
   const response = await fetch('/api/knesset/update-faction', {
     method: 'POST',

@@ -1,3 +1,5 @@
+import { isDev, getElectionsEditSecret } from './runtimeEnv'
+
 type PipelineError = { ok: false; error: string }
 
 export type PollsTableCounts = {
@@ -83,7 +85,7 @@ export type PollsRunOptions = {
 }
 
 function getEditHeaders(): Record<string, string> {
-  const secret = import.meta.env.VITE_ELECTIONS_EDIT_SECRET as string | undefined
+  const secret = getElectionsEditSecret()
   return {
     'Content-Type': 'application/json',
     ...(secret ? { 'X-Elections-Edit-Secret': secret } : {}),
@@ -111,7 +113,7 @@ async function parseResponse<T extends { ok: boolean }>(
 }
 
 export async function fetchPollsStatus(): Promise<PollsStatusResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -127,7 +129,7 @@ export async function runPollsStage(
   stage: number,
   options: PollsRunOptions = {},
 ): Promise<PollsStageResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -147,7 +149,7 @@ export async function runPollsStage(
 export async function runPollsFullSync(
   options: PollsRunOptions = {},
 ): Promise<PollsFullSyncResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 

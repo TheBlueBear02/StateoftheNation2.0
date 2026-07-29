@@ -8,10 +8,10 @@ Frontend and pipeline module for Knesset-26 opinion poll seat projections source
 
 | Route | Component | Purpose |
 |-------|-----------|---------|
-| `/elections/polls` | `src/pages/ElectionsPollsPage.tsx` | Last-N bar chart, bloc bar, party trend lines, bloc trend |
-| `/elections/polls/edit` | `src/pages/ElectionsPollsEditPage.tsx` | Password-gated pipeline runner (dev) |
+| `/elections/polls` | `src/views/ElectionsPollsPage.tsx` | Last-N bar chart, bloc bar, party trend lines, bloc trend |
+| `/elections/polls/edit` | `src/views/ElectionsPollsEditPage.tsx` | Password-gated pipeline runner (dev) |
 
-Register `/elections/polls/edit` **before** `/elections/polls` and `/elections/:partyId` in `src/main.tsx`.
+Register `/elections/polls/edit` as a static App Router segment under `src/app/elections/polls/edit/` (alongside `/elections/polls`); views live in `src/views/…`.
 
 The elections index at `/elections` links to polls from the hero.
 
@@ -39,7 +39,7 @@ Scheduling: `.github/workflows/polls-pipeline.yml` — twice daily UTC.
 
 ## Dev Edit UI (`/elections/polls/edit`)
 
-Password-gated with `VITE_ELECTIONS_EDIT_SECRET` (same as `/elections/edit`). Unlock stored in `sessionStorage` under `polls-edit-unlocked`.
+Password-gated with `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` / `ELECTIONS_EDIT_SECRET` (same as `/elections/edit`; legacy `VITE_ELECTIONS_EDIT_SECRET` still read). Unlock stored in `sessionStorage` under `polls-edit-unlocked`.
 
 Shows:
 - Last UI pipeline run + last successful DB sync (`pipeline_sync_state`)
@@ -49,7 +49,7 @@ Shows:
 - Full sync button (**טען סקרים חדשים**) — incremental by default (main wiki page only; skips unchanged revids)
 - Optional per-stage run, `--force`, and `--backfill` checkboxes
 
-Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `VITE_ELECTIONS_EDIT_SECRET`. Vite plugin: `vite-plugins/pollsEditApi.ts` → `/api/polls/*`.
+Requires `npm run dev` (or `ENABLE_PIPELINE_API`), `SUPABASE_SERVICE_KEY`, and `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET`. Next.js route: `src/app/api/polls/[...path]/route.ts` → `/api/polls/*`.
 
 ## Frontend Files
 
@@ -65,10 +65,11 @@ Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `VITE_ELECTIONS_EDIT_SECRET`
 | `src/components/polls/PartyStackedColumnChart.tsx` | 100% stacked columns per poll date + party legend (not currently shown on the page) |
 | `src/components/polls/BlocTrendChart.tsx` | Horizontal stacked bars per poll date by bloc |
 | `src/components/polls/PollsPipelinePanel.tsx` | Pipeline runner panel on edit page |
-| `src/pages/ElectionsPollsPage.tsx` / `.css` | Polls page UI |
-| `src/pages/ElectionsPollsEditPage.tsx` / `.css` | Password-gated pipeline edit UI |
+| `src/views/ElectionsPollsPage.tsx` / `.css` | Polls page UI |
+| `src/views/ElectionsPollsEditPage.tsx` / `.css` | Password-gated pipeline edit UI |
 | `src/content/pipelines/elections2026Polls.ts` | Pipeline docs content |
-| `vite-plugins/pollsEditApi.ts` | Dev middleware for `/api/polls/*` |
+| `src/app/api/polls/[...path]/route.ts` | Next.js App Router handlers for `/api/polls/*` (gated by `assertPipelineEnabled`) |
+| `src/server/apiCommon.ts` | Shared pipeline API helpers (auth, Python spawn, JSON responses) |
 
 ## Page Layout (`/elections/polls`)
 

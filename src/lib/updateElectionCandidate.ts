@@ -1,3 +1,5 @@
+import { isDev, getElectionsEditSecret } from './runtimeEnv'
+
 import { supabase, supabaseConfigError } from './supabase'
 
 export type ElectionCandidateEditInput = {
@@ -28,7 +30,7 @@ function emptyToNull(value: string): string | null {
 async function updateViaDevApi(
   input: ElectionCandidateEditInput,
 ): Promise<UpdateElectionCandidateResult> {
-  const secret = import.meta.env.VITE_ELECTIONS_EDIT_SECRET as string | undefined
+  const secret = getElectionsEditSecret()
 
   const response = await fetch('/api/elections/update-candidate', {
     method: 'POST',
@@ -157,7 +159,7 @@ async function updateViaAnonClient(
 export async function updateElectionCandidate(
   input: ElectionCandidateEditInput,
 ): Promise<UpdateElectionCandidateResult> {
-  if (import.meta.env.DEV) {
+  if (isDev) {
     return updateViaDevApi(input)
   }
 

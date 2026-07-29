@@ -1,3 +1,5 @@
+import { isDev, getElectionsEditSecret } from './runtimeEnv'
+
 export type PipelineListFormat = 'txt' | 'csv'
 
 export type PipelinePreviewCandidate = {
@@ -19,7 +21,7 @@ export type PipelineReviewItem = {
 type PipelineError = { ok: false; error: string }
 
 function getEditHeaders(): Record<string, string> {
-  const secret = import.meta.env.VITE_ELECTIONS_EDIT_SECRET as string | undefined
+  const secret = getElectionsEditSecret()
   return {
     'Content-Type': 'application/json',
     ...(secret ? { 'X-Elections-Edit-Secret': secret } : {}),
@@ -54,7 +56,7 @@ export async function previewPartyPipelineList(input: {
   | { ok: true; candidates: PipelinePreviewCandidate[]; count: number }
   | PipelineError
 > {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -80,7 +82,7 @@ export async function insertPartyPipelineList(input: {
     }
   | PipelineError
 > {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -97,7 +99,7 @@ export async function runPartyPipelineStage(stage: number): Promise<
   | { ok: true; message?: string; reviewCount?: number }
   | PipelineError
 > {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -114,7 +116,7 @@ export async function fetchPartyReviewQueue(partyId: number): Promise<
   | { ok: true; items: PipelineReviewItem[] }
   | PipelineError
 > {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -140,7 +142,7 @@ export async function resolvePartyReviewQueue(input: {
   | { ok: true; updated: number; remaining: number; message?: string }
   | PipelineError
 > {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 

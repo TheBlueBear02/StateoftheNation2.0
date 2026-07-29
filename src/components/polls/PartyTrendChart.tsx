@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { formatFieldwork, type PollWithResults } from '../../hooks/usePolls'
 import {

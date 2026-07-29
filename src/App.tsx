@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom'
+'use client'
+
+import Link from 'next/link'
 import { SiteLayout } from './components/SiteLayout'
 
 const HERO_BUTTONS = [
@@ -38,16 +40,10 @@ function App() {
               <nav className="hero__nav" aria-label="פרויקטים עיקריים">
                 <ul className="hero__buttons">
                   {HERO_BUTTONS.map((button) => (
-                    <li key={'to' in button ? button.to : button.href}>
-                      {'to' in button ? (
-                        <Link to={button.to} className="hero__button">
-                          {button.label}
-                        </Link>
-                      ) : (
-                        <a href={button.href} className="hero__button">
-                          {button.label}
-                        </a>
-                      )}
+                    <li key={button.to}>
+                      <Link href={button.to} className="hero__button">
+                        {button.label}
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -89,7 +85,7 @@ function App() {
               <p className="project-section__description">
                 כנסו, שחקו ותראו איזו רשימה מתאימה לכם באמת
               </p>
-              <Link to="/elections/lists" className="project-section__cta">
+              <Link href="/elections/lists" className="project-section__cta">
                 למשחק &gt;&gt;
               </Link>
             </div>
@@ -122,7 +118,7 @@ function App() {
                 הדשבורד אוסף את המדדים המרכזיים ממשרדי הממשלה במקום אחד — כדי
                 לעזור להבין את מצב המדינה ואת ביצועי המשרדים השונים.
               </p>
-              <Link to="/government" className="project-section__cta">
+              <Link href="/government" className="project-section__cta">
                 לדשבורד &gt;&gt;
               </Link>
             </div>

@@ -1,5 +1,7 @@
+'use client'
+
 import { useState, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import { formatFieldwork, usePolls } from '../../hooks/usePolls'
 import {
   computePartyLastNTrend,
@@ -117,7 +119,7 @@ export function SeatsTrend({ partyId, color }: SeatsTrendProps) {
                 : 'אין סקרים זמינים'}
         </p>
         {hasTrend ? (
-          <Link to="/elections/polls" className="seats-trend__link">
+          <Link href="/elections/polls" className="seats-trend__link">
             לכל הסקרים
           </Link>
         ) : null}

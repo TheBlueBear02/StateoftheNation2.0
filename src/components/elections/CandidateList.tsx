@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { ElectionCandidate } from '../../hooks/useElectionCandidates'
 import { getInitials, tintColor } from '../../lib/hemicycle'

@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom'
+'use client'
+
+import Link from 'next/link'
 import type { MouseEvent } from 'react'
 import './PageBreadcrumb.css'
 
@@ -30,7 +32,7 @@ export function PageBreadcrumb({ items, className }: PageBreadcrumbProps) {
             </span>
           ) : null}
           {item.to ? (
-            <Link to={item.to} onClick={item.onClick}>
+            <Link href={item.to} onClick={item.onClick}>
               {item.label}
             </Link>
           ) : (

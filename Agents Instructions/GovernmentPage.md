@@ -31,8 +31,8 @@ Route: `/government`
 
 | File | Role |
 |------|------|
-| `src/pages/GovernmentPage.tsx` | Page shell, government picker, title, error state |
-| `src/pages/GovernmentPage.css` | Pyramid, office cards, tooltip, loading skeletons |
+| `src/views/GovernmentPage.tsx` | Page shell, government picker, title, error state |
+| `src/views/GovernmentPage.css` | Pyramid, office cards, tooltip, loading skeletons |
 | `src/components/government/GovernmentPyramid.tsx` | Hierarchy diagram with circular minister avatars |
 | `src/components/government/OfficeList.tsx` | Office cards with ministers and deputy ministers |
 | `src/hooks/useGovernmentList.ts` | Loads all governments for the picker |
@@ -149,4 +149,4 @@ npm run build
 npm run dev   # visit /government — switch governments in the header dropdown
 ```
 
-Ensure `VITE_SUPABASE_ANON_KEY` is set in `.env` before testing live data.
+Ensure `NEXT_PUBLIC_SUPABASE_ANON_KEY` is set in `.env` before testing live data (legacy `VITE_SUPABASE_ANON_KEY` still mapped in `next.config`).

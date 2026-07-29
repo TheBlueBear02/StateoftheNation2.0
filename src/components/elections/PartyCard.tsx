@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom'
+'use client'
+
+import Link from 'next/link'
 import type { CSSProperties } from 'react'
 import type { ElectionParty } from '../../lib/supabase'
 
@@ -17,7 +19,7 @@ export function PartyCard({ party }: PartyCardProps) {
 
   return (
     <Link
-      to={`/elections/${party.id}`}
+      href={`/elections/${party.id}`}
       className={cardClassName}
       style={style}
       aria-label={`לעמוד הבחירות של ${displayName}`}

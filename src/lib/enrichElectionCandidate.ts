@@ -1,3 +1,5 @@
+import { isDev, getElectionsEditSecret } from './runtimeEnv'
+
 export type CandidateEnrichmentUpdates = {
   fullName?: string
   description?: string
@@ -21,14 +23,14 @@ export type EnrichElectionCandidateResult =
 export async function enrichElectionCandidate(
   candidateId: number,
 ): Promise<EnrichElectionCandidateResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return {
       ok: false,
       error: 'זמין רק בסביבת פיתוח (npm run dev)',
     }
   }
 
-  const secret = import.meta.env.VITE_ELECTIONS_EDIT_SECRET as string | undefined
+  const secret = getElectionsEditSecret()
 
   const response = await fetch('/api/elections/enrich-candidate', {
     method: 'POST',

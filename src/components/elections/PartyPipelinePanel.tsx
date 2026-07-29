@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState, type ChangeEvent } from 'react'
 import type { ElectionParty } from '../../lib/supabase'
 import {

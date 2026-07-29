@@ -1,3 +1,5 @@
+'use client'
+
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import type { ElectionCandidate } from '../../../hooks/useElectionCandidates'

@@ -1,16 +1,18 @@
+import { getSupabaseAnonKey, getSupabaseUrl } from './runtimeEnv'
+
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = getSupabaseUrl()
+const supabaseAnonKey = getSupabaseAnonKey()
 
 export const supabaseConfigError =
   !supabaseUrl || !supabaseAnonKey
-    ? 'Missing Supabase env vars — add VITE_SUPABASE_ANON_KEY (public anon key) to .env'
+    ? 'Missing Supabase env vars — add NEXT_PUBLIC_SUPABASE_ANON_KEY (public anon key) to .env'
     : null
 
 export const supabase: SupabaseClient | null = supabaseConfigError
   ? null
-  : createClient(supabaseUrl, supabaseAnonKey)
+  : createClient(supabaseUrl!, supabaseAnonKey!)
 
 export const ACTIVE_KNESSET_ID = 26
 export const ACTIVE_ELECTION_YEAR = 2026

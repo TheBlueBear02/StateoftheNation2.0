@@ -1,3 +1,5 @@
+import { isDev, getKnessetEditSecret } from './runtimeEnv'
+
 type PipelineError = { ok: false; error: string }
 
 export type KnessetTableCounts = {
@@ -111,7 +113,7 @@ export type KmImagesResult =
   | PipelineError
 
 function getEditHeaders(): Record<string, string> {
-  const secret = import.meta.env.VITE_KNESSET_EDIT_SECRET as string | undefined
+  const secret = getKnessetEditSecret()
   return {
     'Content-Type': 'application/json',
     ...(secret ? { 'X-Knesset-Edit-Secret': secret } : {}),
@@ -139,7 +141,7 @@ async function parseResponse<T extends { ok: boolean }>(
 }
 
 export async function fetchKnessetStatus(): Promise<KnessetStatusResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -152,7 +154,7 @@ export async function fetchKnessetStatus(): Promise<KnessetStatusResult> {
 }
 
 export async function runKnessetStage(stage: number): Promise<KnessetStageResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -166,7 +168,7 @@ export async function runKnessetStage(stage: number): Promise<KnessetStageResult
 }
 
 export async function runKnessetFullSync(): Promise<KnessetFullSyncResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -179,7 +181,7 @@ export async function runKnessetFullSync(): Promise<KnessetFullSyncResult> {
 }
 
 export async function previewFactionLinks(): Promise<FactionLinkPreviewResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -192,7 +194,7 @@ export async function previewFactionLinks(): Promise<FactionLinkPreviewResult> {
 }
 
 export async function applyFactionLinks(): Promise<FactionLinkApplyResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 
@@ -205,7 +207,7 @@ export async function applyFactionLinks(): Promise<FactionLinkApplyResult> {
 }
 
 export async function runKmImages(): Promise<KmImagesResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return devOnlyError()
   }
 

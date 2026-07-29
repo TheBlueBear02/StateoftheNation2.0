@@ -1,3 +1,5 @@
+'use client'
+
 import { useMemo, useState, type MouseEvent } from 'react'
 import type { FactionGroup } from '../../lib/hemicycle'
 import { getInitials, resolveFactionColor, tintColor } from '../../lib/hemicycle'

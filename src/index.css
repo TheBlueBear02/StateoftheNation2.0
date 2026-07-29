@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap');
-
 :root {
   --color-blue: #4890fd;
   --color-blue-dark: #3b7ae6;
@@ -10,7 +8,7 @@
   --color-border: #1a1a1a;
   --color-alert: #e74c3c;
 
-  --font-sans: 'Heebo', system-ui, sans-serif;
+  --font-sans: var(--font-heebo), 'Heebo', system-ui, sans-serif;
   --header-height: 56px;
   --container-max: 1120px;
   --container-pad: clamp(20px, 6vw, 80px);

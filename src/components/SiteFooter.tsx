@@ -1,3 +1,5 @@
+'use client'
+
 const SOCIAL_LINKS = [
   {
     href: 'https://x.com/nationstateIL',

@@ -1,3 +1,5 @@
+import { isDev, getElectionsEditSecret } from './runtimeEnv'
+
 export type GeocodeElectionMapResult =
   | {
       ok: true
@@ -12,14 +14,14 @@ export type GeocodeElectionMapResult =
 export async function geocodeElectionMap(
   partyId: number,
 ): Promise<GeocodeElectionMapResult> {
-  if (!import.meta.env.DEV) {
+  if (!isDev) {
     return {
       ok: false,
       error: 'זמין רק בסביבת פיתוח (npm run dev)',
     }
   }
 
-  const secret = import.meta.env.VITE_ELECTIONS_EDIT_SECRET as string | undefined
+  const secret = getElectionsEditSecret()
 
   const response = await fetch('/api/elections/geocode-map', {
     method: 'POST',

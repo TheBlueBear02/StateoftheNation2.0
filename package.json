@@ -2,27 +2,26 @@
   "name": "stateofthenation2-0",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
     "html-to-image": "^1.11.13",
+    "next": "^16.2.12",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.1"
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.12",
     "oxlint": "^1.69.0",
-    "typescript": "~6.0.2",
-    "vite": "^8.1.0"
+    "typescript": "~6.0.2"
   }
 }

@@ -101,6 +101,7 @@ When creating a **new page**, always include `PageBreadcrumb` with at least the 
 ## Typography
 
 - Use the global Heebo stack from `--font-sans`.
+- Heebo is loaded with `next/font` in `src/app/layout.tsx`; prefer `next/image` for new images; see [SeoAndWebStandards.md](./SeoAndWebStandards.md).
 - Keep headings bold and direct.
 - Prefer short explanatory copy over dense paragraphs.
 - Use muted text for context, metadata, and helper descriptions.

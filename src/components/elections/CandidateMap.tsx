@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
 import type { CandidateMapPin } from '../../hooks/useElectionCandidates'
 import {

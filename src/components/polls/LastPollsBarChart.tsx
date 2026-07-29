@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom'
+'use client'
+
+import Link from 'next/link'
 import { formatFieldwork, type PollWithResults } from '../../hooks/usePolls'
 import {
   displayBlocBarGradientForParty,
@@ -194,7 +196,7 @@ export function LastPollsBarChart({
             return (
               <Link
                 key={party.partyId}
-                to={`/elections/${party.partyId}`}
+                href={`/elections/${party.partyId}`}
                 className="polls-bar-chart__column"
                 role="listitem"
                 aria-label={`לעמוד הבחירות של ${party.partyName}, ${displaySeats} מנדטים`}

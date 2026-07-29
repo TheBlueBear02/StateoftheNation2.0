@@ -31,14 +31,14 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 
 | File | Role |
 |------|------|
-| `src/App.tsx` | Section markup and static content arrays |
-| `src/main.tsx` | React Router — `/` homepage, `/elections` Elections page, `/elections/lists` list rating game, `/elections/:partyId` party detail page, `/government` Government page, `/knesset` Knesset page |
+| `src/app/page.tsx` | Homepage route + metadata |
+| `src/app/layout.tsx` | RTL (`lang="he"` `dir="rtl"`), Heebo via `next/font`, root metadata |
+| `src/App.tsx` | Homepage body — section markup and static content arrays |
 | `src/components/SiteHeader.tsx` | Shared header with logo link home, Israel-time Hebrew-numeral/civil date labels, and current government/Knesset context |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue background) |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
 | `src/App.css` | `.container` primitive and section-specific styles |
-| `src/index.css` | Global reset, CSS variables, Heebo font |
-| `index.html` | `lang="he"`, `dir="rtl"`, page title |
+| `src/index.css` | Global reset, CSS variables |
 | `public/header-logo 3.svg` | Header logo |
 | `public/white logo.svg` | White footer logo |
 | `public/hero-bear-image.svg` | Hero bear illustration |
@@ -133,8 +133,8 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 
 ## RTL & Typography
 
-- `dir="rtl"` on `.site` via `SiteLayout` and on `<html>` in `index.html`.
-- Font: **Heebo** (Google Fonts) via `index.css`.
+- `dir="rtl"` on `.site` via `SiteLayout` and on `<html>` in `src/app/layout.tsx`.
+- Font: **Heebo** via `next/font` in `src/app/layout.tsx` (not a Google CSS `@import`).
 - Grid columns flow right-to-left; first DOM child lands in the right column.
 
 ## State Management
@@ -145,10 +145,10 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 
 ## Routing
 
-- `react-router-dom` in `src/main.tsx`
-- `/` → homepage
+- Next.js App Router + `next/link` (`href`), not `react-router-dom`
+- `/` → homepage (`src/app/page.tsx` → `App.tsx`)
 - `/elections` → Elections 2026 party index
-- `/elections/:partyId` → Elections 2026 party detail page
+- `/elections/[partyId]` → Elections 2026 party detail page
 - `/government` → Government page
 - `/knesset` → Knesset hemicycle page
 

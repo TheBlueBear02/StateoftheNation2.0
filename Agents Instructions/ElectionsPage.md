@@ -2,19 +2,19 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md), [DesignLanguage.md](./DesignLanguage.md), and [Database.md](./Database.md) for shared conventions and schema details.
 
-Frontend module for the 2026 elections. It has a party index at `/elections`, a party detail page at `/elections/:partyId`, a list rating game at `/elections/lists`, and a password-gated candidate editor at `/elections/edit`.
+Frontend module for the 2026 elections. It has a party index at `/elections`, a party detail page at `/elections/[partyId]`, a list rating game at `/elections/lists`, and a password-gated candidate editor at `/elections/edit`.
 
 ## Routes
 
 | Route | Component | Purpose |
 |-------|-----------|---------|
-| `/elections` | `src/pages/ElectionsPage.tsx` | Cards for confirmed parties (`party_status = 'confirmed'`) |
-| `/elections/polls` | `src/pages/ElectionsPollsPage.tsx` | Weighted poll averages, trend chart, poll table |
-| `/elections/lists` | `src/pages/ElectionListsGamePage.tsx` | Client-only list rating game (green / orange / red) with fit score and share image |
-| `/elections/edit` | `src/pages/ElectionCandidatesEditPage.tsx` | Password-gated editor for existing candidate + person fields |
-| `/elections/:partyId` | `src/pages/ElectionPartyPage.tsx` | Detail page for one party, keyed by `election_parties.id` |
+| `/elections` | `src/views/ElectionsPage.tsx` | Cards for confirmed parties (`party_status = 'confirmed'`) |
+| `/elections/polls` | `src/views/ElectionsPollsPage.tsx` | Weighted poll averages, trend chart, poll table |
+| `/elections/lists` | `src/views/ElectionListsGamePage.tsx` | Client-only list rating game (green / orange / red) with fit score and share image |
+| `/elections/edit` | `src/views/ElectionCandidatesEditPage.tsx` | Password-gated editor for existing candidate + person fields |
+| `/elections/[partyId]` | `src/views/ElectionPartyPage.tsx` | Detail page for one party, keyed by `election_parties.id` |
 
-Register `/elections/edit`, `/elections/lists`, and `/elections/polls` **before** `/elections/:partyId` in `src/main.tsx` so those path segments are not parsed as a party id.
+App Router uses static segments (`edit`, `lists`, `polls`) under `src/app/elections/`; the dynamic party detail is `src/app/elections/[partyId]/page.tsx`. Thin `page.tsx` wrappers own metadata and render the views in `src/views/…`.
 
 The homepage hero button **בחירות 2026** links to `/elections`. The homepage project section **משחק הרשימות** links to `/elections/lists`.
 
@@ -22,10 +22,10 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 
 | File | Role |
 |------|------|
-| `src/pages/ElectionsPage.tsx` / `.css` | Party index page, party-card grid, and all-parties residence map |
-| `src/pages/ElectionPartyPage.tsx` / `.css` | Party detail layout and section styles |
-| `src/pages/ElectionListsGamePage.tsx` / `.css` | List rating game: pick party → rate candidates → fit report + share PNG |
-| `src/pages/ElectionCandidatesEditPage.tsx` / `.css` | Password gate, party picker, per-candidate edit forms, and party pipeline panel |
+| `src/views/ElectionsPage.tsx` / `.css` | Party index page, party-card grid, and all-parties residence map |
+| `src/views/ElectionPartyPage.tsx` / `.css` | Party detail layout and section styles |
+| `src/views/ElectionListsGamePage.tsx` / `.css` | List rating game: pick party → rate candidates → fit report + share PNG |
+| `src/views/ElectionCandidatesEditPage.tsx` / `.css` | Password gate, party picker, per-candidate edit forms, and party pipeline panel |
 | `src/components/elections/lists/ListPartyPicker.tsx` | Confirmed-party picker with full-bleed list-leader photo cards |
 | `src/components/elections/lists/ListRatingStep.tsx` | Tinder-style one-card rating deck with progress and action buttons |
 | `src/components/elections/lists/CandidateRateCard.tsx` | Full-bleed candidate swipe card (overlay details + pointer swipe) |
@@ -39,7 +39,9 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/lib/enrichElectionCandidate.ts` | Dev-only client for per-card pipeline preview (`/api/elections/enrich-candidate`) |
 | `src/lib/runElectionPartyPipeline.ts` | Dev-only client for party-level pipeline (`/api/elections/pipeline/*`) |
 | `src/lib/geocodeElectionMap.ts` | Dev-only client for party-scoped map geocode (`/api/elections/geocode-map`) |
-| `vite-plugins/electionsEditApi.ts` | Dev middleware: `update-candidate`, `enrich-candidate`, party pipeline, and geocode-map endpoints |
+| `src/app/api/elections/[...path]/route.ts` | Next.js App Router handlers: `update-candidate`, `enrich-candidate`, party pipeline, and geocode-map (gated by `assertPipelineEnabled`) |
+| `src/app/elections/**/page.tsx` | App Router wrappers + per-route metadata for index, polls, lists, edit, and `[partyId]` |
+| `src/server/apiCommon.ts` | Shared pipeline API helpers (auth, Python spawn, JSON responses) |
 | `src/components/elections/PartyCard.tsx` | Clickable card with the top-candidate portrait on the right and the party logo pinned to the top-left corner |
 | `src/components/elections/SeatsTrend.tsx` | Party-hero last-5-polls average + sparkline from `polls` / `poll_results` |
 | `src/components/elections/StatsBar.tsx` | Average age, % new MKs, and % women stat blocks |
@@ -70,7 +72,7 @@ Null source data is displayed honestly with coverage labels or empty states; the
 
 The election data pipeline runs six stages: resolve candidates, general Wikidata enrichment, generate descriptions, geocode cities, `fetch_candidate_birthdates.py` for any remaining null `people.birth_date` values, then `fetch_candidate_wiki_urls.py` for any remaining null `people.wikipedia_url` values. Those final two stages update only their target field on `people`, so frontend age coverage and **קרא עוד** links improve without changing candidate descriptions, cities, map coordinates, gender, or images.
 
-The frontend uses `VITE_SUPABASE_ANON_KEY`, not the service key. If service-role scripts can see parties but `/elections` shows an empty list, check public `select` policies for `elections`, `election_parties`, and `election_candidates` (see [Database.md](./Database.md)).
+The frontend uses `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy `VITE_SUPABASE_ANON_KEY` still mapped in `next.config`), not the service key. If service-role scripts can see parties but `/elections` shows an empty list, check public `select` policies for `elections`, `election_parties`, and `election_candidates` (see [Database.md](./Database.md)).
 
 ## List Rating Game (`/elections/lists`)
 
@@ -87,7 +89,7 @@ Client-only game (no DB writes). Flow: **pick party → rate every candidate →
 
 ## Candidate Edit Page (`/elections/edit`)
 
-Lightweight private tool for editing **existing** candidates only (no add/delete). Access is gated by comparing a submitted password to `VITE_ELECTIONS_EDIT_SECRET` in the browser; a successful unlock is stored in `sessionStorage` under `elections-edit-unlocked`. If the env var is missing, the page shows a config error instead of opening.
+Lightweight private tool for editing **existing** candidates only (no add/delete). Access is gated by comparing a submitted password to `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` in the browser (legacy `VITE_ELECTIONS_EDIT_SECRET` still read); a successful unlock is stored in `sessionStorage` under `elections-edit-unlocked`. If the env var is missing, the page shows a config error instead of opening.
 
 After unlock, pick a party (same square `<select>` pattern as Knesset/Government) and edit one candidate card at a time. Each card is **collapsed by default**, showing list position, photo, and full name; click the summary row to expand the full edit form. Collapsed rows with empty fields show **חסר:** followed by the missing field labels (e.g. `תיאור · עיר · תמונה`). Unsaved changes show **יש שינויים לא שמורים** on the collapsed row. Each card saves independently via `updateElectionCandidate`.
 
@@ -130,14 +132,14 @@ Stage 1 (`resolve_candidates`) is skipped — cards already exist. Stage 4 (`geo
 
 Flow:
 
-1. Button calls `POST /api/elections/enrich-candidate` with `{ candidateId }` (Vite dev middleware only).
+1. Button calls `POST /api/elections/enrich-candidate` with `{ candidateId }` (local-dev / `ENABLE_PIPELINE_API` only).
 2. Middleware spawns `enrich_single_candidate.py --candidate-id N --json` with service-role env vars.
 3. Returned JSON is merged into the card draft for **empty fields only**; user reviews, edits, then saves via `updateElectionCandidate`.
 4. Name lookups try shortened variants when the DB has middle names (e.g. `יולי יואל אדלשטיין` → `יולי אדלשטיין`) and fall back to Hebrew Wikipedia for missing URLs.
-5. In production builds the button is hidden (`import.meta.env.DEV`); static hosting cannot run Python.
+5. In production builds the button is hidden (`isDev` / `NODE_ENV !== 'development'`); static hosting cannot run Python.
 6. While running, the card shows a live seconds counter (e.g. `מחפש מידע חסר… 12 שניות`) and a spinner until the preview returns. If nothing is found, a warning message stays visible on the card.
 
-Requires `SUPABASE_SERVICE_KEY` and `OPENAI_API_KEY` in `.env` alongside `VITE_ELECTIONS_EDIT_SECRET`.
+Requires `SUPABASE_SERVICE_KEY` and `OPENAI_API_KEY` in `.env` alongside `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET`.
 
 ### Party pipeline panel (dev only)
 
@@ -165,11 +167,11 @@ Unlike per-card enrich, this flow **writes directly to the database** (same as C
 
 Stages 2–6 process all 2026 candidates with null target fields (not party-scoped), matching CLI `run_pipeline.py` behavior.
 
-Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, `OPENAI_API_KEY`, and `VITE_ELECTIONS_EDIT_SECRET` in `.env`.
+Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, `OPENAI_API_KEY`, and `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` in `.env`.
 
 ### Party map geocode (dev only)
 
-After selecting a party, the toolbar shows **עדכן מפה** when `import.meta.env.DEV` is true. One click runs pipeline Stage 4 (`geocode_cities.py`) scoped to that party's candidates with a non-null `city` and null `latitude` — the same rows that appear as pins on `/elections/:partyId`.
+After selecting a party, the toolbar shows **עדכן מפה** when `isDev` is true. One click runs pipeline Stage 4 (`geocode_cities.py`) scoped to that party's candidates with a non-null `city` and null `latitude` — the same rows that appear as pins on `/elections/[partyId]`.
 
 | Step | UI | Backend |
 |------|-----|---------|
@@ -180,9 +182,9 @@ Unlike the full party pipeline, this only geocodes the selected party (not all 2
 
 When a candidate's `city` is edited and saved, `latitude` / `longitude` are cleared so stale pins are not shown; run **עדכן מפה** after saving city changes.
 
-Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `VITE_ELECTIONS_EDIT_SECRET` in `.env`.
+Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` in `.env`.
 
-**Dev saves:** `npm run dev` routes writes through `/api/elections/update-candidate` and `/api/elections/update-party`, local Vite middleware that uses `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). **Production saves** use the anon client and require the UPDATE policies in `Layer 1 - Gathering Data/Elections/anon_update_policies.sql` (including `election_parties`).
+**Dev saves:** `npm run dev` routes writes through `/api/elections/update-candidate` and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which uses `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret`. **Production saves** use the anon client and require the UPDATE policies in `Layer 1 - Gathering Data/Elections/anon_update_policies.sql` (including `election_parties`).
 
 ## Seats Trend (party hero)
 
@@ -222,7 +224,7 @@ The module follows [DesignLanguage.md](./DesignLanguage.md):
 - The party index grid renders three cards per row on desktop, two on narrower tablet widths, and one on mobile.
 - Party cards show the top-candidate portrait section only when an image exists in `people.image_url`; the portrait is flush to the right edge and fills the card height, while an enlarged party logo is pinned to the top-left corner. Cards do not render a per-party color accent line.
 - Party color is passed through CSS custom property `--party-color` and appears as a subtle left-side background wash plus hover border treatment.
-- The `/elections/:partyId` party detail sections are borderless; section separation comes from spacing and white backgrounds rather than boxed outlines or hero side accents. The party hero uses three desktop columns: logo, party copy, and the seats trend on the visual left. The hero title is capped at `4rem`, wraps within the middle column (`min-width: 0` + `overflow-wrap: anywhere`), and must not overlap the seats column; the compact seats block keeps an opaque white background and sits above adjacent content when columns are tight. Stats blocks are centered within their cells and have no border.
+- The `/elections/[partyId]` party detail sections are borderless; section separation comes from spacing and white backgrounds rather than boxed outlines or hero side accents. The party hero uses three desktop columns: logo, party copy, and the seats trend on the visual left. The hero title is capped at `4rem`, wraps within the middle column (`min-width: 0` + `overflow-wrap: anywhere`), and must not overlap the seats column; the compact seats block keeps an opaque white background and sits above adjacent content when columns are tight. Stats blocks are centered within their cells and have no border.
 - Candidate list cards use larger borderless full-height portrait/initial columns that sit flush against the card side with no edge padding; the list position number sits as an overlay in the visual top-left corner. Former MKs also show tenure under the city line in smaller muted text (`0.8rem`, e.g. `3.4 שנים בכנסת`). When `election_candidates.city` is null, the city line shows **לא ידוע מקום מגורים**. When a candidate has both a generated description and `people.wikipedia_url`, the description ends with an external **קרא עוד** link to the Hebrew Wikipedia article.
 - Mobile layouts collapse to one column.
 
@@ -236,10 +238,10 @@ npm run build
 Manual checks:
 
 - `/elections` loads all parties and card links, plus the all-parties residence map with party filter.
-- `/elections/:partyId` renders a breadcrumb (`בחירות 2026 / {party}` linking back to `/elections`), the party header, live seats trend from last 5 polls, stats, candidate list, and map.
+- `/elections/[partyId]` renders a breadcrumb (`בחירות 2026 / {party}` linking back to `/elections`), the party header, live seats trend from last 5 polls, stats, candidate list, and map.
 - Parties without candidate rows show empty candidate/map states.
-- `/elections/edit` requires `VITE_ELECTIONS_EDIT_SECRET`, unlocks with the password, and can save a candidate field change after anon UPDATE policies are applied.
+- `/elections/edit` requires `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET`, unlocks with the password, and can save a candidate field change after anon UPDATE policies are applied.
 - `/elections/edit` party panel can save party name, color, logo, ballot letter, and description for the selected party.
 - In dev, **השלם מידע** on a card with missing fields fills the form from pipeline preview; save persists to Supabase.
 - In dev, for a party with 0–2 candidates, the party pipeline panel can paste a list, preview it, run all six stages, resolve review-queue items, and load candidate cards.
-- In dev, **עדכן מפה** geocodes candidates with city but missing coordinates for the selected party; pins appear on `/elections/:partyId` after a successful run.
+- In dev, **עדכן מפה** geocodes candidates with city but missing coordinates for the selected party; pins appear on `/elections/[partyId]` after a successful run.
