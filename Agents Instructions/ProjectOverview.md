@@ -121,7 +121,7 @@ These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Loc
 ```
 NEXT_PUBLIC_SUPABASE_URL=...          # or VITE_SUPABASE_URL / SUPABASE_URL (mapped in next.config)
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...     # or VITE_SUPABASE_ANON_KEY
-NEXT_PUBLIC_SITE_URL=https://...      # canonical / OG / sitemap base
+NEXT_PUBLIC_SITE_URL=https://...      # canonical / OG / sitemap base (bare domain ok; https:// added)
 NEXT_PUBLIC_ELECTIONS_EDIT_SECRET=... # or VITE_ELECTIONS_EDIT_SECRET / ELECTIONS_EDIT_SECRET
 NEXT_PUBLIC_KNESSET_EDIT_SECRET=...   # or VITE_KNESSET_EDIT_SECRET / KNESSET_EDIT_SECRET
 SUPABASE_SERVICE_KEY=...              # pipelines + local edit APIs

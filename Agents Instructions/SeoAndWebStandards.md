@@ -9,7 +9,7 @@ Professional SEO and web standards for the Next.js App Router site.
 1. Every **public** URL has a unique Hebrew `title` + `description` (via `metadata` or `generateMetadata`).
 2. Crawlers get real HTML from the App Router shell (not an empty SPA root).
 3. Edit / pipeline tools are **noindex** and excluded from the sitemap.
-4. Absolute URLs use `NEXT_PUBLIC_SITE_URL` (`getSiteUrl()` in `src/lib/runtimeEnv.ts`).
+4. Absolute URLs use `NEXT_PUBLIC_SITE_URL` (`getSiteUrl()` in `src/lib/runtimeEnv.ts`). Prefer `https://stateofthenation.co.il`; a bare host is normalized with `https://`. On Vercel, unset falls back to `https://${VERCEL_URL}`.
 
 ## Files
 

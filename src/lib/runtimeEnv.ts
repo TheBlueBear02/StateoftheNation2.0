@@ -38,11 +38,19 @@ export function getKnessetEditSecret(): string | undefined {
   )
 }
 
+/** Ensure an absolute origin URL (bare domains get https://). */
+function normalizeSiteUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/$/, '')
+  if (!trimmed) return trimmed
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
 export function getSiteUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL
-  if (explicit) return explicit.replace(/\/$/, '')
+  if (explicit?.trim()) return normalizeSiteUrl(explicit)
   if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, '')
+    return normalizeSiteUrl(process.env.VERCEL_URL)
   }
   return 'http://localhost:3000'
 }
