@@ -101,9 +101,11 @@ export function PollsPipelinePanel({
           סנכרון ויקיפדיה → מסד הנתונים
         </h2>
         <p className="party-pipeline-panel__intro">
-          הרצה רגילה מושכת את דף הסקרים הראשי ומכניסה רק סקרים חדשים שעדיין לא
-          במסד. סמנו &quot;כפייה&quot; כדי לפרסר מחדש גם כש־revid לא השתנה, או
-          &quot;backfill&quot; לכל ארבעת דפי הויקיפדיה.
+          הרצה רגילה מושכת את דף הסקרים הראשי ומפרסרת רק את טבלת המנדטים
+          העדכנית ביותר (Seat projections) — בלי טבלאות ארכיון ותרחישים.
+          שורות שכבר קיימות במסד לא נכנסות מחדש לתור. סמנו &quot;כפייה&quot;
+          כדי למשוך מחדש גם כש־revid לא השתנה, או &quot;backfill&quot; לכל
+          הטבלאות וכל ארבעת דפי הויקיפדיה.
         </p>
       </div>
 
@@ -115,7 +117,7 @@ export function PollsPipelinePanel({
             disabled={running}
             onChange={(event) => setForce(event.target.checked)}
           />
-          <span>כפייה (force) — פרסור מחדש גם בלי שינוי revid</span>
+          <span>כפייה (force) — משיכה מחדש גם בלי שינוי revid</span>
         </label>
         <label className="polls-pipeline-panel__checkbox">
           <input
@@ -124,7 +126,7 @@ export function PollsPipelinePanel({
             disabled={running}
             onChange={(event) => setBackfill(event.target.checked)}
           />
-          <span>backfill — כל ארבעת דפי הויקיפדיה</span>
+          <span>backfill — כל הטבלאות + כל ארבעת דפי הויקיפדיה</span>
         </label>
       </div>
 

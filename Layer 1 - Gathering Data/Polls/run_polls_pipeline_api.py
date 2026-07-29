@@ -286,7 +286,7 @@ def run_stage(
                 )
             ]
         )
-        return label, f"הוכנסו/עודכנו {inserted} שורות גולמיות", summary
+        return label, f"הוכנסו {inserted} שורות גולמיות חדשות", summary
 
     if stage == 3:
         resolved, rejected = resolve_poll_parties.run(sb, dry_run=False)
@@ -357,7 +357,7 @@ def run_stage(
         return label, f"חושבו ממוצעים ל־{count} תאריכים", summary
 
     if stage == 6:
-        exit_code = validate_polls.run(sb, None, dry_run=False)
+        exit_code = validate_polls.run(sb, None, dry_run=False, full=backfill)
         ok = exit_code == 0
         summary = make_run_summary(
             [

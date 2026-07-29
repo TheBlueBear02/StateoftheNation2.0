@@ -12,11 +12,11 @@ Runs all six pipeline stages in order:
   Stage 6  validate_polls      hard gates + ops alerts
 
 Usage:
-  python run_polls_pipeline.py                # incremental
+  python run_polls_pipeline.py                # incremental: latest seat table only
   python run_polls_pipeline.py --dry-run      # no DB writes
   python run_polls_pipeline.py --stage 4      # single stage
-  python run_polls_pipeline.py --backfill     # all four pages
-  python run_polls_pipeline.py --force        # re-parse even if revid unchanged
+  python run_polls_pipeline.py --backfill     # all tables + all four wiki pages
+  python run_polls_pipeline.py --force        # re-fetch even if revid unchanged
 
 Requirements:
   pip install -r requirements.txt
@@ -62,7 +62,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Polls pipeline orchestrator")
     parser.add_argument("--dry-run", action="store_true", help="No DB writes")
     parser.add_argument("--stage", type=int, choices=[1, 2, 3, 4, 5, 6], help="Run one stage only")
-    parser.add_argument("--backfill", action="store_true", help="All four wiki pages")
+    parser.add_argument(
+        "--backfill",
+        action="store_true",
+        help="Full history: all seat + scenario tables on all four wiki pages",
+    )
     parser.add_argument("--force", action="store_true", help="Re-fetch even if revid unchanged")
     args = parser.parse_args()
 
@@ -70,6 +74,10 @@ def main() -> None:
     sb = get_supabase()
     start = datetime.now()
     log.info("═══ Polls pipeline start — %s ═══", start.strftime("%Y-%m-%d %H:%M"))
+    if args.backfill:
+        log.info("Mode: backfill (all tables / all pages)")
+    else:
+        log.info("Mode: incremental (latest Seat projections table only)")
 
     as_of_dates = None
     exit_code = 0
@@ -96,7 +104,9 @@ def main() -> None:
 
     if not args.stage or args.stage == 6:
         log.info("─── Stage 6: validate polls ───")
-        exit_code = validate_polls.run(sb, as_of_dates, args.dry_run)
+        exit_code = validate_polls.run(
+            sb, as_of_dates, args.dry_run, full=args.backfill
+        )
 
     elapsed = (datetime.now() - start).seconds
     log.info("═══ Pipeline complete in %dm %ds ═══", elapsed // 60, elapsed % 60)

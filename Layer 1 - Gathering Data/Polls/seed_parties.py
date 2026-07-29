@@ -44,6 +44,7 @@ PARTIES = [
     {"short_name": "בנט 2026", "name": "בנט 2026", "party_status": "polled_only", "bloc": "opposition", "color": "#00CED1"},
     {"short_name": "הרשימה המשותפת", "name": "הרשימה המשותפת", "party_status": "polled_only", "bloc": "opposition", "color": "#DC143C"},
     {"short_name": "מילואימניקים", "name": "מילואימניקים", "party_status": "polled_only", "bloc": "opposition", "color": "#708090"},
+    {"short_name": "בית ציוני", "name": "בית ציוני", "party_status": "polled_only", "bloc": "opposition", "color": "#5B7C99"},
     # ── historical (merged / dissolved) ────────────────────────────────────
     {"short_name": "עבודה", "name": "עבודה", "party_status": "historical", "bloc": "opposition", "color": "#E30613"},
     {"short_name": "מרצ", "name": "מרצ", "party_status": "historical", "bloc": "opposition", "color": "#008080"},

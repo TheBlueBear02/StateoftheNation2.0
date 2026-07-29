@@ -82,7 +82,10 @@ ALIASES = [
     {"raw_label": "Dems", "short_name": "הדמוקרטים", "valid_from": "2024-07-01"},
     {"raw_label": "Otzma", "short_name": "עוצמה יהודית"},
     {"raw_label": "Together", "short_name": "ביחד"},
-    {"raw_label": "Zionist Home", "short_name": "הציונות הדתית"},
+    # Zionist Home (בית ציוני) — Tropper/Hendel; distinct from Religious Zionism (RZP)
+    {"raw_label": "Zionist Home", "short_name": "בית ציוני"},
+    {"raw_label": "Zionist Home–The Reservists", "short_name": "בית ציוני"},
+    {"raw_label": "Tropper", "short_name": "בית ציוני"},
     {"raw_label": "Reserv.", "short_name": "מילואימניקים"},
     {"raw_label": "Reserv", "short_name": "מילואימניקים"},
     {"raw_label": "Hadash –Ta'al", "short_name": "חד״ש-תע״ל"},
@@ -130,6 +133,13 @@ LINEAGE = [
         "event_date": "2022-11-01",
         "event_type": "dissolve",
         "note": "Blue and White dissolved",
+    },
+    {
+        "predecessor": "מילואימניקים",
+        "successor": "בית ציוני",
+        "event_date": "2026-07-07",
+        "event_type": "rename",
+        "note": "The Reservists renamed / merged into Zionist Home–The Reservists",
     },
 ]
 

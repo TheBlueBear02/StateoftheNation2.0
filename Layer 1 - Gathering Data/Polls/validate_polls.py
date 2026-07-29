@@ -17,24 +17,39 @@ log = logging.getLogger(__name__)
 STALENESS_DAYS = 5
 VOLUME_SPIKE_FACTOR = 3.0
 VOLUME_WINDOW_WEEKS = 8
+# Incremental runs only deep-check recent regular polls (avoids N+1 on full history).
+RECENT_VALIDATE_DAYS = 45
 
 
-def _validate_polls(sb: Client, election_id: int) -> list[str]:
+def _validate_polls(
+    sb: Client,
+    election_id: int,
+    *,
+    full: bool = False,
+) -> list[str]:
     errors: list[str] = []
-    polls = (
+    query = (
         sb.table("polls")
         .select("id, fieldwork_end, is_scenario")
         .eq("election_id", election_id)
-        .execute()
-        .data
-    ) or []
+        .eq("is_scenario", False)
+    )
+    if not full:
+        cutoff = (today_jerusalem() - timedelta(days=RECENT_VALIDATE_DAYS)).isoformat()
+        query = query.gte("fieldwork_end", cutoff)
+    polls = query.execute().data or []
 
     today = today_jerusalem()
+    if full:
+        log.info("Validating %d regular poll(s) (full history)", len(polls))
+    else:
+        log.info(
+            "Validating %d regular poll(s) with fieldwork_end ≥ %s",
+            len(polls),
+            cutoff,
+        )
 
     for poll in polls:
-        if poll["is_scenario"]:
-            continue
-
         fw_end = date.fromisoformat(poll["fieldwork_end"][:10])
         if fw_end > today:
             errors.append(f"Poll {poll['id']}: fieldwork_end {fw_end} is in the future")
@@ -117,9 +132,11 @@ def run(
     sb: Client,
     as_of_dates: list[date] | None = None,
     dry_run: bool = False,
+    *,
+    full: bool = False,
 ) -> int:
     election_id = get_election_id(sb)
-    data_errors = _validate_polls(sb, election_id)
+    data_errors = _validate_polls(sb, election_id, full=full)
     ops_warnings: list[str] = []
 
     stale = _check_staleness(sb, election_id)

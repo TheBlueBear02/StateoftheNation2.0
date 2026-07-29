@@ -368,8 +368,8 @@ def run(sb: Client, dry_run: bool = False) -> int:
                 continue
 
             # Multiple Wikipedia columns can resolve to the same party
-            # (e.g. RZP + Zionist Home). Sum seats; never let a below-threshold
-            # column wipe a seat count from a sibling column.
+            # (e.g. alternate spellings of one label). Sum seats; never let a
+            # below-threshold column wipe a seat count from a sibling column.
             seats_a = existing.get("seats")
             seats_b = incoming.get("seats")
             if seats_a is not None and seats_b is not None:

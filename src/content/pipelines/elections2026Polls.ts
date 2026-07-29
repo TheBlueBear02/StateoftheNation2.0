@@ -11,8 +11,8 @@ export const elections2026PollsPipeline: PipelineDoc = {
       id: 'overview',
       title: 'סקירה',
       paragraphs: [
-        'מקור הנתונים היחיד בגרסה 1 הוא ויקיפדיה באנגלית — דפי Opinion polling for the 2026 Israeli legislative election וארכיוני 2022–2025. הטבלאות נמשכות דרך MediaWiki API (לא HTML scraping), ומפורשות מה-HTML המרונדר.',
-        'הצינור רץ פעמיים ביום ב-GitHub Actions, בודק revid לשינוי, ומעדכן Supabase באופן idempotent.',
+        'מקור הנתונים היחיד בגרסה 1 הוא ויקיפדיה באנגלית — דף Opinion polling for the 2026 Israeli legislative election (וב־backfill גם ארכיוני 2022–2025). בריצה רגילה מפורסרת רק טבלת המנדטים העדכנית ביותר. הטבלאות נמשכות דרך MediaWiki API ומפורשות מה-HTML המרונדר.',
+        'הצינור רץ פעמיים ביום ב-GitHub Actions, בודק revid לשינוי, ומעדכן את מסד הנתונים באופן idempotent (שורות קיימות לא נכנסות מחדש לתור).',
       ],
     },
     {
@@ -20,17 +20,17 @@ export const elections2026PollsPipeline: PipelineDoc = {
       title: 'שלבי הצינור',
       list: [
         '1. fetch_wikipedia — MediaWiki parse + revid cache',
-        '2. parse_poll_tables — wikitable לכל segment, header map עצמאי',
+        '2. parse_poll_tables — ברירת מחדל: טבלת Seat projections העדכנית בלבד; --backfill לכל הטבלאות/דפים',
         '3. resolve_poll_parties — מיפוי תוויות אנגלית דרך poll_party_aliases',
         '4. normalize_polls — polls + poll_results, supersede logic',
         '5. compute_aggregates — last3 + weighted (30 יום אחרונים)',
-        '6. validate_polls — שערים: סכום 120, כיסוי, staleness',
+        '6. validate_polls — שערים על סקרים אחרונים (או היסטוריה מלאה ב-backfill)',
       ],
-      code: `python run_polls_pipeline.py                # incremental
+      code: `python run_polls_pipeline.py                # incremental: latest seat table only
 python run_polls_pipeline.py --dry-run      # no DB writes
 python run_polls_pipeline.py --stage 4      # single stage
-python run_polls_pipeline.py --backfill     # all four wiki pages
-python run_polls_pipeline.py --force        # re-parse unchanged revid`,
+python run_polls_pipeline.py --backfill     # all tables + all four wiki pages
+python run_polls_pipeline.py --force        # re-fetch unchanged revid`,
     },
     {
       id: 'aggregation',

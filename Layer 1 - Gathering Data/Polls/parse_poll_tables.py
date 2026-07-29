@@ -283,8 +283,16 @@ def _section_is_scenario(section_path: str) -> bool:
     return "scenario" in section_path.lower()
 
 
-def _walk_sections(soup: BeautifulSoup) -> list[tuple[str, Tag]]:
-    """Return (section_path, table) pairs for in-scope wikitables."""
+def _walk_sections(
+    soup: BeautifulSoup,
+    *,
+    latest_only: bool = False,
+) -> list[tuple[str, Tag]]:
+    """Return (section_path, table) pairs for in-scope wikitables.
+
+    latest_only=True keeps only the first Seat projections table (newest polls)
+    and skips scenario / archived continuation tables.
+    """
     results: list[tuple[str, Tag]] = []
     section_stack: list[str] = []
     heading_tags = {"h2", "h3", "h4", "h5"}
@@ -304,6 +312,11 @@ def _walk_sections(soup: BeautifulSoup) -> list[tuple[str, Tag]]:
             path = " > ".join(section_stack)
             if _section_should_skip(path):
                 continue
+            if latest_only:
+                if "seat projection" not in path.lower() or _section_is_scenario(path):
+                    continue
+                results.append((path, element))
+                break
             if "seat projection" not in path.lower() and not _section_is_scenario(path):
                 continue
             results.append((path, element))
@@ -431,12 +444,22 @@ def _page_year_hint(source_page: str) -> int:
     return 2026
 
 
-def parse_html(source_page: str, revid: int, html: str) -> list[dict]:
+def parse_html(
+    source_page: str,
+    revid: int,
+    html: str,
+    *,
+    latest_only: bool = False,
+) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     year_hint = _page_year_hint(source_page)
     all_rows: list[dict] = []
 
-    for section_path, table in _walk_sections(soup):
+    tables = _walk_sections(soup, latest_only=latest_only)
+    if latest_only:
+        log.info("  latest-only mode: %d seat-projection table(s)", len(tables))
+
+    for section_path, table in tables:
         rows = _parse_table(
             section_path, table,
             source_page=source_page,
@@ -449,6 +472,24 @@ def parse_html(source_page: str, revid: int, html: str) -> list[dict]:
     return all_rows
 
 
+def _existing_row_keys(sb: Client, rows: list[dict]) -> set[tuple[str, str]]:
+    """Return {(natural_key, content_hash)} already in staging."""
+    keys = list({r["natural_key"] for r in rows})
+    found: set[tuple[str, str]] = set()
+    for i in range(0, len(keys), 50):
+        chunk = keys[i : i + 50]
+        data = (
+            sb.table("raw_poll_rows")
+            .select("natural_key, content_hash")
+            .in_("natural_key", chunk)
+            .execute()
+            .data
+        ) or []
+        for row in data:
+            found.add((row["natural_key"], row["content_hash"]))
+    return found
+
+
 def run(
     sb: Client,
     *,
@@ -457,7 +498,9 @@ def run(
     dry_run: bool = False,
 ) -> int:
     pages = WIKI_PAGES if backfill else [MAIN_WIKI_PAGE]
+    latest_only = not backfill
     inserted = 0
+    skipped = 0
 
     for page in pages:
         cached = fetch_wikipedia.load_cached(page)
@@ -471,21 +514,31 @@ def run(
 
         revid = cached["revid"]
         html = cached["text"]
-        rows = parse_html(page, revid, html)
-        log.info("Parsed %d rows from %s", len(rows), page)
+        rows = parse_html(page, revid, html, latest_only=latest_only)
+        log.info(
+            "Parsed %d rows from %s (%s)",
+            len(rows),
+            page,
+            "latest table only" if latest_only else "full page",
+        )
 
+        if dry_run or not rows:
+            continue
+
+        existing = _existing_row_keys(sb, rows)
         for row in rows:
-            if dry_run:
+            key = (row["natural_key"], row["content_hash"])
+            if key in existing:
+                skipped += 1
                 continue
             try:
-                sb.table("raw_poll_rows").upsert(
-                    row,
-                    on_conflict="natural_key,content_hash",
-                ).execute()
+                sb.table("raw_poll_rows").insert(row).execute()
                 inserted += 1
+                existing.add(key)
             except Exception as exc:
                 log.warning("Insert failed for %s: %s", row["natural_key"][:16], exc)
 
+    log.info("Stage 2 done: %d new rows, %d unchanged skipped", inserted, skipped)
     return inserted
 
 
