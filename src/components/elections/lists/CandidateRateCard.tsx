@@ -14,13 +14,21 @@ type CandidateRateCardProps = {
   inBand: boolean
   flyOut: 'left' | 'right' | 'up' | null
   disabled?: boolean
-  ratedCount: number
-  totalCount: number
   onSwipe: (rating: CandidateRating) => void
 }
 
 const SWIPE_THRESHOLD = 100
 const DRAG_MAX = 180
+
+const RATING_ACTIONS: {
+  value: CandidateRating
+  label: string
+  icon: string
+}[] = [
+  { value: 'green', label: 'רוצה לראות בכנסת', icon: '♥' },
+  { value: 'orange', label: 'לא יודע / לא אכפת', icon: '?' },
+  { value: 'red', label: 'לא רוצה לראות בכנסת', icon: '✕' },
+]
 
 function ageFromBirthDate(birthDate: string | null): number | null {
   if (!birthDate) return null
@@ -42,10 +50,8 @@ function ageFromBirthDate(birthDate: string | null): number | null {
 
 function buildMetaChips(candidate: ElectionCandidate): string[] {
   const chips: string[] = []
-  const age = ageFromBirthDate(candidate.birthDate)
 
   if (candidate.city) chips.push(candidate.city)
-  if (age !== null) chips.push(`גיל ${age}`)
 
   if (candidate.isNewMk) {
     chips.push('חדש/ה לכנסת')
@@ -61,8 +67,6 @@ export function CandidateRateCard({
   inBand,
   flyOut,
   disabled = false,
-  ratedCount,
-  totalCount,
   onSwipe,
 }: CandidateRateCardProps) {
   const pointerIdRef = useRef<number | null>(null)
@@ -71,6 +75,7 @@ export function CandidateRateCard({
   const [dragging, setDragging] = useState(false)
 
   const metaChips = buildMetaChips(candidate)
+  const age = ageFromBirthDate(candidate.birthDate)
   const dragDistance = Math.hypot(drag.x, drag.y)
   const previewRating: CandidateRating | null =
     flyOut === 'right' || (!flyOut && drag.x > 48)
@@ -181,62 +186,92 @@ export function CandidateRateCard({
       onPointerUp={handlePointerUp}
       onPointerCancel={resetDrag}
     >
-      <div className="lists-swipe-card__media">
-        {candidate.imageUrl ? (
-          <img
-            className="lists-swipe-card__photo"
-            src={candidate.imageUrl}
-            alt=""
-            draggable={false}
-          />
-        ) : (
-          <span className="lists-swipe-card__initials" aria-hidden="true">
-            {getInitials(candidate.fullName)}
-          </span>
-        )}
-        <span className="lists-swipe-card__gradient" aria-hidden="true" />
+      <div className="lists-swipe-card__body">
+        <div className="lists-swipe-card__media">
+          {candidate.imageUrl ? (
+            <img
+              className="lists-swipe-card__photo"
+              src={candidate.imageUrl}
+              alt=""
+              draggable={false}
+            />
+          ) : (
+            <span className="lists-swipe-card__initials" aria-hidden="true">
+              {getInitials(candidate.fullName)}
+            </span>
+          )}
+          <span className="lists-swipe-card__gradient" aria-hidden="true" />
+        </div>
+
+        <span className="lists-swipe-card__position">
+          מקום {candidate.listPosition}
+        </span>
+
+        <div className="lists-swipe-card__overlay">
+          {inBand ? (
+            <span className="lists-swipe-card__band">בטווח המנדטים הריאלי</span>
+          ) : null}
+          <div className="lists-swipe-card__meta">
+            <div className="lists-swipe-card__heading">
+              <h3 className="lists-swipe-card__name">{candidate.fullName}</h3>
+              {age !== null ? (
+                <span className="lists-swipe-card__age">{age}</span>
+              ) : null}
+            </div>
+            {metaChips.length > 0 ? (
+              <ul className="lists-swipe-card__chips">
+                {metaChips.map((chip) => (
+                  <li key={chip}>{chip}</li>
+                ))}
+              </ul>
+            ) : null}
+            {candidate.description || candidate.wikipediaUrl ? (
+              <div className="lists-swipe-card__description">
+                <p className="lists-swipe-card__description-text">
+                  {candidate.description}
+                  {candidate.wikipediaUrl ? (
+                    <>
+                      {candidate.description ? ' ' : null}
+                      <a
+                        className="lists-swipe-card__wiki"
+                        href={candidate.wikipediaUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        קרא עוד
+                      </a>
+                    </>
+                  ) : null}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      <span className="lists-swipe-card__progress" aria-live="polite">
-        {ratedCount.toLocaleString('he-IL')}/{totalCount.toLocaleString('he-IL')}
-      </span>
-
-      <span className="lists-swipe-card__position">
-        מקום {candidate.listPosition}
-      </span>
-
-      <div className="lists-swipe-card__overlay">
-        {inBand ? (
-          <span className="lists-swipe-card__band">בטווח המנדטים הריאלי</span>
-        ) : null}
-        <h3 className="lists-swipe-card__name">{candidate.fullName}</h3>
-        {metaChips.length > 0 ? (
-          <ul className="lists-swipe-card__chips">
-            {metaChips.map((chip) => (
-              <li key={chip}>{chip}</li>
-            ))}
-          </ul>
-        ) : null}
-        {candidate.description || candidate.wikipediaUrl ? (
-          <p className="lists-swipe-card__description">
-            {candidate.description}
-            {candidate.wikipediaUrl ? (
-              <>
-                {candidate.description ? ' ' : null}
-                <a
-                  className="lists-swipe-card__wiki"
-                  href={candidate.wikipediaUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  קרא עוד
-                </a>
-              </>
-            ) : null}
-          </p>
-        ) : null}
+      <div
+        className="lists-swipe-card__actions"
+        role="group"
+        aria-label={`דירוג עבור ${candidate.fullName}`}
+      >
+        {RATING_ACTIONS.map((action) => (
+          <button
+            key={action.value}
+            type="button"
+            className={`lists-swipe-action lists-swipe-action--${action.value}`}
+            aria-label={action.label}
+            title={action.label}
+            disabled={disabled || flyOut !== null}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => onSwipe(action.value)}
+          >
+            <span className="lists-swipe-action__icon" aria-hidden="true">
+              {action.icon}
+            </span>
+          </button>
+        ))}
       </div>
     </article>
   )

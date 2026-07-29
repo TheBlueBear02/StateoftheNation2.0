@@ -56,6 +56,7 @@ export function PartyTrendChart({ polls }: PartyTrendChartProps) {
   )
   const [hoveredPollIndex, setHoveredPollIndex] = useState<number | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+  const [brokenLogoIds, setBrokenLogoIds] = useState<Set<number>>(() => new Set())
 
   const publisherLogos = useMemo(() => {
     const source = selectRecentRegularPolls(polls, 30)
@@ -185,6 +186,15 @@ export function PartyTrendChart({ polls }: PartyTrendChartProps) {
     setHoveredPollIndex(null)
   }
 
+  const handleLogoError = (partyId: number) => {
+    setBrokenLogoIds((current) => {
+      if (current.has(partyId)) return current
+      const next = new Set(current)
+      next.add(partyId)
+      return next
+    })
+  }
+
   const handlePartyToggle = (partyId: number) => {
     setSelectedPartyIds((current) => {
       const next = new Set(current ?? [])
@@ -283,19 +293,27 @@ export function PartyTrendChart({ polls }: PartyTrendChartProps) {
                 }`}
                 onClick={() => handlePartyToggle(line.partyId)}
                 aria-pressed={isSelected}
+                aria-label={line.partyShortName ?? line.partyName}
                 title={
                   isSelected
                     ? `הסר את ${line.partyName}`
                     : `הוסף את ${line.partyName}`
                 }
               >
-                <span
-                  className="polls-party-trend-legend__swatch"
-                  style={{ backgroundColor: color }}
-                />
-                <span className="polls-party-trend-legend__name">
-                  {line.partyShortName ?? line.partyName}
-                </span>
+                {line.partyLogoUrl && !brokenLogoIds.has(line.partyId) ? (
+                  <img
+                    className="polls-party-trend-legend__logo"
+                    src={line.partyLogoUrl}
+                    alt=""
+                    onError={() => handleLogoError(line.partyId)}
+                  />
+                ) : (
+                  <span
+                    className="polls-party-trend-legend__swatch"
+                    style={{ backgroundColor: color }}
+                    aria-hidden="true"
+                  />
+                )}
               </button>
             </li>
           )

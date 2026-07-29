@@ -19,8 +19,8 @@ export type DisplayBlocKey = 'coalition' | 'raam' | 'hadashTaal' | 'opposition'
 
 export const DISPLAY_BLOC_ORDER: DisplayBlocKey[] = [
   'coalition',
-  'raam',
   'hadashTaal',
+  'raam',
   'opposition',
 ]
 
@@ -38,17 +38,93 @@ export const DISPLAY_BLOC_LABELS: Record<DisplayBlocKey, string> = {
   opposition: 'אופוזיציה',
 }
 
-const RAAM_PARTY_NAME = 'רע״ם'
-const HADASH_TAAL_PARTY_NAME = 'חד״ש-תע״ל'
+/** Legend chips for bloc distribution and trend charts (RTL-friendly order). */
+export const DISPLAY_BLOC_LEGEND_ORDER: DisplayBlocKey[] = [
+  'opposition',
+  'raam',
+  'hadashTaal',
+  'coalition',
+]
+
+export const MAJORITY_SEATS = 60
+
+export type PartyBranding = {
+  color: string | null
+  logoUrl: string | null
+}
+
+/** Collapse spelling variants (e.g. ש״ס / ש"ס / שס) for branding lookup. */
+export function normalizePartyShortName(name: string): string {
+  return name
+    .trim()
+    .replace(/[\s\-–—]/g, '')
+    .replace(/["״''`׳]/g, '')
+}
+
+function nonEmpty(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+export function mergePartyBranding(
+  target: PartyBranding,
+  color: string | null | undefined,
+  logoUrl: string | null | undefined,
+): PartyBranding {
+  return {
+    color: nonEmpty(color) ?? target.color,
+    logoUrl: nonEmpty(logoUrl) ?? target.logoUrl,
+  }
+}
+
+export function registerPartyBranding(
+  map: Map<string, PartyBranding>,
+  shortName: string | null | undefined,
+  color: string | null | undefined,
+  logoUrl: string | null | undefined,
+): void {
+  if (!shortName?.trim()) return
+  const key = normalizePartyShortName(shortName)
+  if (!key) return
+  const existing = map.get(key) ?? { color: null, logoUrl: null }
+  map.set(key, mergePartyBranding(existing, color, logoUrl))
+}
+
+export function resolvePartyBranding(
+  shortName: string | null | undefined,
+  color: string | null | undefined,
+  logoUrl: string | null | undefined,
+  brandingByKey: Map<string, PartyBranding>,
+): PartyBranding {
+  const direct: PartyBranding = {
+    color: nonEmpty(color),
+    logoUrl: nonEmpty(logoUrl),
+  }
+  if (!shortName?.trim()) return direct
+  const fallback = brandingByKey.get(normalizePartyShortName(shortName))
+  return {
+    color: direct.color ?? fallback?.color ?? null,
+    logoUrl: direct.logoUrl ?? fallback?.logoUrl ?? null,
+  }
+}
+
+const HADASH_TAAL_SHORT_NAMES = new Set(['חד״ש-תע״ל', 'חד"ש תע"ל', 'חד"ש-תע"ל'])
+const RAAM_SHORT_NAMES = new Set(['רע״ם', 'רע"ם'])
 
 export type DisplayBlocTotals = Record<DisplayBlocKey, number>
 
 function classifyDisplayBloc(party: {
   partyName: string
+  partyShortName?: string | null
   bloc: PartyBloc | null
 }): DisplayBlocKey {
-  if (party.partyName === RAAM_PARTY_NAME) return 'raam'
-  if (party.partyName === HADASH_TAAL_PARTY_NAME) return 'hadashTaal'
+  const short = party.partyShortName?.trim()
+  if (short && RAAM_SHORT_NAMES.has(short)) return 'raam'
+  if (short && HADASH_TAAL_SHORT_NAMES.has(short)) return 'hadashTaal'
+  if (party.partyName.includes('רע') && party.partyName.includes('ם')) return 'raam'
+  if (party.partyName.includes('חד') && party.partyName.includes('תע')) {
+    return 'hadashTaal'
+  }
   if (party.bloc === 'coalition') return 'coalition'
   return 'opposition'
 }
@@ -83,7 +159,10 @@ function buildDisplayBlocShares(totals: DisplayBlocTotals): DisplayBlocTotals {
 }
 
 export function sumDisplayBlocTotals(
-  parties: Pick<PartySeatAverage, 'partyName' | 'bloc' | 'seatsAvg'>[],
+  parties: Pick<
+    PartySeatAverage,
+    'partyName' | 'partyShortName' | 'bloc' | 'seatsAvg'
+  >[],
 ): DisplayBlocTotals {
   const totals: DisplayBlocTotals = {
     coalition: 0,
@@ -98,7 +177,7 @@ export function sumDisplayBlocTotals(
 }
 
 function sumDisplayBlocTotalsFromParties(
-  parties: Pick<PartySnapshot, 'partyName' | 'bloc' | 'seats'>[],
+  parties: Pick<PartySnapshot, 'partyName' | 'partyShortName' | 'bloc' | 'seats'>[],
 ): DisplayBlocTotals {
   const totals: DisplayBlocTotals = {
     coalition: 0,
@@ -130,6 +209,7 @@ export type BlocTotals = {
 export type PartySnapshot = {
   partyId: number
   partyName: string
+  partyShortName: string | null
   partyColor: string | null
   bloc: PartyBloc | null
   seats: number
@@ -197,6 +277,7 @@ export type PartyTrendLine = {
   partyName: string
   partyShortName: string | null
   partyColor: string | null
+  partyLogoUrl: string | null
   seatsAvg: number
   /** Chronological seat values aligned with `polls` (oldest → newest). */
   seats: number[]
@@ -217,6 +298,7 @@ export function buildPartyTrendLines(
       name: string
       shortName: string | null
       color: string | null
+      logoUrl: string | null
     }
   >()
 
@@ -234,6 +316,7 @@ export function buildPartyTrendLines(
           name: result.partyName,
           shortName: result.partyShortName,
           color: result.partyColor,
+          logoUrl: result.partyLogoUrl,
         })
       }
     }
@@ -245,6 +328,7 @@ export function buildPartyTrendLines(
       partyName: meta.name,
       partyShortName: meta.shortName,
       partyColor: meta.color,
+      partyLogoUrl: meta.logoUrl,
       seatsAvg: meta.total / meta.appearances,
       seats: chronological.map((poll) => {
         const result = poll.results.find((r) => r.partyId === partyId)
@@ -530,6 +614,7 @@ export function buildPollSnapshots(
       .map((r) => ({
         partyId: r.partyId,
         partyName: r.partyName,
+        partyShortName: r.partyShortName,
         partyColor: r.partyColor,
         bloc: partyBlocs.get(r.partyId) ?? null,
         seats: r.seats ?? 0,

@@ -2,8 +2,10 @@ import { useState, type MouseEvent } from 'react'
 import {
   DISPLAY_BLOC_COLORS,
   DISPLAY_BLOC_LABELS,
+  DISPLAY_BLOC_LEGEND_ORDER,
   DISPLAY_BLOC_ORDER,
   KNESSET_SEATS,
+  MAJORITY_SEATS,
   cleanPollPublisher,
   selectRecentCompleteSnapshots,
   selectRecentCompleteSnapshotsForPublisher,
@@ -17,8 +19,7 @@ type BlocTrendChartProps = {
   snapshots: PollSnapshot[]
 }
 
-const MAJORITY_SEATS = 60
-const MAJORITY_PCT = 50
+const MAJORITY_PCT = (MAJORITY_SEATS / KNESSET_SEATS) * 100
 const TREND_POLLS = 30
 const PUBLISHER_TREND_POLLS = 10
 
@@ -38,12 +39,6 @@ const PLOT_WIDTH = CHART_WIDTH - MARGIN.left - MARGIN.right
 const DATE_LABEL_X = 18
 
 const GRID_LINES = [0, 25, 50, 75, 100]
-
-const BLOC_TREND_LEGEND_ORDER: DisplayBlocKey[] = [
-  'opposition',
-  'hadashTaal',
-  'coalition',
-]
 
 function sumDisplaySeats(snapshot: PollSnapshot): number {
   return DISPLAY_BLOC_ORDER.reduce(
@@ -167,7 +162,7 @@ export function BlocTrendChart({ snapshots }: BlocTrendChartProps) {
       )}
 
       <div className="polls-bloc-legend" aria-label="מקרא גושים">
-        {BLOC_TREND_LEGEND_ORDER.map((bloc) => (
+        {DISPLAY_BLOC_LEGEND_ORDER.map((bloc) => (
           <span key={bloc} className="polls-bloc-legend__item">
             <span
               className="polls-bloc-legend__swatch"
@@ -311,7 +306,7 @@ export function BlocTrendChart({ snapshots }: BlocTrendChartProps) {
               </div>
             )}
             <div className="polls-bloc-tooltip__blocs">
-              {BLOC_TREND_LEGEND_ORDER.map((bloc) => {
+              {DISPLAY_BLOC_LEGEND_ORDER.map((bloc) => {
                 const seats = hovered.displayBlocTotals[bloc]
                 if (seats <= 0) return null
                 return (

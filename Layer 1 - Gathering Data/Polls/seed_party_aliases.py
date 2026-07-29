@@ -134,6 +134,35 @@ LINEAGE = [
 ]
 
 
+# Elections list import uses different short_name spellings than seed_parties.
+HADASH_SHORT_NAME_FALLBACKS = ("חד״ש-תע״ל", 'חד"ש תע"ל', 'חד"ש-תע"ל')
+RAAM_SHORT_NAME_FALLBACKS = ("רע״ם", 'רע"ם')
+
+
+def _find_party_id(party_map: dict[str, int], short_name: str) -> int | None:
+    """Resolve party_id even when DB short_name differs from seed key."""
+    if short_name in party_map:
+        return party_map[short_name]
+
+    if short_name in HADASH_SHORT_NAME_FALLBACKS:
+        for candidate in HADASH_SHORT_NAME_FALLBACKS:
+            if candidate in party_map:
+                return party_map[candidate]
+        for key, party_id in party_map.items():
+            if "חד" in key and "תע" in key:
+                return party_id
+
+    if short_name in RAAM_SHORT_NAME_FALLBACKS:
+        for candidate in RAAM_SHORT_NAME_FALLBACKS:
+            if candidate in party_map:
+                return party_map[candidate]
+        for key, party_id in party_map.items():
+            if "רע" in key and "ם" in key:
+                return party_id
+
+    return None
+
+
 def _find_alias_row(sb: Client, raw_label: str, valid_from: str | None) -> dict | None:
     """Lookup by unique key (raw_label, valid_from) — matches poll_party_aliases_label_from_key."""
     query = sb.table("poll_party_aliases").select("id").eq("raw_label", raw_label)
@@ -150,7 +179,7 @@ def run(sb: Client, dry_run: bool = False) -> None:
     party_map = party_id_by_short_name(sb, election_id)
 
     for alias in ALIASES:
-        party_id = party_map.get(alias["short_name"])
+        party_id = _find_party_id(party_map, alias["short_name"])
         if not party_id:
             log.warning("Party not found for short_name=%s", alias["short_name"])
             continue

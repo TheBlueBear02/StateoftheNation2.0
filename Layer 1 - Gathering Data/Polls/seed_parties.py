@@ -39,9 +39,9 @@ PARTIES = [
     {"short_name": "הדמוקרטים", "name": "הדמוקרטים", "party_status": "confirmed", "bloc": "opposition", "color": "#E91E63"},
     {"short_name": "ביחד", "name": "ביחד", "party_status": "confirmed", "bloc": "opposition", "color": "#0066CC"},
     {"short_name": "נועם", "name": "נועם", "party_status": "confirmed", "bloc": "coalition", "color": "#4B0082"},
+    {"short_name": "ישר", "name": "ישר", "party_status": "confirmed", "bloc": "opposition", "color": "#4169E1"},
     # ── polled_only (hypothetical lists) ─────────────────────────────────────
     {"short_name": "בנט 2026", "name": "בנט 2026", "party_status": "polled_only", "bloc": "opposition", "color": "#00CED1"},
-    {"short_name": "ישר", "name": "ישר", "party_status": "polled_only", "bloc": "opposition", "color": "#4169E1"},
     {"short_name": "הרשימה המשותפת", "name": "הרשימה המשותפת", "party_status": "polled_only", "bloc": "opposition", "color": "#DC143C"},
     {"short_name": "מילואימניקים", "name": "מילואימניקים", "party_status": "polled_only", "bloc": "opposition", "color": "#708090"},
     # ── historical (merged / dissolved) ────────────────────────────────────

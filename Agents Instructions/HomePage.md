@@ -111,9 +111,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 ### 4. Lists game project (`#lists-game`)
 
 - White section placed **above** the government dashboard teaser.
-- Title **משחק הרשימות**, description about rating candidates green/orange/red and seeing realistic poll seat range.
+- Title **משחק הרשימות**, description: **כנסו, שחקו ותראו איזו רשימה מתאימה לכם באמת**.
 - CTA **למשחק >>** links to `/elections/lists`.
-- Preview (`.lists-game-preview`): CSS mock of rated list rows with traffic-light accents and a “טווח מנדטים ריאלי” band label.
+- Preview (`.lists-game-preview`): screenshot from `public/election-game-homepage.png` showing stacked swipe cards from the list rating game.
 
 ### 5. Government Dashboard project (`#government-dashboard`)
 

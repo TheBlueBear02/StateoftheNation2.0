@@ -20,15 +20,6 @@ type ListRatingStepProps = {
 
 const FLY_OUT_MS = 320
 
-const RATING_ACTIONS: {
-  value: CandidateRating
-  label: string
-}[] = [
-  { value: 'green', label: 'רוצה לראות בכנסת' },
-  { value: 'orange', label: 'לא יודע / לא אכפת' },
-  { value: 'red', label: 'לא רוצה לראות בכנסת' },
-]
-
 function flyDirectionForRating(
   rating: CandidateRating,
 ): 'left' | 'right' | 'up' {
@@ -52,8 +43,6 @@ export function ListRatingStep({
   const [cardKey, setCardKey] = useState(0)
   const flyTimeoutRef = useRef<number | null>(null)
 
-  const ratedCount = ratings.size
-  const total = candidates.length
   const partyId = candidates[0]?.partyId ?? null
 
   const nextUnrated =
@@ -161,8 +150,7 @@ export function ListRatingStep({
     <div className="lists-swipe">
       <div className="lists-swipe__legend" role="note">
         <p className="lists-swipe__gesture-hint">
-          רוצים לראות את המועמד בכנסת? החליקו ימינה. לא רוצים? החליקו שמאלה,
-          לא בטוחים? החליקו למעלה. או העזרו בכפתורים
+          בדקו עד כמה אתם אוהבים את הרשימה על ידי החלקה ימינה, שמאלה או למעלה
         </p>
       </div>
 
@@ -173,30 +161,8 @@ export function ListRatingStep({
           inBand={isInRealisticBand(current.listPosition, band)}
           flyOut={flyOut}
           disabled={flyOut !== null}
-          ratedCount={Math.min(ratedCount + (flyOut ? 1 : 0), total)}
-          totalCount={total}
           onSwipe={commitRating}
         />
-      </div>
-
-      <div
-        className="lists-swipe__actions"
-        role="group"
-        aria-label={`דירוג עבור ${current.fullName}`}
-      >
-        {RATING_ACTIONS.map((action) => (
-          <button
-            key={action.value}
-            type="button"
-            className={`lists-swipe-action lists-swipe-action--${action.value}`}
-            aria-label={action.label}
-            title={action.label}
-            disabled={flyOut !== null}
-            onClick={() => commitRating(action.value)}
-          >
-            <span className="lists-swipe-action__caption">{action.label}</span>
-          </button>
-        ))}
       </div>
     </div>
   )

@@ -294,6 +294,35 @@
 
 /* ── Bloc distribution bar ────────────────────────────────────────────────── */
 
+.polls-bloc-bar-wrap {
+  position: relative;
+  width: 100%;
+  padding-block-start: 20px;
+}
+
+.polls-bloc-bar__majority-label {
+  position: absolute;
+  inset-inline-start: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--color-black);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.polls-bloc-bar__majority-line {
+  position: absolute;
+  inset-inline-start: 50%;
+  top: 16px;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-black);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .polls-bloc-bar {
   display: flex;
   direction: ltr;
@@ -474,17 +503,17 @@
 .polls-party-trend-legend__btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 0;
+  justify-content: center;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: 6px;
   background: #fff;
-  color: var(--color-text);
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.15s ease, background-color 0.15s ease;
+  transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.polls-party-trend-legend__btn:not(.polls-party-trend-legend__btn--hidden) {
+  border-color: rgba(0, 0, 0, 0.12);
 }
 
 .polls-party-trend-legend__btn:hover {
@@ -504,14 +533,23 @@
   background-color: #bbb !important;
 }
 
-.polls-party-trend-legend__swatch {
-  flex-shrink: 0;
-  width: 10px;
-  height: 10px;
+.polls-party-trend-legend__btn--hidden .polls-party-trend-legend__logo {
+  filter: grayscale(1);
+  opacity: 0.45;
 }
 
-.polls-party-trend-legend__name {
-  line-height: 1.2;
+.polls-party-trend-legend__swatch {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+}
+
+.polls-party-trend-legend__logo {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .polls-party-trend-wrap {

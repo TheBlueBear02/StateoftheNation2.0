@@ -361,126 +361,13 @@
   min-width: 0;
   justify-self: start;
   width: 100%;
-  max-width: 420px;
-  padding: 18px;
-  border: 2px solid rgba(0, 0, 0, 0.12);
-  background: var(--color-white);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  max-width: 580px;
 }
 
-.lists-game-preview__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.lists-game-preview__logo {
-  width: 36px;
-  height: 36px;
-  background: var(--color-blue);
-  flex-shrink: 0;
-}
-
-.lists-game-preview__title-bar {
-  flex: 1;
-  height: 14px;
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.lists-game-preview__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.lists-game-preview__row {
-  display: grid;
-  grid-template-columns: 22px 28px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  padding: 8px;
-  border: 2px solid rgba(0, 0, 0, 0.08);
-}
-
-.lists-game-preview__row--green {
-  border-color: rgba(39, 174, 96, 0.55);
-  background: rgba(46, 204, 113, 0.08);
-}
-
-.lists-game-preview__row--orange {
-  border-color: rgba(243, 156, 18, 0.55);
-  background: rgba(243, 156, 18, 0.08);
-}
-
-.lists-game-preview__row--red {
-  border-color: rgba(231, 76, 60, 0.55);
-  background: rgba(231, 76, 60, 0.08);
-}
-
-.lists-game-preview__pos {
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-align: center;
-}
-
-.lists-game-preview__face {
-  width: 28px;
-  height: 28px;
-  background: rgba(0, 0, 0, 0.12);
-}
-
-.lists-game-preview__lines {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.lists-game-preview__line {
+.lists-game-preview__image {
   display: block;
-  height: 6px;
   width: 100%;
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.lists-game-preview__line--short {
-  width: 55%;
-}
-
-.lists-game-preview__dots {
-  display: flex;
-  gap: 4px;
-}
-
-.lists-game-preview__dot {
-  width: 10px;
-  height: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-}
-
-.lists-game-preview__dot--green {
-  background: #2ecc71;
-}
-
-.lists-game-preview__dot--orange {
-  background: #f39c12;
-}
-
-.lists-game-preview__dot--red {
-  background: #e74c3c;
-}
-
-.lists-game-preview__band {
-  margin-top: 4px;
-  padding: 6px 10px;
-  border: 2px solid var(--color-blue);
-  background: rgba(72, 144, 253, 0.1);
-  text-align: center;
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: var(--color-blue-dark);
+  height: auto;
 }
 
 /* ── Dashboard preview placeholder ── */

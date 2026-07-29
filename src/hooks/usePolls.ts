@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  registerPartyBranding,
+  resolvePartyBranding,
+  type PartyBranding,
+} from '../lib/pollChartData'
+import {
   ACTIVE_ELECTION_YEAR,
   supabase,
   supabaseConfigError,
@@ -14,6 +19,7 @@ export type PollPartyResult = {
   partyName: string
   partyShortName: string | null
   partyColor: string | null
+  partyLogoUrl: string | null
   bloc: PartyBloc | null
   seats: number | null
   voteShare: number | null
@@ -58,6 +64,53 @@ function formatFieldwork(start: string, end: string): string {
   }
 
   return `${fmt(start)} – ${fmt(end)}`
+}
+
+const PARTY_BRANDING_SELECT =
+  'id, name, short_name, color, logo_url, bloc, knesset_faction:knesset_factions(logo_url, color, short_name)'
+
+type PartyBrandingSourceRow = {
+  id: number
+  name: string
+  short_name: string | null
+  color: string | null
+  logo_url: string | null
+  bloc: string | null
+  knesset_faction?:
+    | {
+        logo_url: string | null
+        color: string | null
+        short_name: string | null
+      }
+    | {
+        logo_url: string | null
+        color: string | null
+        short_name: string | null
+      }[]
+    | null
+}
+
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null
+  }
+
+  return value ?? null
+}
+
+function ingestPartyBranding(
+  brandingByKey: Map<string, PartyBranding>,
+  row: PartyBrandingSourceRow,
+): void {
+  const faction = unwrapRelation(row.knesset_faction)
+  registerPartyBranding(brandingByKey, row.short_name, row.color, row.logo_url)
+  registerPartyBranding(brandingByKey, row.name, row.color, row.logo_url)
+  registerPartyBranding(
+    brandingByKey,
+    faction?.short_name,
+    faction?.color,
+    faction?.logo_url,
+  )
 }
 
 export function usePolls(limit = 30): UsePollsResult {
@@ -150,21 +203,42 @@ export function usePolls(limit = 30): UsePollsResult {
         name: string
         shortName: string | null
         color: string | null
+        logoUrl: string | null
         bloc: PartyBloc | null
       }
     >()
 
+    const brandingByKey = new Map<string, PartyBranding>()
+
+    const { data: confirmedPartyRows } = await supabase
+      .from('election_parties')
+      .select(PARTY_BRANDING_SELECT)
+      .eq('election_id', electionData.id)
+      .eq('party_status', 'confirmed')
+
+    for (const row of (confirmedPartyRows ?? []) as PartyBrandingSourceRow[]) {
+      ingestPartyBranding(brandingByKey, row)
+    }
+
     if (partyIds.length > 0) {
       const { data: partyRows } = await supabase
         .from('election_parties')
-        .select('id, name, short_name, color, bloc')
+        .select(PARTY_BRANDING_SELECT)
         .in('id', partyIds)
 
-      for (const p of partyRows ?? []) {
+      for (const p of (partyRows ?? []) as PartyBrandingSourceRow[]) {
+        ingestPartyBranding(brandingByKey, p)
+        const branding = resolvePartyBranding(
+          p.short_name,
+          p.color,
+          p.logo_url,
+          brandingByKey,
+        )
         partyMap.set(p.id, {
           name: p.name,
           shortName: p.short_name,
-          color: p.color,
+          color: branding.color,
+          logoUrl: branding.logoUrl,
           bloc: (p.bloc as PartyBloc | null) ?? null,
         })
       }
@@ -179,6 +253,7 @@ export function usePolls(limit = 30): UsePollsResult {
         partyName: party?.name ?? `#${row.party_id}`,
         partyShortName: party?.shortName ?? null,
         partyColor: party?.color ?? null,
+        partyLogoUrl: party?.logoUrl ?? null,
         bloc: party?.bloc ?? null,
         seats: row.seats,
         voteShare: row.vote_share !== null ? Number(row.vote_share) : null,

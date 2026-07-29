@@ -1,10 +1,11 @@
 import {
   DISPLAY_BLOC_COLORS,
   DISPLAY_BLOC_LABELS,
+  DISPLAY_BLOC_LEGEND_ORDER,
   DISPLAY_BLOC_ORDER,
   displayBlocBarGradient,
   KNESSET_SEATS,
-  type DisplayBlocKey,
+  MAJORITY_SEATS,
   type DisplayBlocTotals,
 } from '../../lib/pollChartData'
 import type { PollWithResults } from '../../hooks/usePolls'
@@ -13,13 +14,6 @@ type BlocDistributionBarProps = {
   totals: DisplayBlocTotals
   selectedPoll: PollWithResults | null
 }
-
-/** Same tag set as BlocTrendChart — רע״ם omitted from legend but still drawn in the bar. */
-const BLOC_DIST_LEGEND_ORDER: DisplayBlocKey[] = [
-  'opposition',
-  'hadashTaal',
-  'coalition',
-]
 
 export function BlocDistributionBar({ totals, selectedPoll }: BlocDistributionBarProps) {
   const segments = DISPLAY_BLOC_ORDER.map((bloc) => ({
@@ -37,7 +31,7 @@ export function BlocDistributionBar({ totals, selectedPoll }: BlocDistributionBa
       </h2>
 
       <div className="polls-bloc-legend" aria-label="מקרא גושים">
-        {BLOC_DIST_LEGEND_ORDER.map((bloc) => (
+        {DISPLAY_BLOC_LEGEND_ORDER.map((bloc) => (
           <span key={bloc} className="polls-bloc-legend__item">
             <span
               className="polls-bloc-legend__swatch"
@@ -48,24 +42,30 @@ export function BlocDistributionBar({ totals, selectedPoll }: BlocDistributionBa
         ))}
       </div>
 
-      <div
-        className="polls-bloc-bar"
-        role="img"
-        aria-label="חלוקת מנדטים לפי גושים"
-      >
-        {segments.map(({ bloc, seats, width }) => (
-          <div
-            key={bloc}
-            className="polls-bloc-bar__segment"
-            style={{
-              width: `${width}%`,
-              background: displayBlocBarGradient(DISPLAY_BLOC_COLORS[bloc]),
-            }}
-            title={`${DISPLAY_BLOC_LABELS[bloc]}: ${Math.round(seats)}`}
-          >
-            <span className="polls-bloc-bar__value">{Math.round(seats)}</span>
-          </div>
-        ))}
+      <div className="polls-bloc-bar-wrap">
+        <span className="polls-bloc-bar__majority-label" aria-hidden="true">
+          {MAJORITY_SEATS} מנדטים
+        </span>
+        <div
+          className="polls-bloc-bar"
+          role="img"
+          aria-label="חלוקת מנדטים לפי גושים"
+        >
+          {segments.map(({ bloc, seats, width }) => (
+            <div
+              key={bloc}
+              className="polls-bloc-bar__segment"
+              style={{
+                width: `${width}%`,
+                background: displayBlocBarGradient(DISPLAY_BLOC_COLORS[bloc]),
+              }}
+              title={`${DISPLAY_BLOC_LABELS[bloc]}: ${Math.round(seats)}`}
+            >
+              <span className="polls-bloc-bar__value">{Math.round(seats)}</span>
+            </div>
+          ))}
+        </div>
+        <span className="polls-bloc-bar__majority-line" aria-hidden="true" />
       </div>
     </section>
   )

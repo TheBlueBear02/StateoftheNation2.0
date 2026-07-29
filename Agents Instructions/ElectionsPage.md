@@ -54,7 +54,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 
 ## Data Flow
 
-`useElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero links to `/elections/polls` for weighted poll averages.
+`useElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר (promoted from polled_only). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero links to `/elections/polls` for weighted poll averages.
 
 `useElectionCandidates(partyId)` loads ordered `election_candidates` joined to `people`. It then queries `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merges overlapping terms with `computeMemberTenureStats`, and attaches `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
 
@@ -77,13 +77,13 @@ The frontend uses `VITE_SUPABASE_ANON_KEY`, not the service key. If service-role
 Client-only game (no DB writes). Flow: **pick party → rate every candidate → fit report**. Ratings live in React state for the session; choosing another party resets them. There is no multi-party comparison board.
 
 1. **Party picker** — confirmed parties from `useElectionParties`. Parties without a list leader (no `list_position = 1`) are disabled. Each card is a full-bleed list-leader portrait with a black bottom gradient, white party name + leader name overlaid at the bottom, and the party logo pinned to the top corner. Breadcrumb is `בחירות 2026 / משחק הרשימות` (both linked: `/elections` and `/elections/lists`). After a party is chosen, the breadcrumb becomes `בחירות 2026 / משחק הרשימות / {party}`; clicking **משחק הרשימות** returns to the picker.
-2. **Rating deck (Tinder-style)** — one candidate at a time from `useElectionCandidates`, in list order. Each card is a full-bleed portrait with a black bottom gradient and overlaid details: list-position badge (top-right), name, description, city, age, new-MK / tenure chips, and Wikipedia link when available. Gender is not shown on the card. Candidates in the realistic seats band show a “בטווח המנדטים הריאלי” badge.
-3. **Desktop actions** — three buttons under the card: green (רוצה לראות בכנסת), orange (לא יודע / לא אכפת), red (לא רוצה לראות בכנסת).
+2. **Rating deck (Tinder-style)** — one candidate at a time from `useElectionCandidates`, in list order. The portrait fills the card down to a black action strip; name, age, chips, and description are overlaid on the image bottom with a gradient for legibility. List-position badge (top-right), Wikipedia link when available. Gender is not shown on the card. Candidates in the realistic seats band show a “בטווח המנדטים הריאלי” badge.
+3. **Rating actions** — three circular buttons in a black bottom strip on the card (Tinder-style): green ♥ (רוצה לראות בכנסת), orange ? (לא יודע / לא אכפת), red ✕ (לא רוצה לראות בכנסת). Dark fill, colored border; the strip and buttons move with the card on swipe/fly-out.
 4. **Mobile swipe** — pointer drag on the card: right = green, left = red, up = orange (physical screen directions). Drag tints the card border to the choice color; releasing past the threshold flies the card out.
-5. **Progress** — `X/N` in white at the top-left of the current card; after the last rating the game advances automatically to the fit report.
+5. **Progress** — after the last rating the game advances automatically to the fit report (no on-card counter).
 6. **Realistic seats band** — `E = round(seatsAvg)` from the last 5 regular polls. Positions `E−1`, `E`, and `E+1` (clamped to `1…N`) mark the realistic zone on cards with a badge. No separate band summary text is shown above the deck.
 7. **Fit score** — position-weighted: green=1, orange=0.5, red=0; weight for position `p` is `N − p + 1`. Score = `round(100 × Σ(rating×weight) / Σ(weight))`.
-8. **Report / share** — score out of 100, rating counts, party name/logo, site logo, and candidate faces with colored borders. **הורד תמונה לשיתוף** exports a PNG from an offscreen `ShareableListReport` via `html-to-image` (`toPng`); uses Web Share with a file when available, otherwise downloads. **בחר מפלגה אחרת** returns to the picker.
+8. **Report / share** — single dark-blue card (`#0a1628`): white share icon (top-left) exports/shares a PNG; white site logo top-right; fit score and rating counts centered in white at the top; candidates in list order as small portrait cards (same 3∶4.2 ratio as the swipe cards) with green/orange/red borders, a list-position badge on each card, and no names. The portrait grid uses `direction: ltr` so place 1 starts on the left and continues left-to-right (rows wrap naturally). Below the card: centered **בחר מפלגה אחרת** and a Hebrew note explaining the weighted score (green=1, orange=0.5, red=0; higher list positions weigh more; 0–100).
 
 ## Candidate Edit Page (`/elections/edit`)
 

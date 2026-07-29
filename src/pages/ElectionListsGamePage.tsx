@@ -151,11 +151,8 @@ export function ElectionListsGamePage() {
           {step === 'rate' && selectedParty && !error ? (
             <section
               className="lists-game-section"
-              aria-labelledby="lists-rate-title"
+              aria-label={`דרגו את רשימת ${partyName}`}
             >
-              <h2 id="lists-rate-title" className="lists-game-section__title">
-                דרגו את רשימת {partyName}
-              </h2>
               <ListRatingStep
                 candidates={candidates}
                 ratings={ratings}
