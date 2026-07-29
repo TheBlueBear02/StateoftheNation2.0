@@ -149,7 +149,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-blue);
+  background: #3083f0;
   color: var(--color-white);
   min-height: clamp(460px, 64vh, 600px);
   padding-block: 48px;
@@ -172,10 +172,14 @@
 }
 
 .hero__title {
-  font-size: clamp(2.75rem, 6vw, 4.5rem);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--color-white);
+  display: flex;
+  margin: 0;
+  line-height: 0;
+}
+
+.hero__title-logo {
+  width: min(100%, clamp(220px, 42vw, 420px));
+  height: auto;
 }
 
 .hero__subtitle {
@@ -234,12 +238,23 @@
   display: flex;
   justify-content: flex-start;
   align-items: center;
+  overflow: visible;
 }
 
 .hero__bear {
-  width: min(100%, 520px);
-  max-width: 100%;
+  display: block;
+  width: min(110%, 560px);
+  max-width: none;
   height: auto;
+  object-fit: contain;
+  transform: scale(1.08) translateX(28px);
+  transform-origin: center center;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.hero__bear--ready {
+  opacity: 1;
 }
 
 /* ── News strip ── */
@@ -291,93 +306,140 @@
 /* ── Project section ── */
 
 .project-section {
-  padding-block: 72px 96px;
   background: var(--color-white);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.project-section__link {
+  display: block;
+  padding-block: 48px 64px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.project-section__link:focus-visible {
+  outline: 3px solid var(--color-blue);
+  outline-offset: -3px;
 }
 
 .project-section__inner {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
   align-items: center;
-  gap: clamp(32px, 5vw, 64px);
+  gap: clamp(28px, 4vw, 56px);
+  padding: clamp(16px, 2.5vw, 28px);
+  transition: background-color 0.2s ease;
+}
+
+.project-section__inner:hover {
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
 .project-section__content {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 20px;
-  justify-self: end;
+  gap: 18px;
+  justify-self: stretch;
+  max-width: 34ch;
+}
+
+.project-section__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--color-blue);
+  color: var(--color-white);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  border-radius: 0;
 }
 
 .project-section__title {
-  font-size: clamp(2rem, 4vw, 2.75rem);
+  margin: 0;
+  font-size: clamp(1.35rem, 2.6vw, 1.85rem);
   font-weight: 800;
   color: var(--color-text);
-}
-
-.project-section__description {
-  font-size: 1.05rem;
-  line-height: 1.65;
-  color: var(--color-text-muted);
-  max-width: 36ch;
-}
-
-.project-section__cta {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 8px;
-  padding: 14px 28px;
-  background: linear-gradient(180deg, var(--color-blue) 0%, var(--color-blue-dark) 100%);
-  color: var(--color-white);
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
+  line-height: 1.2;
   text-decoration: none;
-  box-shadow: 0 4px 12px rgba(72, 144, 253, 0.35);
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: text-decoration-color 0.2s ease;
 }
 
-.project-section__cta:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(72, 144, 253, 0.45);
+.project-section__link:has(.project-section__title:hover, .project-section__media:hover)
+  .project-section__title {
+  text-decoration: underline;
 }
 
-.project-section__cta:focus-visible {
-  outline: 3px solid var(--color-blue);
-  outline-offset: 3px;
+.project-section__media {
+  min-width: 0;
+  justify-self: stretch;
+  width: 100%;
+  overflow: hidden;
+}
+
+.project-section__image {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .project-section--alt {
   background: #fafafa;
 }
 
-/* ── Lists game preview ── */
+/* ── Polls preview placeholder ── */
 
-.lists-game-preview {
-  min-width: 0;
-  justify-self: start;
+.polls-preview {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  aspect-ratio: 16 / 10;
   width: 100%;
-  max-width: 580px;
+  max-width: 520px;
+  margin-inline: auto;
+  padding: 28px 24px 20px;
 }
 
-.lists-game-preview__image {
-  display: block;
+.polls-preview__bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(6px, 1.2vw, 12px);
+  height: 100%;
+}
+
+.polls-preview__bar {
+  flex: 1;
+  min-width: 0;
+  border-radius: 4px 4px 0 0;
+  background: var(--color-blue);
+}
+
+.polls-preview__bar--1 { height: 88%; background: #1f4e9e; }
+.polls-preview__bar--2 { height: 72%; background: #4890fd; }
+.polls-preview__bar--3 { height: 54%; background: #6aa6fd; }
+.polls-preview__bar--4 { height: 44%; background: #c45c5c; }
+.polls-preview__bar--5 { height: 36%; background: #8a8a8a; }
+.polls-preview__bar--6 { height: 28%; background: #5a9e6e; }
+.polls-preview__bar--7 { height: 22%; background: #d4a017; }
+.polls-preview__bar--8 { height: 16%; background: #7b6bb0; }
+
+.polls-preview__baseline {
+  height: 2px;
   width: 100%;
-  height: auto;
+  background: rgba(0, 0, 0, 0.12);
 }
 
 /* ── Dashboard preview placeholder ── */
 
 .dashboard-preview {
-  min-width: 0;
-  justify-self: start;
   position: relative;
   aspect-ratio: 1;
-  width: min(100%, 420px);
+  width: 100%;
+  max-width: 520px;
+  margin-inline: auto;
   padding: 24px;
 }
 
@@ -444,6 +506,10 @@
 /* ── Responsive ── */
 
 @media (max-width: 900px) {
+  .site-header--home {
+    display: none;
+  }
+
   .hero {
     min-height: auto;
     padding-block: 64px 72px;
@@ -462,6 +528,16 @@
     text-align: center;
   }
 
+  .hero__title {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hero__title-logo {
+    width: min(100%, clamp(300px, 82vw, 480px));
+    margin-inline: auto;
+  }
+
   .hero__nav {
     width: 100%;
   }
@@ -474,31 +550,34 @@
     max-width: 28ch;
   }
 
-  .project-section {
-    padding-block: 56px 72px;
+  .project-section__link {
+    padding-block: 28px 36px;
   }
 
   .project-section__inner {
-    grid-template-columns: 1fr;
-    gap: 40px;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+    gap: 16px;
+    align-items: center;
+    padding: 12px;
   }
 
   .project-section__content {
-    justify-self: stretch;
-  }
-
-  .lists-game-preview,
-  .dashboard-preview {
-    justify-self: stretch;
     max-width: none;
+    gap: 10px;
+  }
+
+  .project-section__tag {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+  }
+
+  .project-section__title {
+    font-size: clamp(1rem, 3.6vw, 1.25rem);
   }
 
   .dashboard-preview {
-    justify-self: center;
-  }
-
-  .project-section__description {
     max-width: none;
+    padding: 12px;
   }
 }
 

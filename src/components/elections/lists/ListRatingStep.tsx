@@ -150,12 +150,6 @@ export function ListRatingStep({
 
   return (
     <div className="lists-swipe">
-      <div className="lists-swipe__legend" role="note">
-        <p className="lists-swipe__gesture-hint">
-          בדקו עד כמה אתם אוהבים את הרשימה על ידי החלקה ימינה, שמאלה או למעלה
-        </p>
-      </div>
-
       <div className="lists-swipe__deck">
         <CandidateRateCard
           key={`${current.id}-${cardKey}`}
@@ -165,6 +159,12 @@ export function ListRatingStep({
           disabled={flyOut !== null}
           onSwipe={commitRating}
         />
+      </div>
+
+      <div className="lists-swipe__legend" role="note">
+        <p className="lists-swipe__gesture-hint">
+          בדקו עד כמה אתם אוהבים את הרשימה על ידי החלקה ימינה, שמאלה או למעלה
+        </p>
       </div>
     </div>
   )

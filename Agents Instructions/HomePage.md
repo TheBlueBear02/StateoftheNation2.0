@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and shared conventions.
 
-Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with five visible sections.
+Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with six visible sections.
 
 ## Page Structure
 
@@ -17,10 +17,13 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 │  News strip (black, full-bleed) — edge-to-edge ticker   │
 ├─────────────────────────────────────────────────────────┤
 │  Project: משחק הרשימות (white, full-bleed)             │
-│    └─ .container — 2-col grid: text | lists preview     │
+│    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
-│  Project: דשבורד ממשלה (#fafafa, full-bleed)           │
-│    └─ .container — 2-col grid: text | dashboard preview │
+│  Project: סקרי מנדטים (#fafafa, full-bleed)            │
+│    └─ .container — tag + title | media                  │
+├─────────────────────────────────────────────────────────┤
+│  Project: דשבורד ממשלה (white, full-bleed)             │
+│    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
 │  Footer (blue, full-bleed) — logo + social + copyright│
 │    └─ .container — 3-column grid                      │
@@ -34,14 +37,16 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/app/page.tsx` | Homepage route + metadata |
 | `src/app/layout.tsx` | RTL (`lang="he"` `dir="rtl"`), Heebo via `next/font`, root metadata |
 | `src/App.tsx` | Homepage body — section markup and static content arrays |
-| `src/components/SiteHeader.tsx` | Shared header with logo link home, Israel-time Hebrew-numeral/civil date labels, and current government/Knesset context |
+| `src/components/SiteHeader.tsx` | Shared header; hidden on homepage mobile (≤900px) |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue background) |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
 | `src/App.css` | `.container` primitive and section-specific styles |
 | `src/index.css` | Global reset, CSS variables |
-| `public/header-logo 3.svg` | Header logo |
+| `public/header-logo 3.svg` | Header logo (desktop / non-home) |
+| `public/while-logo-nobg.svg` | White logo used as homepage hero title |
 | `public/white logo.svg` | White footer logo |
-| `public/hero-bear-image.svg` | Hero bear illustration |
+| `public/hero-bear-image.svg` | Unused leftover still (was hero poster; video has no poster) |
+| Supabase `site-assets/bear-hero-video2.mp4` | Desktop hero bear video (not in git) |
 
 ## Layout primitive: `.container`
 
@@ -60,7 +65,7 @@ All section content (except the news ticker) lives inside a shared centered cont
 - **Centered content** via `margin-inline: auto` guarantees the container is exactly centered.
 - **Fluid side padding** via `clamp()` scales gutters with viewport width.
 
-Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site-footer__inner`.
+Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell, `site-footer__inner`.
 
 ## Design tokens
 
@@ -68,28 +73,30 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 |-------|-------|---------|
 | `--container-max` | `1120px` | Max width of centered content shell |
 | `--container-pad` | `clamp(20px, 6vw, 80px)` | Fluid horizontal inset on both sides |
-| `--hero-text-max` | `580px` | Inner cap for hero title/subtitle/buttons |
+| `--hero-text-max` | `640px` | Inner cap for hero title/subtitle/buttons |
 
 ## Sections
 
 ### 1. Header (`site-header`)
 
-- White full-bleed background with bottom border.
+- White full-bleed background with bottom border (desktop and non-home routes).
 - Inner wrapper (`site-header__inner container`): logo at RTL start (top-right), metadata block at the opposite side.
 - Logo path: `/header-logo%203.svg` (URL-encoded space in filename).
 - Date block: client-side `Intl.DateTimeFormat` using `Asia/Jerusalem`; Gregorian label is `DD.MM.YYYY`, Hebrew label uses `he-IL-u-ca-hebrew` civil-day behavior and formats day/year as Hebrew numerals (for example `י״ח בתמוז תשפ״ו`).
 - Context line below the date is static copy: `ממשלת ישראל ה37 | הכנסת ה25`.
+- **Homepage mobile (≤900px):** `site-header--home` is hidden so the blue hero is the first surface; brand is carried by the larger hero title logo.
 
 ### 2. Hero (`hero`)
 
-- Blue background (`--color-blue: #4890FD`).
+- Blue background (`#3083F0`).
 - Taller section: `min-height: clamp(460px, 64vh, 600px)` with `48px` vertical padding.
 - `.hero__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, visual second — in RTL this places text on the right and bear on the left.
-- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center). Column `gap: 16px` between title, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
+- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center). Column `gap: 16px` between title logo, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
 - Bear column: `justify-content: flex-start` (faces toward center).
-- **Title:** מצב האומה
-- **Subtitle:** להבין מה באמת המצב של ישראל באמצעות טכנולוגיה
-- **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): 2×2 grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (580px) so buttons read wider.
+- **Visual (desktop):** muted `<video>` from Supabase Storage (`site-assets/bear-hero-video2.mp4`), plays once (no loop). No poster image — video stays `opacity: 0` until first frame (`onLoadedData` / `onCanPlay` / `onPlaying`), then fades in (`.hero__bear--ready`). Explicit `play()` on mount/`loadeddata` so autoplay is reliable. File is large (~17MB), so first paint can take a moment. Autoplay + `playsInline` + `preload="auto"`. Sized larger than the grid column (`width: min(110%, 560px)`, `scale(1.08) translateX(28px)`); overflow visible on `.hero__visual`. Still hidden on mobile via `.hero__visual`.
+- **Title:** `/while-logo-nobg.svg` inside the `h1` (desktop and mobile) — brand mark replaces the text headline; `alt="מצב האומה"`.
+- **Subtitle:** הבית של המידע הפוליטי בישראל
+- **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): 2×2 grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (640px) so buttons read wider.
 
 | Label | Destination |
 |-------|--------|
@@ -110,19 +117,27 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 
 ### 4. Lists game project (`#lists-game`)
 
-- White section placed **above** the government dashboard teaser.
-- Title **משחק הרשימות**, description: **כנסו, שחקו ותראו איזו רשימה מתאימה לכם באמת**.
-- CTA **למשחק >>** links to `/elections/lists`.
-- Preview (`.lists-game-preview`): screenshot from `public/election-game-homepage.png` showing stacked swipe cards from the list rating game.
+- White section placed **above** the polls teaser, with a bottom border divider.
+- News-block layout: title **משחק הרשימות: שחקו וגלו איזו רשימה הכי מתאימה לכם** + category tag **בחירות 2026** below it (no description / meta line).
+- Whole section is a link (`.project-section__link`) to `/elections/lists`.
+- Media (`.project-section__media`): screenshot from `public/election-game-homepage.png`.
 
-### 5. Government Dashboard project (`#government-dashboard`)
+### 5. Mandate polls project (`#mandate-polls`)
 
-- Uses `.project-section--alt` (`#fafafa`) so it sits visually below the lists teaser.
-- Title, description, and CTA **לדשבורד >>**.
-- `.project-section__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, preview second — text right, dashboard preview left in RTL.
-- CTA links to `/government`.
+- Uses `.project-section--alt` (`#fafafa`) so it sits visually between the lists game and government dashboard teasers.
+- Same news-block layout: title **סקרי מנדטים** + category tag **בחירות 2026** below it (no description / meta line).
+- Whole section is a link (`.project-section__link`) to `/elections/polls`.
+- Media (`.project-section__media`): CSS bar-chart placeholder (`.polls-preview`) — eight descending bars in varied party-like colors above a baseline.
 
-### 6. Footer (`site-footer`)
+### 6. Government Dashboard project (`#government-dashboard`)
+
+- White section below the polls teaser (alternating backgrounds: white → alt → white).
+- Same news-block layout: title **דשבורד ממשלה** + category tag **הממשלה** below it (no description / meta line).
+- `.project-section__inner.container`: ~`0.95fr / 1.2fr` grid (media larger). DOM order is content first, media second — text right, preview left in RTL.
+- Hover on `.project-section__inner`: light grey background on the whole content box. Hover on title or media: title underline. Whole section remains clickable; focus-visible outline on the link.
+- Tag (`.project-section__tag`): square corners, `--color-blue` fill / white text.
+
+### 7. Footer (`site-footer`)
 
 - Blue background (`--color-blue: #4890FD`), white text.
 - Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: white logo brand (RTL start), centered social links, copyright (RTL end).
@@ -149,20 +164,22 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section__inner`, `site
 - `/` → homepage (`src/app/page.tsx` → `App.tsx`)
 - `/elections` → Elections 2026 party index
 - `/elections/[partyId]` → Elections 2026 party detail page
+- `/elections/polls` → Mandate poll averages
+- `/elections/lists` → Lists matching game
 - `/government` → Government page
 - `/knesset` → Knesset hemicycle page
 
 ## Responsive Behavior
 
-- **≤900px:** Hero collapses to a single centered column — bear image is hidden (`display: none` on `.hero__visual`); title, subtitle, and button grid are centered (`align-items: center`, `text-align: center`). Content capped at `--hero-text-max`. Project 2-col grids collapse to single column; container padding remains fluid via `clamp()`.
-- **≤480px:** Hero buttons become single column; header height, logo, and date text scale down.
+- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Project sections keep the desktop side-by-side layout (text RTL-start / right, media left); gap and type scale down. Container padding remains fluid via `clamp()`.
+- **≤480px:** Hero buttons become single column; header height, logo, and date text scale down (non-home / desktop-style header).
 
 ## Future Work
 
-- Wire remaining placeholder hero buttons and dashboard CTA to real routes.
+- Wire remaining placeholder hero buttons to real routes.
 - Replace `NEWS_ITEMS` with live news feed API.
 - Replace dashboard CSS placeholder with final dashboard screenshot/asset.
-- Add remaining project sections below the first one.
+- Replace polls CSS bar-chart placeholder with a final polls page screenshot/asset.
 
 ## Verification
 

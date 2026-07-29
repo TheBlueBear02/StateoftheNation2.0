@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 const CURRENT_TERM_LABEL = 'ממשלת ישראל ה37 | הכנסת ה25'
 
@@ -91,10 +92,12 @@ function getHeaderDateLabels(date = new Date()) {
 }
 
 export function SiteHeader() {
+  const pathname = usePathname()
+  const isHome = pathname === '/'
   const { civilDate, hebrewDate, isoDate } = getHeaderDateLabels()
 
   return (
-    <header className="site-header">
+    <header className={isHome ? 'site-header site-header--home' : 'site-header'}>
       <div className="site-header__inner container">
         <Link href="/" className="site-header__logo-link">
           <img
