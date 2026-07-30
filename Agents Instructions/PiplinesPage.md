@@ -51,7 +51,7 @@ Schedules today:
 
 | Pipeline | Schedule label |
 |----------|----------------|
-| Polls | פעמיים ביום · 05:00 ו־17:00 UTC (`0 5,17 * * *`) |
+| Polls | כל יום בחצות · 00:00 שעון ישראל (`0 21 * * *` UTC) |
 | Knesset | לא נקבע עדיין |
 | Elections candidates | לא נקבע עדיין |
 

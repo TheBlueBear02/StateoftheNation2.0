@@ -582,7 +582,7 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 | `sync_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Weekly (GitHub Actions) |
 | `insert_raw_list.py` | `raw_candidate_lists` | Manual — when a party publishes their list |
 | `run_pipeline.py` | `election_candidates` · `people` (enrichment) | Manual — after each `insert_raw_list.py` run |
-| `run_polls_pipeline.py` | `polls` · `poll_results` · `poll_aggregates` · `raw_poll_rows` | Twice daily (GitHub Actions) |
+| `run_polls_pipeline.py` | `polls` · `poll_results` · `poll_aggregates` · `raw_poll_rows` | Daily midnight Israel (GitHub Actions) |
 | `link_factions.py` | `election_parties.knesset_faction_id` | Post-election — once per election |
 
 All sync writes are upserts. No script deletes data except `insert_raw_list.py` which removes `processed=false` rows for a party when re-inserting an updated list.

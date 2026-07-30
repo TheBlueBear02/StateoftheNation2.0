@@ -35,7 +35,7 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 
 Schema: `schema_polls.sql` (apply manually in Supabase).
 
-Scheduling: `.github/workflows/polls-pipeline.yml` — twice daily UTC.
+Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel).
 
 ## Dev Edit UI (`/elections/polls/edit`)
 

@@ -9,9 +9,9 @@ export const elections2026PollsPipeline: PipelineDoc = {
   docsPath: '/piplines/docs/elections-2026-polls',
   editPath: '/elections/polls/edit',
   schedule: {
-    label: 'פעמיים ביום · 05:00 ו־17:00 UTC',
-    cron: '0 5,17 * * *',
-    timezone: 'UTC',
+    label: 'כל יום בחצות · 00:00 שעון ישראל',
+    cron: '0 21 * * *',
+    timezone: 'Asia/Jerusalem',
   },
   sections: [
     {
@@ -19,7 +19,7 @@ export const elections2026PollsPipeline: PipelineDoc = {
       title: 'סקירה',
       paragraphs: [
         'מקור הנתונים היחיד בגרסה 1 הוא ויקיפדיה באנגלית — דף Opinion polling for the 2026 Israeli legislative election (וב־backfill גם ארכיוני 2022–2025). בריצה רגילה מפורסרת רק טבלת המנדטים העדכנית ביותר. הטבלאות נמשכות דרך MediaWiki API ומפורשות מה-HTML המרונדר.',
-        'הצינור רץ פעמיים ביום ב-GitHub Actions, בודק revid לשינוי, ומעדכן את מסד הנתונים באופן idempotent (שורות קיימות לא נכנסות מחדש לתור).',
+        'הצינור רץ כל יום בחצות שעון ישראל ב-GitHub Actions (21:00 UTC בקיץ), בודק revid לשינוי, ומעדכן את מסד הנתונים באופן idempotent (שורות קיימות לא נכנסות מחדש לתור).',
       ],
     },
     {

@@ -13,7 +13,7 @@ export type PipelineSection = {
 }
 
 export type PipelineSchedule = {
-  /** Hebrew display line, e.g. פעמיים ביום · 05:00 ו־17:00 UTC */
+  /** Hebrew display line, e.g. כל יום בחצות · 00:00 שעון ישראל */
   label: string
   cron?: string
   timezone?: string
