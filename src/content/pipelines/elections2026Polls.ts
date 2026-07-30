@@ -65,7 +65,7 @@ python seed_parties.py
 # aliases אנגליים + lineage
 python seed_party_aliases.py`,
       paragraphs: [
-        'לפני seed: ודאו ש-party_status=confirmed מסונן בכל שאילתות election_parties הקיימות. review_queue.json מתריע על תוויות לא ממופות — יש לטפל לפני שהסדרה מתפצלת.',
+        'לפני seed: ודאו ש-party_status=confirmed מסונן בכל שאילתות election_parties הקיימות. seed_parties מתאים לפי short_name מנורמל (כולל וריאנטי גרשיים כמו ש"ס / ש״ס) ולא יוצר כפילויות. review_queue.json מתריע על תוויות לא ממופות — יש לטפל לפני שהסדרה מתפצלת.',
       ],
     },
   ],

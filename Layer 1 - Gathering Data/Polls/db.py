@@ -56,6 +56,14 @@ def today_jerusalem() -> date:
     return datetime.now(JERUSALEM).date()
 
 
+def normalize_party_short_name(name: str) -> str:
+    """Collapse Hebrew quote/dash/space variants (ש״ס / ש\"ס / שס) for matching."""
+    collapsed = name.strip()
+    for ch in (" ", "-", "–", "—", '"', "״", "'", "׳", "`"):
+        collapsed = collapsed.replace(ch, "")
+    return collapsed
+
+
 def party_id_by_short_name(sb: Client, election_id: int) -> dict[str, int]:
     rows = (
         sb.table("election_parties")
@@ -65,3 +73,24 @@ def party_id_by_short_name(sb: Client, election_id: int) -> dict[str, int]:
         .data
     )
     return {r["short_name"]: r["id"] for r in rows if r.get("short_name")}
+
+
+def party_id_by_normalized_short_name(sb: Client, election_id: int) -> dict[str, int]:
+    """Map normalized short_name → party_id (first / lowest id wins for duplicates)."""
+    rows = (
+        sb.table("election_parties")
+        .select("id, short_name")
+        .eq("election_id", election_id)
+        .order("id")
+        .execute()
+        .data
+    )
+    out: dict[str, int] = {}
+    for row in rows:
+        sn = row.get("short_name")
+        if not sn:
+            continue
+        key = normalize_party_short_name(sn)
+        if key and key not in out:
+            out[key] = row["id"]
+    return out

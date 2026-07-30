@@ -1,5 +1,6 @@
 import { Heebo } from 'next/font/google'
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/next'
 import { getSiteUrl } from '@/lib/runtimeEnv'
 import '@/index.css'
 import '@/App.css'
@@ -53,6 +54,7 @@ export default function RootLayout({
     <html lang="he" dir="rtl" className={heebo.variable}>
       <body className={heebo.className}>
         {children}
+        <Analytics />
       </body>
     </html>
   )

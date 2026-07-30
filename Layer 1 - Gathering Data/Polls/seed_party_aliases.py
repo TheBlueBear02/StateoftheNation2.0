@@ -13,7 +13,7 @@ from datetime import date
 from dotenv import load_dotenv
 from supabase import Client
 
-from db import get_election_id, get_supabase, party_id_by_short_name
+from db import get_election_id, get_supabase, normalize_party_short_name, party_id_by_short_name
 
 load_dotenv()
 
@@ -45,18 +45,18 @@ ALIASES = [
     {"raw_label": "Otzma Yehudit", "short_name": "עוצמה יהודית"},
     {"raw_label": "Jewish Power", "short_name": "עוצמה יהודית"},
     # Haredi
-    {"raw_label": "Shas", "short_name": "ש״ס"},
+    {"raw_label": "Shas", "short_name": 'ש"ס'},
     {"raw_label": "United Torah Judaism", "short_name": "יהדות התורה"},
     {"raw_label": "UTJ", "short_name": "יהדות התורה"},
     # Secular right / center
     {"raw_label": "Yisrael Beiteinu", "short_name": "ישראל ביתנו"},
     {"raw_label": "Israel Beiteinu", "short_name": "ישראל ביתנו"},
     # Arab parties
-    {"raw_label": "Ra'am", "short_name": "רע״ם"},
-    {"raw_label": "Raam", "short_name": "רע״ם"},
-    {"raw_label": "Hadash–Ta'al", "short_name": "חד״ש-תע״ל"},
-    {"raw_label": "Hadash-Ta'al", "short_name": "חד״ש-תע״ל"},
-    {"raw_label": "Balad", "short_name": "בל״ד"},
+    {"raw_label": "Ra'am", "short_name": 'רע"ם'},
+    {"raw_label": "Raam", "short_name": 'רע"ם'},
+    {"raw_label": "Hadash–Ta'al", "short_name": 'חד"ש תע"ל'},
+    {"raw_label": "Hadash-Ta'al", "short_name": 'חד"ש תע"ל'},
+    {"raw_label": "Balad", "short_name": 'בל"ד'},
     # Democrats (post-merger)
     {"raw_label": "The Democrats", "short_name": "הדמוקרטים", "valid_from": "2024-07-01"},
     {"raw_label": "Democrats", "short_name": "הדמוקרטים", "valid_from": "2024-07-01"},
@@ -88,9 +88,9 @@ ALIASES = [
     {"raw_label": "Tropper", "short_name": "בית ציוני"},
     {"raw_label": "Reserv.", "short_name": "מילואימניקים"},
     {"raw_label": "Reserv", "short_name": "מילואימניקים"},
-    {"raw_label": "Hadash –Ta'al", "short_name": "חד״ש-תע״ל"},
-    {"raw_label": "Hadash – Ta'al", "short_name": "חד״ש-תע״ל"},
-    {"raw_label": "Hadash– Ta'al", "short_name": "חד״ש-תע״ל"},
+    {"raw_label": "Hadash –Ta'al", "short_name": 'חד"ש תע"ל'},
+    {"raw_label": "Hadash – Ta'al", "short_name": 'חד"ש תע"ל'},
+    {"raw_label": "Hadash– Ta'al", "short_name": 'חד"ש תע"ל'},
     {"raw_label": "YA", "short_name": "יש עתיד"},
     {"raw_label": "YB", "short_name": "ישראל ביתנו"},
     {"raw_label": "B&W", "short_name": "כחול לבן", "valid_to": "2022-12-31"},
@@ -144,9 +144,11 @@ LINEAGE = [
 ]
 
 
-# Elections list import uses different short_name spellings than seed_parties.
+# Elections list import and older seed rows may use different quote/dash spellings.
 HADASH_SHORT_NAME_FALLBACKS = ("חד״ש-תע״ל", 'חד"ש תע"ל', 'חד"ש-תע"ל')
 RAAM_SHORT_NAME_FALLBACKS = ("רע״ם", 'רע"ם')
+SHAS_SHORT_NAME_FALLBACKS = ("ש״ס", 'ש"ס')
+BALAD_SHORT_NAME_FALLBACKS = ("בל״ד", 'בל"ד')
 
 
 def _find_party_id(party_map: dict[str, int], short_name: str) -> int | None:
@@ -154,21 +156,25 @@ def _find_party_id(party_map: dict[str, int], short_name: str) -> int | None:
     if short_name in party_map:
         return party_map[short_name]
 
-    if short_name in HADASH_SHORT_NAME_FALLBACKS:
-        for candidate in HADASH_SHORT_NAME_FALLBACKS:
-            if candidate in party_map:
-                return party_map[candidate]
-        for key, party_id in party_map.items():
-            if "חד" in key and "תע" in key:
-                return party_id
+    target = normalize_party_short_name(short_name)
+    for key, party_id in party_map.items():
+        if normalize_party_short_name(key) == target:
+            return party_id
 
-    if short_name in RAAM_SHORT_NAME_FALLBACKS:
-        for candidate in RAAM_SHORT_NAME_FALLBACKS:
-            if candidate in party_map:
-                return party_map[candidate]
-        for key, party_id in party_map.items():
-            if "רע" in key and "ם" in key:
-                return party_id
+    fallback_groups = (
+        HADASH_SHORT_NAME_FALLBACKS,
+        RAAM_SHORT_NAME_FALLBACKS,
+        SHAS_SHORT_NAME_FALLBACKS,
+        BALAD_SHORT_NAME_FALLBACKS,
+    )
+    for group in fallback_groups:
+        if short_name in group or target == normalize_party_short_name(group[0]):
+            for candidate in group:
+                if candidate in party_map:
+                    return party_map[candidate]
+            for key, party_id in party_map.items():
+                if normalize_party_short_name(key) == normalize_party_short_name(group[0]):
+                    return party_id
 
     return None
 

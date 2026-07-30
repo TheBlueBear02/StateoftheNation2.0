@@ -34,7 +34,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/lib/listFitScore.ts` | Position-weighted fit score and `realisticSeatBand` helpers |
 | `src/components/elections/PartyPipelinePanel.tsx` | Dev-only full pipeline UI for parties with 0–2 candidates |
 | `src/components/elections/EditablePartyPanel.tsx` | Collapsible party metadata editor on `/elections/edit` |
-| `src/lib/updateElectionCandidate.ts` | Anon-key updates to `people` + `election_candidates` with list-position conflict checks |
+| `src/lib/updateElectionCandidate.ts` | Calls `/api/elections/update-candidate` (service key server-side) with list-position conflict checks |
 | `src/lib/updateElectionParty.ts` | Updates to `election_parties` (name, short name, color, logo, ballot letter, description) |
 | `src/lib/enrichElectionCandidate.ts` | Dev-only client for per-card pipeline preview (`/api/elections/enrich-candidate`) |
 | `src/lib/runElectionPartyPipeline.ts` | Dev-only client for party-level pipeline (`/api/elections/pipeline/*`) |
@@ -42,7 +42,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/app/api/elections/[...path]/route.ts` | Next.js App Router handlers: `update-candidate`, `enrich-candidate`, party pipeline, and geocode-map (gated by `assertPipelineEnabled`) |
 | `src/app/elections/**/page.tsx` | App Router wrappers + per-route metadata for index, polls, lists, edit, and `[partyId]` |
 | `src/server/apiCommon.ts` | Shared pipeline API helpers (auth, Python spawn, JSON responses) |
-| `src/components/elections/PartyCard.tsx` | Clickable card with the top-candidate portrait on the right and the party logo pinned to the top-left corner |
+| `src/components/elections/PartyCard.tsx` | Clickable portrait card (same UI as the lists-game party picker): full-bleed leader photo/initials, bottom gradient overlay with name + leader line, party logo pinned top-start |
 | `src/components/elections/SeatsTrend.tsx` | Party-hero last-5-polls average + sparkline from `polls` / `poll_results` |
 | `src/components/elections/StatsBar.tsx` | Average age, % new MKs, and % women stat blocks |
 | `src/components/elections/CandidateList.tsx` | Ordered candidate cards with photo/initial fallback; shows 9 by default and loads 9 more per click |
@@ -56,7 +56,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 
 ## Data Flow
 
-`useElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר (promoted from polled_only). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero links to `/elections/polls` for weighted poll averages.
+`useElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר (promoted from polled_only); נועם stays `polled_only` (on the ballot in theory but not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero links to `/elections/polls` for weighted poll averages.
 
 `useElectionCandidates(partyId)` loads ordered `election_candidates` joined to `people`. It then queries `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merges overlapping terms with `computeMemberTenureStats`, and attaches `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
 
@@ -184,7 +184,7 @@ When a candidate's `city` is edited and saved, `latitude` / `longitude` are clea
 
 Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` in `.env`.
 
-**Dev saves:** `npm run dev` routes writes through `/api/elections/update-candidate` and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which uses `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret`. **Production saves** use the anon client and require the UPDATE policies in `Layer 1 - Gathering Data/Elections/anon_update_policies.sql` (including `election_parties`).
+**Saves (dev + production):** `/elections/edit` always writes through `/api/elections/update-candidate` and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which use `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret` / `x-pipeline-edit-secret`. These two routes are available in production without `ENABLE_PIPELINE_API`; Python pipeline/enrich/geocode routes stay dev-only (or opt-in). Anon UPDATE on `people` / `election_candidates` / `election_parties` must be revoked — apply `Layer 1 - Gathering Data/Elections/revoke_anon_update_policies.sql` after deploying this path. Hosting must set `SUPABASE_SERVICE_KEY` and the edit secret env vars.
 
 ## Seats Trend (party hero)
 
@@ -221,9 +221,9 @@ The module follows [DesignLanguage.md](./DesignLanguage.md):
 - Page and hero backgrounds are flat white (no soft blue gradient washes), per [DesignLanguage.md](./DesignLanguage.md). The election date renders as plain bold text, without a chip background or border.
 - The party list section header shows only the title **המפלגות המתמודדות**; it does not include explanatory copy under the title.
 - Below the party grid, the overview map uses the same card header as the party detail map (**איפה גרים המועמדים**); party filter chips use each party color as a swatch.
-- The party index grid renders three cards per row on desktop, two on narrower tablet widths, and one on mobile.
-- Party cards show the top-candidate portrait section only when an image exists in `people.image_url`; the portrait is flush to the right edge and fills the card height, while an enlarged party logo is pinned to the top-left corner. Cards do not render a per-party color accent line.
-- Party color is passed through CSS custom property `--party-color` and appears as a subtle left-side background wash plus hover border treatment.
+- The party index grid matches the lists-game picker: `auto-fill` columns (`minmax(140px, 1fr)`) on desktop, three columns on mobile (≤720px).
+- Party cards reuse the lists-game portrait UI: `3 / 4` aspect ratio, full-bleed leader photo (or initials fallback), dark bottom gradient overlay with short name + **בראשות {leader}**, and a small white party-logo badge pinned top-start. Cards have no border; hover lifts with a hard offset shadow.
+- Party color is passed through CSS custom property `--party-color` and tints the media background behind initials / missing photos.
 - The `/elections/[partyId]` party detail sections are borderless; section separation comes from spacing and white backgrounds rather than boxed outlines or hero side accents. The party hero uses three desktop columns: logo, party copy, and the seats trend on the visual left. The hero title is capped at `4rem`, wraps within the middle column (`min-width: 0` + `overflow-wrap: anywhere`), and must not overlap the seats column; the compact seats block keeps an opaque white background and sits above adjacent content when columns are tight. Stats blocks are centered within their cells and have no border.
 - Candidate list cards use larger borderless full-height portrait/initial columns that sit flush against the card side with no edge padding; the list position number sits as an overlay in the visual top-left corner. Former MKs also show tenure under the city line in smaller muted text (`0.8rem`, e.g. `3.4 שנים בכנסת`). When `election_candidates.city` is null, the city line shows **לא ידוע מקום מגורים**. When a candidate has both a generated description and `people.wikipedia_url`, the description ends with an external **קרא עוד** link to the Hebrew Wikipedia article.
 - Mobile layouts collapse to one column.
@@ -240,8 +240,8 @@ Manual checks:
 - `/elections` loads all parties and card links, plus the all-parties residence map with party filter.
 - `/elections/[partyId]` renders a breadcrumb (`בחירות 2026 / {party}` linking back to `/elections`), the party header, live seats trend from last 5 polls, stats, candidate list, and map.
 - Parties without candidate rows show empty candidate/map states.
-- `/elections/edit` requires `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET`, unlocks with the password, and can save a candidate field change after anon UPDATE policies are applied.
-- `/elections/edit` party panel can save party name, color, logo, ballot letter, and description for the selected party.
+- `/elections/edit` requires `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` (or shared `PIPELINE_EDIT_SECRET`), unlocks with the password, and can save a candidate field change via `/api/elections/update-candidate` when `SUPABASE_SERVICE_KEY` is set (anon UPDATE must be revoked).
+- `/elections/edit` party panel can save party name, color, logo, ballot letter, and description for the selected party via `/api/elections/update-party`.
 - In dev, **השלם מידע** on a card with missing fields fills the form from pipeline preview; save persists to Supabase.
 - In dev, for a party with 0–2 candidates, the party pipeline panel can paste a list, preview it, run all six stages, resolve review-queue items, and load candidate cards.
 - In dev, **עדכן מפה** geocodes candidates with city but missing coordinates for the selected party; pins appear on `/elections/[partyId]` after a successful run.

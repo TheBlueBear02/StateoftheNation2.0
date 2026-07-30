@@ -29,7 +29,7 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 | `normalize_polls.py` | 4 | `polls` + `poll_results` |
 | `compute_aggregates.py` | 5 | `last3` + `weighted` |
 | `validate_polls.py` | 6 | hard gates + ops alerts |
-| `seed_parties.py` | one-off | confirmed + historical + polled_only parties (ישר is confirmed; בית ציוני is polled_only) |
+| `seed_parties.py` | one-off | confirmed + historical + polled_only parties (ישר is confirmed; נועם and בית ציוני are polled_only). Matches by *normalized* `short_name` (quote/dash variants) so it never recreates ש״ס / ש"ס duplicates; merges any existing quote-variant dupes into the preferred row |
 | `seed_party_aliases.py` | one-off | English labels + lineage |
 | `seed_poll_publishers.sql` | one-off | Distinct `polls.publisher` → `poll_publishers` + `publisher_id` backfill |
 
@@ -116,8 +116,8 @@ All existing elections queries filter `election_parties.party_status = 'confirme
 - Seat averages on the header chart are forced to **integer seats summing to 120** after dropping parties under 4; other charts may still show raw poll seats
 - House effects (`pollster_house_effects`) — schema exists; compute/UI deferred post-MVP
 - **Natural key:** `parse_poll_tables` strips Wikipedia footnote markers (`[20]`) before hashing; regular seat tables share a stable section bucket. `normalize_polls` merges by identity and runs `dedupe_polls` after each normalize pass.
-- **Party alias seeding:** `seed_party_aliases.py` maps Wikipedia English labels to `election_parties` via `short_name`. When the elections list import uses a different spelling (e.g. `חד"ש תע"ל` vs seed `חד״ש-תע״ל`), `_find_party_id` falls back to fuzzy Hebrew matching so Hadash–Ta'al / Ra'am aliases still resolve. Missing aliases leave polls short of 120 seats and hide them from the bloc-trend chart (which only shows complete polls).
-
+- **Party alias seeding:** `seed_party_aliases.py` maps Wikipedia English labels to `election_parties` via `short_name`. Matching uses `normalize_party_short_name` (and Hadash/Ra'am/Shas/Balad fallbacks) so elections-import spellings (`ש"ס`, `רע"ם`, `חד"ש תע"ל`, `בל"ד`) and older gershayim seed rows resolve to the same party. Missing aliases leave polls short of 120 seats and hide them from the bloc-trend chart (which only shows complete polls).
+- **Party seed / duplicate guard:** `seed_parties.py` must not invent parallel rows for Hebrew quote variants. It updates existing parties by normalized `short_name`, preserves elections-import `name`/`short_name`, and merges any leftover dupes (reassigning `poll_results` / `poll_aggregates` / aliases) before inserting.
 ## Licensing
 
 Wikipedia CC BY-SA 4.0 attribution on `/elections/polls` and pipeline docs page.

@@ -233,15 +233,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
   return jsonError('Not found', 404)
 }
 
+/** Data edits use service role + edit secret in all environments.
+ *  Python pipeline routes stay behind assertPipelineEnabled (dev / opt-in). */
+const DATA_EDIT_ROUTES = new Set(['update-candidate', 'update-party'])
+
 export async function POST(request: NextRequest, context: RouteContext) {
-  const gated = assertPipelineEnabled()
-  if (gated) return gated
+  const { path: segments } = await context.params
+  const route = segments.join('/')
+
+  if (!DATA_EDIT_ROUTES.has(route)) {
+    const gated = assertPipelineEnabled()
+    if (gated) return gated
+  }
 
   const auth = requireElectionsSecret(request)
   if (auth.error) return auth.error
-
-  const { path: segments } = await context.params
-  const route = segments.join('/')
 
   try {
     if (route === 'pipeline/preview') {

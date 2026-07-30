@@ -35,7 +35,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | File | Role |
 |------|------|
 | `src/app/page.tsx` | Homepage route + metadata |
-| `src/app/layout.tsx` | RTL (`lang="he"` `dir="rtl"`), Heebo via `next/font`, root metadata |
+| `src/app/layout.tsx` | RTL (`lang="he"` `dir="rtl"`), Heebo via `next/font`, root metadata, Vercel Analytics |
 | `src/App.tsx` | Homepage body — section markup and static content arrays |
 | `src/components/SiteHeader.tsx` | Shared header; hidden on homepage mobile (≤900px) |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue); legal links to `/about` and `/terms` only |

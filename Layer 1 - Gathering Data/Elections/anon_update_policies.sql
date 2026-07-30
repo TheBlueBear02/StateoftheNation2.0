@@ -1,27 +1,8 @@
--- Run once in Supabase SQL Editor for production builds (anon client writes).
--- Dev (`npm run dev`) uses the service key via a local Vite API route instead.
-
-grant update on public.election_candidates to anon;
-grant update on public.people to anon;
-grant update on public.election_parties to anon;
-
-create policy "Anon update election candidates"
-on public.election_candidates
-for update
-to anon
-using (true)
-with check (true);
-
-create policy "Anon update people"
-on public.people
-for update
-to anon
-using (true)
-with check (true);
-
-create policy "Anon update election parties"
-on public.election_parties
-for update
-to anon
-using (true)
-with check (true);
+-- DEPRECATED — do not apply.
+-- Anon UPDATE on people / election_candidates / election_parties is retired.
+-- Use revoke_anon_update_policies.sql instead.
+--
+-- /elections/edit now saves through Next Route Handlers
+-- (/api/elections/update-candidate, /api/elections/update-party) using
+-- SUPABASE_SERVICE_KEY server-side. Public pages use anon SELECT only.
+-- Python pipelines continue to use SUPABASE_SERVICE_KEY.

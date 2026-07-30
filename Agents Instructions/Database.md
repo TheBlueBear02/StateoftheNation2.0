@@ -16,7 +16,7 @@ The schema is split into four logical groups:
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | Live — `/elections`, party detail, lists game, edit |
 | **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` | Live — `/elections/polls`, `/piplines` |
 
-All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/`. The public site reads via the anon key. The password-gated editor at `/elections/edit` can also `UPDATE` `election_candidates` and `people` through the anon key once the UPDATE policies below are applied — this is a lightweight private-tool gate, not production auth.
+All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE.
 
 ---
 
@@ -299,7 +299,7 @@ Parties running on the ballot in a given election. Separate from `knesset_factio
 | `description` | text | Party description |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** Manually inserted when parties are confirmed; extended by `seed_parties.py` for polls pipeline. `short_name` is critical — it is what `insert_raw_list.py` and the pipeline use to look up parties. Unique constraint on `(election_id, short_name)`.
+**Data source:** Manually inserted when parties are confirmed; extended by `seed_parties.py` for polls pipeline. `short_name` is critical — it is what `insert_raw_list.py` and the pipeline use to look up parties. Unique constraint on `(election_id, short_name)` is exact-string only, so Hebrew quote variants (`ש"ס` vs `ש״ס`) are different keys — `seed_parties.py` therefore matches/merges by normalized short_name and must not upsert gershayim stubs alongside elections-import rows.
 
 **Frontend filter:** Public elections pages query only `party_status = 'confirmed'`.
 
@@ -326,7 +326,7 @@ Ordered candidate list per party. One row per candidate per party.
 - `UNIQUE (party_id, list_position)` — no duplicate positions within a party
 - `UNIQUE (party_id, person_id)` — same person can't appear twice on one list
 
-**Data source:** Written by `resolve_candidates.py` (Stage 1 of the election pipeline). Enriched by `enrich_wikidata.py`, `generate_descriptions.py`, `geocode_cities.py`, `fetch_candidate_birthdates.py` for any remaining null `people.birth_date` values, and `fetch_candidate_wiki_urls.py` for any remaining null `people.wikipedia_url` values. Can also be updated from `/elections/edit` via the anon client.
+**Data source:** Written by `resolve_candidates.py` (Stage 1 of the election pipeline). Enriched by `enrich_wikidata.py`, `generate_descriptions.py`, `geocode_cities.py`, `fetch_candidate_birthdates.py` for any remaining null `people.birth_date` values, and `fetch_candidate_wiki_urls.py` for any remaining null `people.wikipedia_url` values. Can also be updated from `/elections/edit` via the service-key API routes.
 
 **Stats computed at query time from this table:**
 
@@ -339,7 +339,7 @@ Ordered candidate list per party. One row per candidate per party.
 
 **Frontend access:**
 
-The elections frontend uses the public anon key. `elections`, `election_parties`, and `election_candidates` must be selectable by `anon`; otherwise the service-role pipeline can see rows while `/elections` renders an empty list. The edit page also needs anon `UPDATE` on `election_candidates` and `people`.
+The elections frontend uses the public anon key for **SELECT only**. `elections`, `election_parties`, and `election_candidates` must be selectable by `anon`; otherwise the service-role pipeline can see rows while `/elections` renders an empty list. Writes from `/elections/edit` go through Next APIs with `SUPABASE_SERVICE_KEY` — do **not** grant anon UPDATE. If those grants were applied earlier, run `Layer 1 - Gathering Data/Elections/revoke_anon_update_policies.sql`.
 
 ```sql
 alter table public.elections enable row level security;
@@ -368,23 +368,8 @@ for select
 to anon
 using (true);
 
--- Required for /elections/edit (lightweight private tool; not production auth)
-grant update on public.election_candidates to anon;
-grant update on public.people to anon;
-
-create policy "Anon update election candidates"
-on public.election_candidates
-for update
-to anon
-using (true)
-with check (true);
-
-create policy "Anon update people"
-on public.people
-for update
-to anon
-using (true)
-with check (true);
+-- Do NOT grant UPDATE to anon. Edit saves use service role via API.
+-- If anon UPDATE policies exist, apply revoke_anon_update_policies.sql.
 ```
 
 ---

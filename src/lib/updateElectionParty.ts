@@ -1,6 +1,4 @@
-import { isDev, getElectionsEditSecret } from './runtimeEnv'
-
-import { supabase, supabaseConfigError } from './supabase'
+import { getElectionsEditSecret } from './runtimeEnv'
 
 export type ElectionPartyEditInput = {
   partyId: number
@@ -16,12 +14,7 @@ export type UpdateElectionPartyResult =
   | { ok: true }
   | { ok: false; error: string }
 
-function emptyToNull(value: string): string | null {
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : null
-}
-
-async function updateViaDevApi(
+export async function updateElectionParty(
   input: ElectionPartyEditInput,
 ): Promise<UpdateElectionPartyResult> {
   const secret = getElectionsEditSecret()
@@ -43,57 +36,4 @@ async function updateViaDevApi(
   }
 
   return body
-}
-
-async function updateViaAnonClient(
-  input: ElectionPartyEditInput,
-): Promise<UpdateElectionPartyResult> {
-  if (supabaseConfigError || !supabase) {
-    return {
-      ok: false,
-      error: supabaseConfigError ?? 'Supabase client is not configured',
-    }
-  }
-
-  const name = input.name.trim()
-  if (!name) {
-    return { ok: false, error: 'יש להזין שם מפלגה' }
-  }
-
-  const { data, error } = await supabase
-    .from('election_parties')
-    .update({
-      name,
-      short_name: emptyToNull(input.shortName ?? ''),
-      color: emptyToNull(input.color ?? ''),
-      logo_url: emptyToNull(input.logoUrl ?? ''),
-      ballot_letter: emptyToNull(input.ballotLetter ?? ''),
-      description: emptyToNull(input.description ?? ''),
-    })
-    .eq('id', input.partyId)
-    .select('id')
-
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  if (!data?.length) {
-    return {
-      ok: false,
-      error:
-        'לא ניתן לעדכן את המפלגה — בדקו שהוגדרו הרשאות UPDATE ל-anon על טבלת election_parties ב-Supabase',
-    }
-  }
-
-  return { ok: true }
-}
-
-export async function updateElectionParty(
-  input: ElectionPartyEditInput,
-): Promise<UpdateElectionPartyResult> {
-  if (isDev) {
-    return updateViaDevApi(input)
-  }
-
-  return updateViaAnonClient(input)
 }

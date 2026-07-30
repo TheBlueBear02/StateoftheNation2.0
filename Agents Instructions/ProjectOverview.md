@@ -105,7 +105,7 @@ These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Loc
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  src/app/layout.tsx (RTL, Heebo, root metadata)             │
+│  src/app/layout.tsx (RTL, Heebo, root metadata, Analytics)  │
 │    └─ App Router pages                                      │
 │         ├─ /           → App.tsx                            │
 │         ├─ /about      → views/AboutPage.tsx                │

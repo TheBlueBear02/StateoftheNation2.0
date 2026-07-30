@@ -15,7 +15,7 @@ Professional SEO and web standards for the Next.js App Router site.
 
 | File | Role |
 |------|------|
-| `src/app/layout.tsx` | Root metadata, Open Graph defaults, Twitter card, Heebo via `next/font`, `lang="he"` `dir="rtl"` |
+| `src/app/layout.tsx` | Root metadata, Open Graph defaults, Twitter card, Heebo via `next/font`, `lang="he"` `dir="rtl"`, Vercel Analytics (`@vercel/analytics/next`) |
 | `src/app/page.tsx` (+ other `page.tsx`) | Per-route metadata |
 | `src/app/elections/[partyId]/page.tsx` | `generateMetadata` + party JSON-LD from Supabase |
 | `src/app/sitemap.ts` | Public routes + confirmed `election_parties` |
