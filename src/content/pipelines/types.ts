@@ -12,10 +12,23 @@ export type PipelineSection = {
   table?: PipelineTable
 }
 
+export type PipelineSchedule = {
+  /** Hebrew display line, e.g. פעמיים ביום · 05:00 ו־17:00 UTC */
+  label: string
+  cron?: string
+  timezone?: string
+}
+
 export type PipelineDoc = {
   id: string
   title: string
   subtitle: string
   status: 'live' | 'planned'
   sections: PipelineSection[]
+  /** Docs path under /piplines/docs */
+  docsPath: string
+  /** Optional edit / runner UI */
+  editPath?: string
+  /** Automated schedule; null / placeholder when not timed yet */
+  schedule: PipelineSchedule | null
 }

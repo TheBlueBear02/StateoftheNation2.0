@@ -30,6 +30,7 @@ import logging
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -40,6 +41,9 @@ import parse_poll_tables
 import resolve_poll_parties
 import validate_polls
 from db import get_supabase
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from record_pipeline_run import record_pipeline_run  # noqa: E402
 
 load_dotenv()
 
@@ -81,35 +85,59 @@ def main() -> None:
 
     as_of_dates = None
     exit_code = 0
+    run_error: str | None = None
 
-    if not args.stage or args.stage == 1:
-        log.info("─── Stage 1: fetch Wikipedia ───")
-        fetch_wikipedia.run(sb, backfill=args.backfill, force=args.force, dry_run=args.dry_run)
+    try:
+        if not args.stage or args.stage == 1:
+            log.info("─── Stage 1: fetch Wikipedia ───")
+            fetch_wikipedia.run(sb, backfill=args.backfill, force=args.force, dry_run=args.dry_run)
 
-    if not args.stage or args.stage == 2:
-        log.info("─── Stage 2: parse poll tables ───")
-        parse_poll_tables.run(sb, backfill=args.backfill, force=args.force, dry_run=args.dry_run)
+        if not args.stage or args.stage == 2:
+            log.info("─── Stage 2: parse poll tables ───")
+            parse_poll_tables.run(sb, backfill=args.backfill, force=args.force, dry_run=args.dry_run)
 
-    if not args.stage or args.stage == 3:
-        log.info("─── Stage 3: resolve poll parties ───")
-        resolve_poll_parties.run(sb, args.dry_run)
+        if not args.stage or args.stage == 3:
+            log.info("─── Stage 3: resolve poll parties ───")
+            resolve_poll_parties.run(sb, args.dry_run)
 
-    if not args.stage or args.stage == 4:
-        log.info("─── Stage 4: normalize polls ───")
-        normalize_polls.run(sb, args.dry_run)
+        if not args.stage or args.stage == 4:
+            log.info("─── Stage 4: normalize polls ───")
+            normalize_polls.run(sb, args.dry_run)
 
-    if not args.stage or args.stage == 5:
-        log.info("─── Stage 5: compute aggregates ───")
-        as_of_dates = compute_aggregates.run(sb, args.dry_run)
+        if not args.stage or args.stage == 5:
+            log.info("─── Stage 5: compute aggregates ───")
+            as_of_dates = compute_aggregates.run(sb, args.dry_run)
 
-    if not args.stage or args.stage == 6:
-        log.info("─── Stage 6: validate polls ───")
-        exit_code = validate_polls.run(
-            sb, as_of_dates, args.dry_run, full=args.backfill
-        )
+        if not args.stage or args.stage == 6:
+            log.info("─── Stage 6: validate polls ───")
+            exit_code = validate_polls.run(
+                sb, as_of_dates, args.dry_run, full=args.backfill
+            )
+    except Exception as exc:
+        exit_code = 1
+        run_error = str(exc)
+        log.exception("Pipeline failed: %s", exc)
 
     elapsed = (datetime.now() - start).seconds
     log.info("═══ Pipeline complete in %dm %ds ═══", elapsed // 60, elapsed % 60)
+
+    if not args.dry_run:
+        action = f"stage-{args.stage}" if args.stage else "sync-full"
+        if args.backfill and not args.stage:
+            action = "backfill"
+        status = "success" if exit_code == 0 else ("error" if run_error else "warning")
+        source = os.environ.get("PIPELINE_RUN_SOURCE", "cli")
+        record_pipeline_run(
+            sb,
+            pipeline="polls",
+            action=action,
+            status=status,
+            message=f"Polls {action} finished in {elapsed}s (exit {exit_code})",
+            error=run_error,
+            source=source,
+            started_at=start,
+        )
+
     sys.exit(exit_code)
 
 

@@ -298,23 +298,27 @@
   position: relative;
   width: 100%;
   padding-block-start: 20px;
+  /* Majority markers share the bar’s LTR 0–120 seat scale (not page RTL). */
+  direction: ltr;
 }
 
 .polls-bloc-bar__majority-label {
   position: absolute;
-  inset-inline-start: 50%;
+  left: 50%;
   top: 0;
   transform: translateX(-50%);
   font-size: 12px;
   font-weight: 900;
   color: var(--color-black);
   line-height: 1;
+  text-align: center;
+  white-space: nowrap;
   pointer-events: none;
 }
 
 .polls-bloc-bar__majority-line {
   position: absolute;
-  inset-inline-start: 50%;
+  left: 50%;
   top: 16px;
   bottom: 0;
   width: 2px;

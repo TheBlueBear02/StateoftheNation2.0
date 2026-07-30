@@ -6,6 +6,9 @@ export const electionsCandidatesPipeline: PipelineDoc = {
   subtitle:
     'מדריך עבודה להוספת רשימת מועמדים שפורסמה, הכנסת הקלט הגולמי, והרצת הצינור שמעשיר את הנתונים לאתר הבחירות.',
   status: 'live',
+  docsPath: '/piplines/docs/elections-candidates',
+  editPath: '/elections/edit',
+  schedule: { label: 'לא נקבע עדיין' },
   sections: [
     {
       id: 'overview',

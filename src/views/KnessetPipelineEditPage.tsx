@@ -1,6 +1,6 @@
 'use client'
 
-import { isDev, getKnessetEditSecret } from '../lib/runtimeEnv'
+import { isDev } from '../lib/runtimeEnv'
 import {
   useEffect,
   useMemo,
@@ -10,6 +10,7 @@ import {
 } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from '../components/SiteLayout'
+import { PipelineUnlockGate } from '../components/pipelines/PipelineUnlockGate'
 import { KnessetPipelinePanel } from '../components/knesset/KnessetPipelinePanel'
 import { KnessetRunSummary } from '../components/knesset/KnessetRunSummary'
 import {
@@ -32,9 +33,6 @@ import { updateKnessetFaction } from '../lib/updateKnessetFaction'
 import './ElectionPartyPage.css'
 import './ElectionCandidatesEditPage.css'
 import './KnessetPipelineEditPage.css'
-
-const UNLOCK_STORAGE_KEY = 'knesset-edit-unlocked'
-const EDIT_SECRET = getKnessetEditSecret()
 
 function formatLastPipelineRun(
   lastRunAt: string | null,
@@ -85,22 +83,6 @@ type FactionDraft = {
 type SaveState = {
   status: 'idle' | 'saving' | 'success' | 'error'
   message: string | null
-}
-
-function getUnlockedFromSession(): boolean {
-  try {
-    return sessionStorage.getItem(UNLOCK_STORAGE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function setUnlockedInSession(): void {
-  try {
-    sessionStorage.setItem(UNLOCK_STORAGE_KEY, '1')
-  } catch {
-    // ignore
-  }
 }
 
 function factionToDraft(faction: KnessetFactionOption): FactionDraft {
@@ -312,11 +294,6 @@ function EditableFactionCard({
 }
 
 export function KnessetPipelineEditPage() {
-  const secretConfigured = Boolean(EDIT_SECRET)
-  const [unlocked, setUnlocked] = useState(() => getUnlockedFromSession())
-  const [password, setPassword] = useState('')
-  const [passwordError, setPasswordError] = useState<string | null>(null)
-
   const { knessets, loading: listLoading } = useKnessetList()
   const [selectedKnesset, setSelectedKnesset] = useState<KnessetOption | null>(
     null,
@@ -391,30 +368,12 @@ export function KnessetPipelineEditPage() {
   }
 
   useEffect(() => {
-    if (secretConfigured && unlocked) {
-      void loadStatus()
-    }
-  }, [secretConfigured, unlocked])
+    void loadStatus()
+  }, [])
 
   async function handlePipelineComplete() {
     await loadStatus()
     await refetchFactions()
-  }
-
-  function handleUnlock(event: FormEvent) {
-    event.preventDefault()
-    if (!secretConfigured) {
-      setPasswordError('חסר KNESSET_EDIT_SECRET / NEXT_PUBLIC_KNESSET_EDIT_SECRET בקובץ .env')
-      return
-    }
-    if (password !== EDIT_SECRET) {
-      setPasswordError('סיסמה שגויה')
-      return
-    }
-    setUnlockedInSession()
-    setUnlocked(true)
-    setPasswordError(null)
-    setPassword('')
   }
 
   const isActiveTerm = selectedKnesset?.isActive ?? false
@@ -437,50 +396,7 @@ export function KnessetPipelineEditPage() {
 
         <section className="election-edit-page__content">
           <div className="election-edit-page__inner container">
-            {!secretConfigured ? (
-              <p className="election-edit-page__panel" role="alert">
-                חסר KNESSET_EDIT_SECRET / NEXT_PUBLIC_KNESSET_EDIT_SECRET בקובץ .env — הוסיפו את המשתנה
-                והפעילו מחדש את שרת הפיתוח.
-              </p>
-            ) : null}
-
-            {secretConfigured && !unlocked ? (
-              <form
-                className="election-edit-page__gate party-detail-card"
-                onSubmit={handleUnlock}
-              >
-                <div className="party-detail-card__header">
-                  <p className="party-detail-card__eyebrow">גישה</p>
-                  <h2 className="party-detail-card__title">הזינו סיסמה</h2>
-                </div>
-                <label className="candidate-edit-card__field">
-                  <span>סיסמה</span>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(event) => {
-                      setPassword(event.target.value)
-                      setPasswordError(null)
-                    }}
-                    autoComplete="current-password"
-                    required
-                  />
-                </label>
-                {passwordError ? (
-                  <p
-                    className="candidate-edit-card__status candidate-edit-card__status--error"
-                    role="alert"
-                  >
-                    {passwordError}
-                  </p>
-                ) : null}
-                <button type="submit" className="candidate-edit-card__save">
-                  כניסה
-                </button>
-              </form>
-            ) : null}
-
-            {secretConfigured && unlocked ? (
+            <PipelineUnlockGate>
               <>
                 <section
                   className="party-detail-card knesset-status-panel"
@@ -622,7 +538,7 @@ export function KnessetPipelineEditPage() {
                   </ul>
                 </section>
               </>
-            ) : null}
+            </PipelineUnlockGate>
           </div>
         </section>
       </main>

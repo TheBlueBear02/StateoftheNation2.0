@@ -48,6 +48,9 @@ export const DISPLAY_BLOC_LEGEND_ORDER: DisplayBlocKey[] = [
 
 export const MAJORITY_SEATS = 60
 
+/** Default parties shown on first load of the party-trend chart (by `short_name`). */
+export const DEFAULT_PARTY_TREND_SHORT_NAMES = ['הליכוד', 'ישר', 'ביחד'] as const
+
 export type PartyBranding = {
   color: string | null
   logoUrl: string | null

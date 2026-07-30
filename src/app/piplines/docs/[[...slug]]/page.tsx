@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
-import { PiplinesPage } from '@/views/PiplinesPage'
+import { PiplinesDocsPage } from '@/views/PiplinesDocsPage'
 
 export const metadata: Metadata = {
-  title: 'צינורות נתונים',
+  title: 'תיעוד צינורות נתונים',
   description: 'תיעוד צינורות הנתונים שמזינים את מסד הנתונים של מצב האומה.',
   robots: { index: false, follow: false },
 }
 
 export default function Page() {
-  return <PiplinesPage />
+  return <PiplinesDocsPage />
 }

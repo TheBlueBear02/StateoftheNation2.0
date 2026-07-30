@@ -1,11 +1,12 @@
 'use client'
 
-import { isDev, getElectionsEditSecret } from '../lib/runtimeEnv'
-import { useEffect, useState, type FormEvent } from 'react'
+import { isDev } from '../lib/runtimeEnv'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from '../components/SiteLayout'
 import { KnessetRunSummary } from '../components/knesset/KnessetRunSummary'
 import { PollsPipelinePanel } from '../components/polls/PollsPipelinePanel'
+import { PipelineUnlockGate } from '../components/pipelines/PipelineUnlockGate'
 import {
   fetchPollsStatus,
   POLLS_STAGE_LABELS,
@@ -17,9 +18,6 @@ import './ElectionPartyPage.css'
 import './ElectionCandidatesEditPage.css'
 import './KnessetPipelineEditPage.css'
 import './ElectionsPollsEditPage.css'
-
-const UNLOCK_STORAGE_KEY = 'polls-edit-unlocked'
-const EDIT_SECRET = getElectionsEditSecret()
 
 const TABLE_LABELS: Record<keyof PollsTableCounts, string> = {
   polls: 'סקרים',
@@ -67,28 +65,7 @@ function shortResourceName(resource: string): string {
     .replace('Opinion_polling_for_the_2026_Israeli_legislative_election', 'ראשי')
 }
 
-function getUnlockedFromSession(): boolean {
-  try {
-    return sessionStorage.getItem(UNLOCK_STORAGE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function setUnlockedInSession(): void {
-  try {
-    sessionStorage.setItem(UNLOCK_STORAGE_KEY, '1')
-  } catch {
-    // ignore
-  }
-}
-
-export function ElectionsPollsEditPage() {
-  const secretConfigured = Boolean(EDIT_SECRET)
-  const [unlocked, setUnlocked] = useState(() => getUnlockedFromSession())
-  const [password, setPassword] = useState('')
-  const [passwordError, setPasswordError] = useState<string | null>(null)
-
+function ElectionsPollsEditContent() {
   const [statusLoading, setStatusLoading] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
   const [tableCounts, setTableCounts] = useState<PollsTableCounts | null>(null)
@@ -145,94 +122,15 @@ export function ElectionsPollsEditPage() {
   }
 
   useEffect(() => {
-    if (secretConfigured && unlocked) {
-      void loadStatus()
-    }
-  }, [secretConfigured, unlocked])
+    void loadStatus()
+  }, [])
 
   async function handlePipelineComplete() {
     await loadStatus()
   }
 
-  function handleUnlock(event: FormEvent) {
-    event.preventDefault()
-    if (!secretConfigured) {
-      setPasswordError('חסר ELECTIONS_EDIT_SECRET / NEXT_PUBLIC_ELECTIONS_EDIT_SECRET בקובץ .env')
-      return
-    }
-    if (password !== EDIT_SECRET) {
-      setPasswordError('סיסמה שגויה')
-      return
-    }
-    setUnlockedInSession()
-    setUnlocked(true)
-    setPasswordError(null)
-    setPassword('')
-  }
-
   return (
-    <SiteLayout className="election-edit-page">
-      <main className="election-edit-page__main">
-        <header className="election-edit-page__hero">
-          <div className="election-edit-page__inner container">
-            <Link href="/elections/polls" className="election-edit-page__back">
-              חזרה לסקרי מנדטים
-            </Link>
-            <p className="election-edit-page__eyebrow">עדכון נתונים</p>
-            <h1 className="election-edit-page__title">עדכון סקרי מנדטים</h1>
-            <p className="election-edit-page__subtitle">
-              הרצת צינור ויקיפדיה לטעינת סקרים חדשים שלא קיימים במסד הנתונים.
-            </p>
-          </div>
-        </header>
-
-        <section className="election-edit-page__content">
-          <div className="election-edit-page__inner container">
-            {!secretConfigured ? (
-              <p className="election-edit-page__panel" role="alert">
-                חסר ELECTIONS_EDIT_SECRET / NEXT_PUBLIC_ELECTIONS_EDIT_SECRET בקובץ .env — הוסיפו את המשתנה
-                והפעילו מחדש את שרת הפיתוח.
-              </p>
-            ) : null}
-
-            {secretConfigured && !unlocked ? (
-              <form
-                className="election-edit-page__gate party-detail-card"
-                onSubmit={handleUnlock}
-              >
-                <div className="party-detail-card__header">
-                  <p className="party-detail-card__eyebrow">גישה</p>
-                  <h2 className="party-detail-card__title">הזינו סיסמה</h2>
-                </div>
-                <label className="candidate-edit-card__field">
-                  <span>סיסמה</span>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(event) => {
-                      setPassword(event.target.value)
-                      setPasswordError(null)
-                    }}
-                    autoComplete="current-password"
-                    required
-                  />
-                </label>
-                {passwordError ? (
-                  <p
-                    className="candidate-edit-card__status candidate-edit-card__status--error"
-                    role="alert"
-                  >
-                    {passwordError}
-                  </p>
-                ) : null}
-                <button type="submit" className="candidate-edit-card__save">
-                  כניסה
-                </button>
-              </form>
-            ) : null}
-
-            {secretConfigured && unlocked ? (
-              <>
+    <>
                 <section
                   className="party-detail-card knesset-status-panel"
                   aria-labelledby="polls-status-title"
@@ -359,8 +257,32 @@ export function ElectionsPollsEditPage() {
                     הרצת הצינור זמינה רק בסביבת פיתוח (npm run dev).
                   </p>
                 )}
-              </>
-            ) : null}
+    </>
+  )
+}
+
+export function ElectionsPollsEditPage() {
+  return (
+    <SiteLayout className="election-edit-page">
+      <main className="election-edit-page__main">
+        <header className="election-edit-page__hero">
+          <div className="election-edit-page__inner container">
+            <Link href="/elections/polls" className="election-edit-page__back">
+              חזרה לסקרי מנדטים
+            </Link>
+            <p className="election-edit-page__eyebrow">עדכון נתונים</p>
+            <h1 className="election-edit-page__title">עדכון סקרי מנדטים</h1>
+            <p className="election-edit-page__subtitle">
+              הרצת צינור ויקיפדיה לטעינת סקרים חדשים שלא קיימים במסד הנתונים.
+            </p>
+          </div>
+        </header>
+
+        <section className="election-edit-page__content">
+          <div className="election-edit-page__inner container">
+            <PipelineUnlockGate>
+              <ElectionsPollsEditContent />
+            </PipelineUnlockGate>
           </div>
         </section>
       </main>

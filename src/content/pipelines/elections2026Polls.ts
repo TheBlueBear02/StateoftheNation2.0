@@ -6,6 +6,13 @@ export const elections2026PollsPipeline: PipelineDoc = {
   subtitle:
     'צינור אוטומטי שמושך סקרי מנדטים מויקיפדיה, מנרמל אותם למסד הנתונים, מחשב ממוצע משוקלל, ומזין את עמוד /elections/polls.',
   status: 'live',
+  docsPath: '/piplines/docs/elections-2026-polls',
+  editPath: '/elections/polls/edit',
+  schedule: {
+    label: 'פעמיים ביום · 05:00 ו־17:00 UTC',
+    cron: '0 5,17 * * *',
+    timezone: 'UTC',
+  },
   sections: [
     {
       id: 'overview',

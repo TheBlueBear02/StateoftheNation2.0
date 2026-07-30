@@ -1,0 +1,128 @@
+.pipeline-run-log {
+  margin-block-start: 2.5rem;
+}
+
+.pipeline-run-log__header {
+  margin-block-end: 1rem;
+}
+
+.pipeline-run-log__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.pipeline-run-log__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.pipeline-run-log__muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.pipeline-run-log__error {
+  margin: 0;
+  color: var(--color-alert);
+}
+
+.pipeline-run-log__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+  max-height: min(32rem, 70vh);
+  overflow-y: auto;
+}
+
+.pipeline-run-log__item {
+  padding: 0.9rem 1rem;
+  border-block-end: 1px solid rgba(0, 0, 0, 0.06);
+  animation: pipeline-run-in 0.35s ease both;
+}
+
+.pipeline-run-log__item:last-child {
+  border-block-end: none;
+}
+
+.pipeline-run-log__item--error {
+  border-inline-start: 3px solid var(--color-alert);
+}
+
+.pipeline-run-log__item--warning {
+  border-inline-start: 3px solid #c47a00;
+}
+
+.pipeline-run-log__item--success {
+  border-inline-start: 3px solid var(--color-blue);
+}
+
+.pipeline-run-log__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-block-end: 0.25rem;
+}
+
+.pipeline-run-log__status {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pipeline-run-log__status--success {
+  color: var(--color-blue-dark);
+}
+
+.pipeline-run-log__status--error {
+  color: var(--color-alert);
+}
+
+.pipeline-run-log__status--warning {
+  color: #c47a00;
+}
+
+.pipeline-run-log__pipeline {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.pipeline-run-log__action {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.pipeline-run-log__message {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
+  color: var(--color-text-muted);
+}
+
+.pipeline-run-log__error-detail {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: var(--color-alert);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@keyframes pipeline-run-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -5,8 +5,10 @@ import { formatFieldwork, type PollWithResults } from '../../hooks/usePolls'
 import {
   buildPartyTrendLines,
   cleanPollPublisher,
+  DEFAULT_PARTY_TREND_SHORT_NAMES,
   formatPollDayMonth,
   formatPollPublisher,
+  normalizePartyShortName,
   selectRecentRegularPolls,
   selectRecentRegularPollsForPublisher,
   type PartyTrendLine,
@@ -45,6 +47,19 @@ function pickRandomPublisherKey(
 ): string | null {
   if (logos.length === 0) return null
   return logos[Math.floor(Math.random() * logos.length)]?.key ?? null
+}
+
+function defaultPartyIdsFromLines(lines: PartyTrendLine[]): number[] {
+  const wanted = new Set(
+    DEFAULT_PARTY_TREND_SHORT_NAMES.map((name) => normalizePartyShortName(name)),
+  )
+  return lines
+    .filter((line) =>
+      wanted.has(
+        normalizePartyShortName(line.partyShortName ?? line.partyName),
+      ),
+    )
+    .map((line) => line.partyId)
 }
 
 export function PartyTrendChart({ polls }: PartyTrendChartProps) {
@@ -117,17 +132,29 @@ export function PartyTrendChart({ polls }: PartyTrendChartProps) {
     [windowPolls],
   )
 
-  // Default: only the largest party. Keep user picks across publisher changes;
-  // if none of the previous picks remain, fall back to the new largest.
+  const defaultTrendPartyIds = useMemo(
+    () => defaultPartyIdsFromLines(lines),
+    [lines],
+  )
+
+  // Default: הליכוד, ישר, ביחד. Keep user picks across publisher changes;
+  // if none remain, fall back to the default trio or the largest party.
   useEffect(() => {
     if (lines.length === 0) return
 
     const availableIds = new Set(lines.map((line) => line.partyId))
     const largestId = lines[0]?.partyId
 
+    const fallbackIds =
+      defaultTrendPartyIds.length > 0
+        ? defaultTrendPartyIds
+        : largestId !== undefined
+          ? [largestId]
+          : []
+
     setSelectedPartyIds((current) => {
       if (current === null) {
-        return largestId !== undefined ? new Set([largestId]) : new Set()
+        return new Set(fallbackIds)
       }
 
       const kept = [...current].filter((id) => availableIds.has(id))
@@ -135,13 +162,19 @@ export function PartyTrendChart({ polls }: PartyTrendChartProps) {
         return new Set(kept)
       }
 
-      return largestId !== undefined ? new Set([largestId]) : new Set()
+      return new Set(fallbackIds)
     })
-  }, [lines])
+  }, [lines, defaultTrendPartyIds])
 
   const effectiveSelectedIds =
     selectedPartyIds ??
-    (lines[0] !== undefined ? new Set([lines[0].partyId]) : new Set<number>())
+    new Set(
+      defaultTrendPartyIds.length > 0
+        ? defaultTrendPartyIds
+        : lines[0] !== undefined
+          ? [lines[0].partyId]
+          : [],
+    )
 
   const visibleLines = lines.filter((line) =>
     effectiveSelectedIds.has(line.partyId),

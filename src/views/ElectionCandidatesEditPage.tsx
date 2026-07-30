@@ -1,6 +1,6 @@
 'use client'
 
-import { isDev, getElectionsEditSecret } from '../lib/runtimeEnv'
+import { isDev } from '../lib/runtimeEnv'
 import {
   useEffect,
   useMemo,
@@ -11,6 +11,7 @@ import {
 } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from '../components/SiteLayout'
+import { PipelineUnlockGate } from '../components/pipelines/PipelineUnlockGate'
 import {
   useElectionCandidates,
   type ElectionCandidate,
@@ -27,9 +28,6 @@ import { EditablePartyPanel } from '../components/elections/EditablePartyPanel'
 import { geocodeElectionMap } from '../lib/geocodeElectionMap'
 import './ElectionPartyPage.css'
 import './ElectionCandidatesEditPage.css'
-
-const UNLOCK_STORAGE_KEY = 'elections-edit-unlocked'
-const EDIT_SECRET = getElectionsEditSecret()
 
 type CandidateDraft = {
   fullName: string
@@ -176,22 +174,6 @@ function formatGeocodeRunningMessage(elapsedSeconds: number): string {
     return 'ממפה ערים… שנייה אחת (Nominatim, ~1 עיר/שנייה)'
   }
   return `ממפה ערים… ${elapsedSeconds} שניות (Nominatim, ~1 עיר/שנייה)`
-}
-
-function isUnlockedInSession(): boolean {
-  try {
-    return sessionStorage.getItem(UNLOCK_STORAGE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function setUnlockedInSession(): void {
-  try {
-    sessionStorage.setItem(UNLOCK_STORAGE_KEY, '1')
-  } catch {
-    // Ignore storage failures; unlock still works for this page load.
-  }
 }
 
 function EditableCandidateCard({
@@ -621,9 +603,6 @@ function EditableCandidateCard({
 }
 
 export function ElectionCandidatesEditPage() {
-  const [unlocked, setUnlocked] = useState(isUnlockedInSession)
-  const [password, setPassword] = useState('')
-  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [selectedPartyId, setSelectedPartyId] = useState<number | null>(null)
   const [mapGeocodeState, setMapGeocodeState] = useState<PipelineState>({
     status: 'idle',
@@ -686,11 +665,8 @@ export function ElectionCandidatesEditPage() {
 
   const accentColor = selectedParty?.color ?? '#4890fd'
   const style = { '--party-color': accentColor } as CSSProperties
-  const secretConfigured = Boolean(EDIT_SECRET && EDIT_SECRET.length > 0)
   const showPartyPipeline =
     isDev &&
-    secretConfigured &&
-    unlocked &&
     selectedParty !== null &&
     !candidatesLoading &&
     candidates.length <= 2
@@ -707,8 +683,6 @@ export function ElectionCandidatesEditPage() {
 
   const showMapGeocodeButton =
     isDev &&
-    secretConfigured &&
-    unlocked &&
     selectedParty !== null &&
     !candidatesLoading
 
@@ -759,22 +733,6 @@ export function ElectionCandidatesEditPage() {
     }
   }
 
-  function handleUnlock(event: FormEvent) {
-    event.preventDefault()
-    if (!secretConfigured) {
-      setPasswordError('חסר ELECTIONS_EDIT_SECRET / NEXT_PUBLIC_ELECTIONS_EDIT_SECRET בקובץ .env')
-      return
-    }
-    if (password !== EDIT_SECRET) {
-      setPasswordError('סיסמה שגויה')
-      return
-    }
-    setUnlockedInSession()
-    setUnlocked(true)
-    setPasswordError(null)
-    setPassword('')
-  }
-
   return (
     <SiteLayout className="election-edit-page">
       <main className="election-edit-page__main" style={style}>
@@ -793,47 +751,7 @@ export function ElectionCandidatesEditPage() {
 
         <section className="election-edit-page__content">
           <div className="election-edit-page__inner container">
-            {!secretConfigured ? (
-              <p className="election-edit-page__panel" role="alert">
-                חסר ELECTIONS_EDIT_SECRET / NEXT_PUBLIC_ELECTIONS_EDIT_SECRET בקובץ .env — הוסיפו את המשתנה
-                והפעילו מחדש את שרת הפיתוח.
-              </p>
-            ) : null}
-
-            {secretConfigured && !unlocked ? (
-              <form
-                className="election-edit-page__gate party-detail-card"
-                onSubmit={handleUnlock}
-              >
-                <div className="party-detail-card__header">
-                  <p className="party-detail-card__eyebrow">גישה</p>
-                  <h2 className="party-detail-card__title">הזינו סיסמה</h2>
-                </div>
-                <label className="candidate-edit-card__field">
-                  <span>סיסמה</span>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(event) => {
-                      setPassword(event.target.value)
-                      setPasswordError(null)
-                    }}
-                    autoComplete="current-password"
-                    required
-                  />
-                </label>
-                {passwordError ? (
-                  <p className="candidate-edit-card__status candidate-edit-card__status--error" role="alert">
-                    {passwordError}
-                  </p>
-                ) : null}
-                <button type="submit" className="candidate-edit-card__save">
-                  כניסה
-                </button>
-              </form>
-            ) : null}
-
-            {secretConfigured && unlocked ? (
+            <PipelineUnlockGate>
               <>
                 <div className="election-edit-page__toolbar party-detail-card">
                   <div className="party-detail-card__header">
@@ -976,7 +894,7 @@ export function ElectionCandidatesEditPage() {
                   </>
                 ) : null}
               </>
-            ) : null}
+            </PipelineUnlockGate>
           </div>
         </section>
       </main>

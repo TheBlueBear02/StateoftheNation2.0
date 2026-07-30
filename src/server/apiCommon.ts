@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process'
 import { NextResponse } from 'next/server'
 import {
-  getElectionsEditSecret,
-  getKnessetEditSecret,
+  getPipelineEditSecret,
   getSupabaseUrl,
   pipelineApisEnabled,
 } from '@/lib/runtimeEnv'
@@ -31,38 +30,39 @@ export function assertPipelineEnabled() {
   return null
 }
 
-export function requireElectionsSecret(request: Request) {
-  const editSecret = getElectionsEditSecret()?.trim() ?? ''
+function providedPipelineSecret(request: Request): string | null {
+  return (
+    request.headers.get('x-pipeline-edit-secret') ||
+    request.headers.get('x-elections-edit-secret') ||
+    request.headers.get('x-knesset-edit-secret')
+  )
+}
+
+export function requirePipelineSecret(request: Request) {
+  const editSecret = getPipelineEditSecret()?.trim() ?? ''
   if (!editSecret) {
     return {
       error: jsonError(
-        'חסר ELECTIONS_EDIT_SECRET / NEXT_PUBLIC_ELECTIONS_EDIT_SECRET בקובץ .env',
+        'חסר PIPELINE_EDIT_SECRET / NEXT_PUBLIC_PIPELINE_EDIT_SECRET בקובץ .env',
         503,
       ),
     }
   }
-  const provided = request.headers.get('x-elections-edit-secret')
+  const provided = providedPipelineSecret(request)
   if (provided !== editSecret) {
     return { error: jsonError('אין הרשאה לערוך', 401) }
   }
   return { secret: editSecret }
 }
 
+/** @deprecated Prefer requirePipelineSecret */
+export function requireElectionsSecret(request: Request) {
+  return requirePipelineSecret(request)
+}
+
+/** @deprecated Prefer requirePipelineSecret */
 export function requireKnessetSecret(request: Request) {
-  const editSecret = getKnessetEditSecret()?.trim() ?? ''
-  if (!editSecret) {
-    return {
-      error: jsonError(
-        'חסר KNESSET_EDIT_SECRET / NEXT_PUBLIC_KNESSET_EDIT_SECRET בקובץ .env',
-        503,
-      ),
-    }
-  }
-  const provided = request.headers.get('x-knesset-edit-secret')
-  if (provided !== editSecret) {
-    return { error: jsonError('אין הרשאה לערוך', 401) }
-  }
-  return { secret: editSecret }
+  return requirePipelineSecret(request)
 }
 
 export function getServiceEnv() {

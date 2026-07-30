@@ -78,6 +78,8 @@ Parent section / Section page / Current item
 | `/elections/lists` | `בחירות 2026` → `/elections` / `משחק הרשימות` → `/elections/lists` |
 | `/elections/lists` (party selected) | … / משחק הרשימות / {party} |
 | `/elections/:partyId` | `בחירות 2026` → `/elections` / {party} |
+| `/piplines` | `צינורות נתונים` |
+| `/piplines/docs/{id}` | `צינורות נתונים` → `/piplines` / תיעוד |
 
 ### Usage
 

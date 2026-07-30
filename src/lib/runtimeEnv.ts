@@ -20,7 +20,7 @@ export function getSupabaseAnonKey(): string | undefined {
   )
 }
 
-export function getElectionsEditSecret(): string | undefined {
+function getLegacyElectionsEditSecret(): string | undefined {
   return (
     process.env.NEXT_PUBLIC_ELECTIONS_EDIT_SECRET ||
     process.env.ELECTIONS_EDIT_SECRET ||
@@ -29,13 +29,34 @@ export function getElectionsEditSecret(): string | undefined {
   )
 }
 
-export function getKnessetEditSecret(): string | undefined {
+function getLegacyKnessetEditSecret(): string | undefined {
   return (
     process.env.NEXT_PUBLIC_KNESSET_EDIT_SECRET ||
     process.env.KNESSET_EDIT_SECRET ||
     process.env.VITE_KNESSET_EDIT_SECRET ||
     undefined
   )
+}
+
+/** Shared unlock secret for /piplines dashboard and all pipeline /edit pages. */
+export function getPipelineEditSecret(): string | undefined {
+  return (
+    process.env.NEXT_PUBLIC_PIPELINE_EDIT_SECRET ||
+    process.env.PIPELINE_EDIT_SECRET ||
+    getLegacyElectionsEditSecret() ||
+    getLegacyKnessetEditSecret() ||
+    undefined
+  )
+}
+
+/** @deprecated Prefer getPipelineEditSecret — kept as alias for existing callers. */
+export function getElectionsEditSecret(): string | undefined {
+  return getPipelineEditSecret()
+}
+
+/** @deprecated Prefer getPipelineEditSecret — kept as alias for existing callers. */
+export function getKnessetEditSecret(): string | undefined {
+  return getPipelineEditSecret()
 }
 
 /** Ensure an absolute origin URL (bare domains get https://). */

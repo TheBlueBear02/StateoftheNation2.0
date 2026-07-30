@@ -6,6 +6,9 @@ export const knessetPipeline: PipelineDoc = {
   subtitle:
     'צינור זה מזין את כל נתוני הכנסת: כנסות, סיעות, חברי כנסת, ממשלות, משרדים ומינויים.',
   status: 'live',
+  docsPath: '/piplines/docs/knesset',
+  editPath: '/knesset/edit',
+  schedule: { label: 'לא נקבע עדיין' },
   sections: [
     {
       id: 'overview',

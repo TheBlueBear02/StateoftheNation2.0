@@ -28,6 +28,11 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+.piplines-sidebar__breadcrumb {
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+}
+
 .piplines-sidebar__title {
   font-size: 0.95rem;
   font-weight: 700;

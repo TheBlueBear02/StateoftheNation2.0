@@ -14,7 +14,7 @@ The schema is split into four logical groups:
 | **Government** | `governments` · `offices` · `minister_appointments` | Seeded — powers the Government page |
 | **KPI data** | `indexes` · `index_data` | Seeded — dashboard page planned |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | Live — `/elections`, party detail, lists game, edit |
-| **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pollster_house_effects` · `poll_publishers` | Live — `/elections/polls` |
+| **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` | Live — `/elections/polls`, `/piplines` |
 
 All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/`. The public site reads via the anon key. The password-gated editor at `/elections/edit` can also `UPDATE` `election_candidates` and `people` through the anon key once the UPDATE policies below are applied — this is a lightweight private-tool gate, not production auth.
 
@@ -411,6 +411,26 @@ Staging table. The only place where data is inserted manually. The election pipe
 ---
 
 ## Polls Group
+
+### `pipeline_runs`
+
+Shared run history for the `/piplines` dashboard (all pipelines).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `pipeline` | text | e.g. `'polls'`, `'knesset'`, `'elections-candidates'` |
+| `action` | text | `'sync-full'`, `'stage-N'`, `'backfill'`, … |
+| `status` | text | `'success'` \| `'error'` \| `'warning'` |
+| `started_at` | timestamptz | Run start |
+| `finished_at` | timestamptz | Run end |
+| `message` | text | Short summary |
+| `error` | text | Error detail when failed |
+| `summary` | jsonb | Optional stage totals |
+| `source` | text | `'ui'` \| `'cli'` \| `'github-actions'` |
+
+**RLS:** anon/authenticated SELECT. Writes via service role only.
+
+**Schema file:** `Layer 1 - Gathering Data/schema_pipeline_runs.sql`
 
 ### `pipeline_sync_state`
 

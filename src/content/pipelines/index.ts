@@ -15,4 +15,4 @@ export function getPipelineById(id: string): PipelineDoc | undefined {
   return PIPELINES.find((pipeline) => pipeline.id === id)
 }
 
-export type { PipelineDoc, PipelineSection, PipelineTable } from './types'
+export type { PipelineDoc, PipelineSection, PipelineTable, PipelineSchedule } from './types'

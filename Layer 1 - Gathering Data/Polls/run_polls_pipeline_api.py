@@ -32,6 +32,9 @@ import resolve_poll_parties
 import validate_polls
 from db import PIPELINE_NAME, get_supabase
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from record_pipeline_run import record_pipeline_run  # noqa: E402
+
 load_dotenv()
 
 STAGE_LABELS: dict[int, str] = {
@@ -391,15 +394,40 @@ def cmd_stage(
         fail("מספר שלב לא תקין (1–6)", as_json)
 
     start = time.time()
+    started_at = datetime.now()
     try:
         label, message, summary = run_stage(
             sb, stage, backfill=backfill, force=force
         )
     except Exception as exc:
+        record_pipeline_run(
+            sb,
+            pipeline="polls",
+            action=f"stage-{stage}",
+            status="error",
+            message=f"Stage {stage} failed",
+            error=str(exc),
+            source="ui",
+            started_at=started_at,
+        )
         fail(str(exc), as_json)
 
     elapsed_seconds = int(time.time() - start)
     last_run_at = record_last_run("stage", stage, summary)
+    note = None
+    if summary.get("stages"):
+        note = summary["stages"][0].get("note")
+    status = "warning" if note and ("אזהר" in note or "שגיא" in note) else "success"
+    record_pipeline_run(
+        sb,
+        pipeline="polls",
+        action=f"stage-{stage}",
+        status=status,
+        message=message,
+        summary=summary,
+        source="ui",
+        started_at=started_at,
+    )
     emit(
         {
             "ok": True,
@@ -422,6 +450,7 @@ def cmd_sync_full(
     force: bool,
 ) -> None:
     start = time.time()
+    started_at = datetime.now()
     stage_summaries: list[dict] = []
     messages: list[str] = []
 
@@ -433,16 +462,38 @@ def cmd_sync_full(
             messages.append(message)
             stage_summaries.extend(summary.get("stages", []))
     except Exception as exc:
+        record_pipeline_run(
+            sb,
+            pipeline="polls",
+            action="backfill" if backfill else "sync-full",
+            status="error",
+            message="סנכרון סקרים נכשל",
+            error=str(exc),
+            source="ui",
+            started_at=started_at,
+        )
         fail(str(exc), as_json)
 
     summary = make_run_summary(stage_summaries)
     elapsed_seconds = int(time.time() - start)
     last_run_at = record_last_run("sync-full", None, summary)
+    joined = "; ".join(messages)
+    status = "warning" if any("אזהר" in m or "שגיא" in m for m in messages) else "success"
+    record_pipeline_run(
+        sb,
+        pipeline="polls",
+        action="backfill" if backfill else "sync-full",
+        status=status,
+        message="סנכרון סקרים הושלם — " + joined,
+        summary=summary,
+        source="ui",
+        started_at=started_at,
+    )
     emit(
         {
             "ok": True,
             "elapsedSeconds": elapsed_seconds,
-            "message": "סנכרון סקרים הושלם — " + "; ".join(messages),
+            "message": "סנכרון סקרים הושלם — " + joined,
             "lastPipelineRunAt": last_run_at,
             "summary": summary,
         },

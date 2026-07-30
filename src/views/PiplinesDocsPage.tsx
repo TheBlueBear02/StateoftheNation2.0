@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { SiteLayout } from '../components/SiteLayout'
+import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { PipelineDocView } from '../components/pipelines/PipelineDocView'
 import {
   DEFAULT_PIPELINE_ID,
@@ -12,7 +13,7 @@ import {
 } from '../content/pipelines'
 import './PiplinesPage.css'
 
-export function PiplinesPage() {
+export function PiplinesDocsPage() {
   const params = useParams<{ slug?: string[] }>()
   const pathname = usePathname()
   const router = useRouter()
@@ -21,7 +22,7 @@ export function PiplinesPage() {
 
   useEffect(() => {
     if (!pipelineId || !pipeline) {
-      router.replace(`/piplines/${DEFAULT_PIPELINE_ID}`)
+      router.replace(`/piplines/docs/${DEFAULT_PIPELINE_ID}`)
     }
   }, [pipelineId, pipeline, router])
 
@@ -31,7 +32,14 @@ export function PiplinesPage() {
         <div className="piplines-page__inner">
           <aside className="piplines-sidebar" aria-label="רשימת צינורות נתונים">
             <div className="piplines-sidebar__header">
-              <h2 className="piplines-sidebar__title">צינורות נתונים</h2>
+              <PageBreadcrumb
+                className="piplines-sidebar__breadcrumb"
+                items={[
+                  { label: 'צינורות נתונים', to: '/piplines' },
+                  { label: 'תיעוד' },
+                ]}
+              />
+              <h2 className="piplines-sidebar__title">תיעוד צינורות</h2>
               <p className="piplines-sidebar__desc">
                 מקורות הנתונים שמזינים את מסד הנתונים של הפרויקט
               </p>
@@ -40,7 +48,7 @@ export function PiplinesPage() {
             <nav className="piplines-sidebar__nav">
               <ul className="piplines-sidebar__list">
                 {PIPELINES.map((p) => {
-                  const href = `/piplines/${p.id}`
+                  const href = `/piplines/docs/${p.id}`
                   const isActive =
                     pathname === href || pathname.startsWith(`${href}/`)
                   return (

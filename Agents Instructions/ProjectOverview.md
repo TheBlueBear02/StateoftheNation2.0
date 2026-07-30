@@ -10,7 +10,8 @@ Central reference for agents working on this repository. Use this file to unders
 |-----------------|----------------|--------|
 | Homepage hub | `/` | Live |
 | הכנסת — Knesset hemicycle | `/knesset` | Live |
-| צינורות נתונים — Data pipelines docs | `/piplines` | Live (noindex) |
+| צינורות נתונים — Pipelines dashboard | `/piplines` | Live (password-gated, noindex) |
+| תיעוד צינורות | `/piplines/docs` | Live (noindex) |
 | דשבורד ממשלה — Government dashboard | `/government` | Live |
 | בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls`, `/elections/lists` | Live |
 | סקרי מנדטים — Poll averages | `/elections/polls` | Live |
@@ -46,7 +47,7 @@ StateoftheNation2.0/
 │   ├── hooks/               # Data-fetching hooks
 │   ├── lib/                 # Pure logic, Supabase client, runtimeEnv
 │   ├── server/              # Shared API helpers (Python spawn, secrets)
-│   ├── content/pipelines/   # Pipeline doc registry for /piplines
+│   ├── content/pipelines/   # Pipeline registry for /piplines dashboard + docs
 │   ├── App.tsx              # Homepage body
 │   ├── App.css
 │   └── index.css            # Global tokens (Heebo via next/font)
@@ -75,7 +76,9 @@ StateoftheNation2.0/
 | `/government` | `src/app/government/page.tsx` |
 | `/knesset` | `src/app/knesset/page.tsx` |
 | `/knesset/edit` | `src/app/knesset/edit/page.tsx` |
-| `/piplines/[[...slug]]` | `src/app/piplines/[[...slug]]/page.tsx` |
+| `/piplines` | `src/app/piplines/page.tsx` |
+| `/piplines/docs/[[...slug]]` | `src/app/piplines/docs/[[...slug]]/page.tsx` |
+| `/piplines/[slug]` | `src/app/piplines/[slug]/page.tsx` (legacy → docs) |
 | `/api/elections/[...path]` | Local-dev pipeline / edit API |
 | `/api/knesset/[...path]` | Local-dev pipeline / faction API |
 | `/api/polls/[...path]` | Local-dev polls pipeline API |
@@ -104,7 +107,8 @@ These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Loc
 │         ├─ /government → views/GovernmentPage.tsx           │
 │         ├─ /knesset    → views/KnessetPage.tsx              │
 │         ├─ /elections… → views/Elections*.tsx               │
-│         └─ /piplines/* → views/PiplinesPage.tsx             │
+│         ├─ /piplines     → PipelinesDashboardPage.tsx       │
+│         └─ /piplines/docs → PiplinesDocsPage.tsx            │
 │              ├─ SiteLayout (header + footer)                │
 │              └─ hooks → Supabase (anon)                     │
 └─────────────────────────────────────────────────────────────┘
@@ -122,8 +126,9 @@ These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Loc
 NEXT_PUBLIC_SUPABASE_URL=...          # or VITE_SUPABASE_URL / SUPABASE_URL (mapped in next.config)
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...     # or VITE_SUPABASE_ANON_KEY
 NEXT_PUBLIC_SITE_URL=https://...      # canonical / OG / sitemap base (bare domain ok; https:// added)
-NEXT_PUBLIC_ELECTIONS_EDIT_SECRET=... # or VITE_ELECTIONS_EDIT_SECRET / ELECTIONS_EDIT_SECRET
-NEXT_PUBLIC_KNESSET_EDIT_SECRET=...   # or VITE_KNESSET_EDIT_SECRET / KNESSET_EDIT_SECRET
+NEXT_PUBLIC_PIPELINE_EDIT_SECRET=...  # shared unlock for /piplines + all /edit pages
+NEXT_PUBLIC_ELECTIONS_EDIT_SECRET=... # fallback alias (or VITE_ / ELECTIONS_EDIT_SECRET)
+NEXT_PUBLIC_KNESSET_EDIT_SECRET=...   # fallback alias (or VITE_ / KNESSET_EDIT_SECRET)
 SUPABASE_SERVICE_KEY=...              # pipelines + local edit APIs
 OPENAI_API_KEY=...                    # elections enrichment
 ENABLE_PIPELINE_API=1                 # optional: allow Python APIs outside development
@@ -159,7 +164,7 @@ npm run lint
 | [GovernmentPage.md](./GovernmentPage.md) | `/government` |
 | [HomePage.md](./HomePage.md) | `/` |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` + `/knesset/edit` |
-| [PiplinesPage.md](./PiplinesPage.md) | `/piplines` |
+| [PiplinesPage.md](./PiplinesPage.md) | `/piplines` dashboard + `/piplines/docs` |
 | [ElectionsPage.md](./ElectionsPage.md) | `/elections` module |
 | [PollsPage.md](./PollsPage.md) | `/elections/polls` |
 
