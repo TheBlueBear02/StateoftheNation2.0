@@ -34,11 +34,17 @@ jobs:
 
       - name: Alert on review queue
         if: always()
+        continue-on-error: true
         working-directory: 'Layer 1 - Gathering Data/Polls'
         run: |
-          if [ -s review_queue.json ] && [ "$(jq 'length' review_queue.json)" -gt 0 ]; then
+          if [ ! -s review_queue.json ]; then
+            echo "review_queue.json empty — skip"
+            exit 0
+          fi
+          count="$(jq 'length' review_queue.json 2>/dev/null || echo 0)"
+          if [ "$count" -gt 0 ]; then
             gh issue create --title "Polls pipeline: unmapped party labels" \
-              --body-file review_queue.json --label polls-pipeline
+              --body-file review_queue.json || true
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

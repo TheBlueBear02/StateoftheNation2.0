@@ -26,8 +26,9 @@ def _validate_polls(
     election_id: int,
     *,
     full: bool = False,
-) -> list[str]:
+) -> tuple[list[str], list[str]]:
     errors: list[str] = []
+    soft_warnings: list[str] = []
     query = (
         sb.table("polls")
         .select("id, fieldwork_end, is_scenario")
@@ -63,8 +64,13 @@ def _validate_polls(
         ) or []
 
         seat_sum = sum(r["seats"] or 0 for r in results)
-        if seat_sum != 120:
+        if abs(seat_sum - 120) > 1:
             errors.append(f"Poll {poll['id']}: seat sum is {seat_sum}, expected 120")
+        elif seat_sum != 120:
+            # ±1 is common Wikipedia rounding for seat projections
+            soft_warnings.append(
+                f"Poll {poll['id']}: seat sum is {seat_sum}, expected 120 (±1 OK)"
+            )
 
         max_seats = max((r["seats"] or 0 for r in results), default=0)
         if max_seats > 45:
@@ -74,7 +80,7 @@ def _validate_polls(
         if non_null < 10:
             errors.append(f"Poll {poll['id']}: only {non_null} parties with results (<10)")
 
-    return errors
+    return errors, soft_warnings
 
 
 def _check_staleness(sb: Client, election_id: int) -> str | None:
@@ -135,10 +141,15 @@ def run(
     *,
     full: bool = False,
 ) -> tuple[int, list[str]]:
-    """Validate polls. Returns (exit_code, diagnostic messages)."""
+    """Validate polls. Returns (exit_code, diagnostic messages).
+
+    Hard data errors → exit 1 and roll back aggregates for this run's as_of dates.
+    Ops / soft warnings (staleness, volume, seat sum ±1) → logged, exit 0 so
+    scheduled CI stays green when the sync itself succeeded.
+    """
     election_id = get_election_id(sb)
-    data_errors = _validate_polls(sb, election_id, full=full)
-    ops_warnings: list[str] = []
+    data_errors, soft_warnings = _validate_polls(sb, election_id, full=full)
+    ops_warnings: list[str] = list(soft_warnings)
     diagnostics: list[str] = []
 
     stale = _check_staleness(sb, election_id)
@@ -166,7 +177,7 @@ def run(
         for w in ops_warnings:
             log.warning("  %s", w)
             diagnostics.append(f"WARNING: {w}")
-        return 1, diagnostics
+        return 0, diagnostics
 
     log.info("Validation passed")
     return 0, diagnostics

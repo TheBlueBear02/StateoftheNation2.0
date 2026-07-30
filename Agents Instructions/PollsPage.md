@@ -35,7 +35,7 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 
 Schema: `schema_polls.sql` (apply manually in Supabase).
 
-Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel).
+Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel). Review-queue alerts create a GitHub issue without a required label (`continue-on-error`). Validation: seat sum ±1 and ops alerts (staleness/volume) log warnings but exit 0 so scheduled runs stay green; harder data errors still fail and roll back that run’s aggregates.
 
 ## Dev Edit UI (`/elections/polls/edit`)
 
