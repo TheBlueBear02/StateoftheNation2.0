@@ -1,5 +1,12 @@
 'use client'
 
+import Link from 'next/link'
+
+const FOOTER_LINKS = [
+  { href: '/about', label: 'אודות' },
+  { href: '/terms', label: 'תנאי שימוש' },
+] as const
+
 const SOCIAL_LINKS = [
   {
     href: 'https://x.com/nationstateIL',
@@ -73,9 +80,22 @@ export function SiteFooter() {
           </ul>
         </nav>
 
-        <p className="site-footer__copy">
-          © {new Date().getFullYear()} מצב האומה. כל הזכויות שמורות.
-        </p>
+        <div className="site-footer__end">
+          <nav className="site-footer__links" aria-label="מידע נוסף">
+            <ul className="site-footer__links-list">
+              {FOOTER_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="site-footer__link">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <p className="site-footer__copy">
+            © {new Date().getFullYear()} מצב האומה. כל הזכויות שמורות.
+          </p>
+        </div>
       </div>
     </footer>
   )

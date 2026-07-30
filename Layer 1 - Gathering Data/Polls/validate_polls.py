@@ -134,10 +134,12 @@ def run(
     dry_run: bool = False,
     *,
     full: bool = False,
-) -> int:
+) -> tuple[int, list[str]]:
+    """Validate polls. Returns (exit_code, diagnostic messages)."""
     election_id = get_election_id(sb)
     data_errors = _validate_polls(sb, election_id, full=full)
     ops_warnings: list[str] = []
+    diagnostics: list[str] = []
 
     stale = _check_staleness(sb, election_id)
     if stale:
@@ -151,23 +153,26 @@ def run(
         log.error("Data validation failed (%d errors):", len(data_errors))
         for err in data_errors[:20]:
             log.error("  %s", err)
+            diagnostics.append(f"ERROR: {err}")
         if not dry_run and as_of_dates:
             for as_of in as_of_dates:
                 sb.table("poll_aggregates").delete().eq("election_id", election_id).eq(
                     "as_of_date", as_of.isoformat()
                 ).execute()
-        return 1
+        return 1, diagnostics
 
     if ops_warnings:
         log.warning("Ops alerts (%d):", len(ops_warnings))
         for w in ops_warnings:
             log.warning("  %s", w)
-        return 1
+            diagnostics.append(f"WARNING: {w}")
+        return 1, diagnostics
 
     log.info("Validation passed")
-    return 0
+    return 0, diagnostics
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-8s  %(message)s")
-    sys.exit(run(get_supabase()))
+    code, _ = run(get_supabase())
+    sys.exit(code)

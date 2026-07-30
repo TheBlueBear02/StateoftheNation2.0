@@ -245,6 +245,7 @@ When `isDev` is true, the **צינור נתונים** panel runs OData sync:
 | 6 | חברויות ומינויים | `sync_positions` |
 
 - **התחל סנכרון מלא** runs stages 1–6 sequentially via `POST /api/knesset/pipeline/stage`
+- While running, the active stage row is highlighted with a spinner; each stage shows its own elapsed time, and the status line also shows total run time (`usePipelineRunProgress`)
 - Per-stage **הרץ** buttons run a single stage
 - Post-sync: **בדוק קישורי סיעות** / **החל קישורי סיעות** (`fix_faction_links_all` logic)
 - **עדכן תמונות** runs `km_images` logic (hardcoded to `public/images/KM Images/הכנסת ה25`)

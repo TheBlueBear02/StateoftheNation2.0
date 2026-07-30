@@ -152,7 +152,7 @@ When a selected party has **0–2** rows in `election_candidates`, a **צינו�
 | Insert + run | **התחל עיבוד** | `POST /api/elections/pipeline/insert` then sequential `POST /api/elections/pipeline/stage` (stages 1–6) |
 | Review queue | **אשר התאמה** / **אדם חדש** per row, then **אשר והמשך** | `GET /api/elections/pipeline/review-queue?partyId=N` + `POST /api/elections/pipeline/resolve-review` |
 
-Stages run one at a time from the frontend with live progress (`שלב X מתוך 6`). If stage 1 produces fuzzy matches for this party, the UI pauses for review before continuing to stages 2–6.
+Stages run one at a time from the frontend with live progress: the current step is highlighted, each step shows its own elapsed timer, and the status line also shows total run time (`שלב X מתוך 6 … · סה״כ …`). Shared helpers live in `src/hooks/usePipelineRunProgress.ts`. If stage 1 produces fuzzy matches for this party, the UI pauses for review before continuing to stages 2–6.
 
 | Stage | Script | Action |
 |-------|--------|--------|

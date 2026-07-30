@@ -516,10 +516,6 @@
   transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.polls-party-trend-legend__btn:not(.polls-party-trend-legend__btn--hidden) {
-  border-color: rgba(0, 0, 0, 0.12);
-}
-
 .polls-party-trend-legend__btn:hover {
   background-color: rgba(0, 0, 0, 0.04);
 }
@@ -531,6 +527,7 @@
 
 .polls-party-trend-legend__btn--hidden {
   opacity: 0.4;
+  border-color: rgba(0, 0, 0, 0.12) !important;
 }
 
 .polls-party-trend-legend__btn--hidden .polls-party-trend-legend__swatch {
@@ -604,6 +601,16 @@
 .polls-party-trend-tooltip .polls-bloc-tooltip__blocs {
   max-height: 180px;
   overflow-y: auto;
+}
+
+/* ── Aggregate history (poll_aggregates) ──────────────────────────────────── */
+
+.polls-aggregate-history__hint {
+  margin: 0;
+  max-width: 52rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
 }
 
 /* ── Bloc trend chart ─────────────────────────────────────────────────────── */

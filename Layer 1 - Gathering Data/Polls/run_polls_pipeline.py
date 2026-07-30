@@ -110,7 +110,7 @@ def main() -> None:
 
         if not args.stage or args.stage == 6:
             log.info("─── Stage 6: validate polls ───")
-            exit_code = validate_polls.run(
+            exit_code, _ = validate_polls.run(
                 sb, as_of_dates, args.dry_run, full=args.backfill
             )
     except Exception as exc:

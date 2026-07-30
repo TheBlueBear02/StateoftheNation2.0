@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  registerPartyBranding,
+  resolvePartyBranding,
+  type PartyBranding,
+} from '../lib/pollChartData'
+import {
   ACTIVE_ELECTION_YEAR,
   supabase,
   supabaseConfigError,
@@ -13,7 +18,9 @@ export type AggregateMethod = 'weighted' | 'last3'
 export type PartyAggregate = {
   partyId: number
   partyName: string
+  partyShortName: string | null
   partyColor: string | null
+  partyLogoUrl: string | null
   bloc: PartyBloc | null
   partyStatus: string | null
   seatsAvg: number
@@ -39,7 +46,9 @@ export type TrendPoint = {
 export type PartyTrendSeries = {
   partyId: number
   partyName: string
+  partyShortName: string | null
   partyColor: string | null
+  partyLogoUrl: string | null
   segments: TrendPoint[][]
 }
 
@@ -52,6 +61,53 @@ export type UsePollAggregatesResult = {
   method: AggregateMethod
   setMethod: (method: AggregateMethod) => void
   refetch: () => Promise<void>
+}
+
+const PARTY_BRANDING_SELECT =
+  'id, name, short_name, color, logo_url, bloc, party_status, knesset_faction:knesset_factions(logo_url, color, short_name)'
+
+type PartyBrandingSourceRow = {
+  id: number
+  name: string
+  short_name: string | null
+  color: string | null
+  logo_url: string | null
+  bloc: string | null
+  party_status: string | null
+  knesset_faction?:
+    | {
+        logo_url: string | null
+        color: string | null
+        short_name: string | null
+      }
+    | {
+        logo_url: string | null
+        color: string | null
+        short_name: string | null
+      }[]
+    | null
+}
+
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null
+  }
+  return value ?? null
+}
+
+function ingestPartyBranding(
+  brandingByKey: Map<string, PartyBranding>,
+  row: PartyBrandingSourceRow,
+): void {
+  const faction = unwrapRelation(row.knesset_faction)
+  registerPartyBranding(brandingByKey, row.short_name, row.color, row.logo_url)
+  registerPartyBranding(brandingByKey, row.name, row.color, row.logo_url)
+  registerPartyBranding(
+    brandingByKey,
+    faction?.short_name,
+    faction?.color,
+    faction?.logo_url,
+  )
 }
 
 export function usePollAggregates(): UsePollAggregatesResult {
@@ -117,19 +173,44 @@ export function usePollAggregates(): UsePollAggregatesResult {
 
     const { data: partyRows } = await supabase
       .from('election_parties')
-      .select('id, name, color, bloc, party_status')
+      .select(PARTY_BRANDING_SELECT)
       .in('id', partyIds)
 
+    const brandingByKey = new Map<string, PartyBranding>()
+    for (const row of (partyRows ?? []) as PartyBrandingSourceRow[]) {
+      ingestPartyBranding(brandingByKey, row)
+    }
+
+    // Second pass over confirmed parties with matching short names fills logo gaps.
+    const { data: confirmedRows } = await supabase
+      .from('election_parties')
+      .select(PARTY_BRANDING_SELECT)
+      .eq('party_status', 'confirmed')
+
+    for (const row of (confirmedRows ?? []) as PartyBrandingSourceRow[]) {
+      ingestPartyBranding(brandingByKey, row)
+    }
+
     const partyMap = new Map(
-      (partyRows ?? []).map((p) => [
-        p.id,
-        {
-          name: p.name,
-          color: p.color,
-          bloc: p.bloc as PartyBloc | null,
-          partyStatus: p.party_status ?? null,
-        },
-      ]),
+      ((partyRows ?? []) as PartyBrandingSourceRow[]).map((p) => {
+        const branding = resolvePartyBranding(
+          p.short_name ?? p.name,
+          p.color,
+          p.logo_url,
+          brandingByKey,
+        )
+        return [
+          p.id,
+          {
+            name: p.name,
+            shortName: p.short_name,
+            color: branding.color,
+            logoUrl: branding.logoUrl,
+            bloc: p.bloc as PartyBloc | null,
+            partyStatus: p.party_status ?? null,
+          },
+        ]
+      }),
     )
 
     const parties: PartyAggregate[] = latestAggs
@@ -138,7 +219,9 @@ export function usePollAggregates(): UsePollAggregatesResult {
         return {
           partyId: a.party_id,
           partyName: party?.name ?? `#${a.party_id}`,
+          partyShortName: party?.shortName ?? null,
           partyColor: party?.color ?? null,
+          partyLogoUrl: party?.logoUrl ?? null,
           bloc: party?.bloc ?? null,
           partyStatus: party?.partyStatus ?? null,
           seatsAvg: Number(a.seats_avg),
@@ -208,7 +291,9 @@ export function usePollAggregates(): UsePollAggregatesResult {
       series.push({
         partyId,
         partyName: party?.name ?? `#${partyId}`,
+        partyShortName: party?.shortName ?? null,
         partyColor: party?.color ?? null,
+        partyLogoUrl: party?.logoUrl ?? null,
         segments: segments.filter((s) => s.length > 0),
       })
     }

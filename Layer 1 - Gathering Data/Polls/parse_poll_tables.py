@@ -23,8 +23,10 @@ SKIP_SECTION_PATTERNS = re.compile(
     r"notes|references|external links|percentage)",
 )
 
+# Matches "29 Jul" and Wikipedia ranges like "29–30 Jul" / "29– 30 Jul".
 EVENT_ROW_PATTERN = re.compile(
-    r"^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
+    r"^\d{1,2}(?:\s*[–—\-]\s*\d{1,2})?\s+"
+    r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
     re.I,
 )
 
@@ -399,6 +401,10 @@ def _parse_table(
             if parsed:
                 results[label] = parsed
 
+        if not results:
+            # Event / annotation rows often start with a date but have no seat cells.
+            continue
+
         payload = {
             "fieldwork_raw": fieldwork_raw,
             "pollster": pollster,
@@ -468,6 +474,15 @@ def parse_html(
         )
         all_rows.extend(rows)
         log.info("  %s: %d rows", section_path[:60], len(rows))
+        if not rows:
+            tbody = table.find("tbody") or table
+            tr_count = len(tbody.find_all("tr"))
+            log.warning(
+                "  %s: parsed 0 poll rows from table with %d <tr> "
+                "(check header detection / date-range rows)",
+                section_path[:60],
+                tr_count,
+            )
 
     return all_rows
 

@@ -28,6 +28,7 @@ import { EditablePartyPanel } from '../components/elections/EditablePartyPanel'
 import { geocodeElectionMap } from '../lib/geocodeElectionMap'
 import './ElectionPartyPage.css'
 import './ElectionCandidatesEditPage.css'
+import './KnessetPipelineEditPage.css'
 
 type CandidateDraft = {
   fullName: string

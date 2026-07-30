@@ -11,6 +11,7 @@ import {
   fetchPollsStatus,
   POLLS_STAGE_LABELS,
   type PipelineRunSummary,
+  type PollsDiagnostics,
   type PollsSyncResource,
   type PollsTableCounts,
 } from '../lib/runPollsPipeline'
@@ -84,6 +85,7 @@ function ElectionsPollsEditContent() {
   )
   const [lastRunSummary, setLastRunSummary] =
     useState<PipelineRunSummary | null>(null)
+  const [diagnostics, setDiagnostics] = useState<PollsDiagnostics | null>(null)
 
   async function loadStatus() {
     if (!isDev) {
@@ -105,6 +107,7 @@ function ElectionsPollsEditContent() {
       setLastPipelineAction(null)
       setLastPipelineStage(null)
       setLastRunSummary(null)
+      setDiagnostics(null)
       setStatusLoading(false)
       return
     }
@@ -118,6 +121,12 @@ function ElectionsPollsEditContent() {
     setLastPipelineAction(result.lastPipelineAction)
     setLastPipelineStage(result.lastPipelineStage ?? null)
     setLastRunSummary(result.lastRunSummary ?? null)
+    setDiagnostics(
+      result.diagnostics ??
+        (result.recentRejected?.length
+          ? { lines: [], rejected: result.recentRejected }
+          : null),
+    )
     setStatusLoading(false)
   }
 
@@ -251,7 +260,10 @@ function ElectionsPollsEditContent() {
                 </section>
 
                 {isDev ? (
-                  <PollsPipelinePanel onComplete={handlePipelineComplete} />
+                  <PollsPipelinePanel
+                    onComplete={handlePipelineComplete}
+                    initialDiagnostics={diagnostics}
+                  />
                 ) : (
                   <p className="election-edit-page__panel" role="status">
                     הרצת הצינור זמינה רק בסביבת פיתוח (npm run dev).

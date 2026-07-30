@@ -25,8 +25,8 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 │  Project: דשבורד ממשלה (white, full-bleed)             │
 │    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
-│  Footer (blue, full-bleed) — logo + social + copyright│
-│    └─ .container — 3-column grid                      │
+│  Footer (blue, full-bleed) — logo + social + legal links + copyright│
+│    └─ .container — 3-column grid (end column: אודות / תנאי שימוש) │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -38,7 +38,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/app/layout.tsx` | RTL (`lang="he"` `dir="rtl"`), Heebo via `next/font`, root metadata |
 | `src/App.tsx` | Homepage body — section markup and static content arrays |
 | `src/components/SiteHeader.tsx` | Shared header; hidden on homepage mobile (≤900px) |
-| `src/components/SiteFooter.tsx` | Shared footer (primary blue background) |
+| `src/components/SiteFooter.tsx` | Shared footer (primary blue); legal links to `/about` and `/terms` only |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
 | `src/App.css` | `.container` primitive and section-specific styles |
 | `src/index.css` | Global reset, CSS variables |
@@ -91,9 +91,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Blue background (`#3083F0`).
 - Taller section: `min-height: clamp(460px, 64vh, 600px)` with `48px` vertical padding.
 - `.hero__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, visual second — in RTL this places text on the right and bear on the left.
-- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center). Column `gap: 16px` between title logo, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
+- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center), nudged up with `translateY(-20px)` (video column stays put). Column `gap: 16px` between title logo, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
 - Bear column: `justify-content: flex-start` (faces toward center).
-- **Visual (desktop):** muted `<video>` from Supabase Storage (`site-assets/bear-hero-video2.mp4`), plays once (no loop). No poster image — video stays `opacity: 0` until first frame (`onLoadedData` / `onCanPlay` / `onPlaying`), then fades in (`.hero__bear--ready`). Explicit `play()` on mount/`loadeddata` so autoplay is reliable. File is large (~17MB), so first paint can take a moment. Autoplay + `playsInline` + `preload="auto"`. Sized larger than the grid column (`width: min(110%, 560px)`, `scale(1.08) translateX(28px)`); overflow visible on `.hero__visual`. Still hidden on mobile via `.hero__visual`.
+- **Visual (desktop):** muted `<video>` from Supabase Storage (`site-assets/bear-hero-video2.mp4`), plays once (no loop). No poster image — video stays `opacity: 0` until first frame (`onLoadedData` / `onCanPlay` / `onPlaying`), then fades in (`.hero__bear--ready`). Explicit `play()` on mount/`loadeddata` so autoplay is reliable. File is large (~17MB), so first paint can take a moment. Autoplay + `playsInline` + `preload="auto"`. Sized larger than the grid column (`width: min(110%, 560px)`, `scale(1.12) translateX(28px)` + light `clip-path` inset) with `object-fit: cover` and hero-blue video background so scaled/narrow viewports do not show black letterbox edges on the right/bottom. Overflow visible on `.hero__visual`. Still hidden on mobile via `.hero__visual`.
 - **Title:** `/while-logo-nobg.svg` inside the `h1` (desktop and mobile) — brand mark replaces the text headline; `alt="מצב האומה"`.
 - **Subtitle:** הבית של המידע הפוליטי בישראל
 - **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): 2×2 grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (640px) so buttons read wider.
@@ -140,8 +140,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 ### 7. Footer (`site-footer`)
 
 - Blue background (`--color-blue: #4890FD`), white text.
-- Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: white logo brand (RTL start), centered social links, copyright (RTL end).
+- Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: white logo brand (RTL start), centered social links, end column with legal links + copyright (RTL end).
 - Footer logo path: `/white%20logo.svg` (URL-encoded space in filename).
+- Legal links (`FOOTER_LINKS` in `SiteFooter.tsx`): **אודות** → `/about`, **תנאי שימוש** → `/terms` — footer only (see [LegalPages.md](./LegalPages.md)).
 - Social nav (`site-footer__social`): icon links to X, Instagram, and Facebook — icons from `public/icons.svg` (`x-icon`, `instagram-icon`, `facebook-icon`), opened in a new tab.
 - URLs are defined in `SOCIAL_LINKS` at the top of `SiteFooter.tsx`.
 - Rendered via `SiteLayout` on every page (homepage and Knesset).
@@ -168,6 +169,8 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - `/elections/lists` → Lists matching game
 - `/government` → Government page
 - `/knesset` → Knesset hemicycle page
+- `/about` → About (footer link only)
+- `/terms` → Terms of use (footer link only)
 
 ## Responsive Behavior
 

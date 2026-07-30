@@ -134,13 +134,48 @@
   display: block;
 }
 
+.site-footer__end {
+  justify-self: end;
+  text-align: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.site-footer__links-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 16px;
+}
+
+.site-footer__link {
+  color: var(--color-white);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  opacity: 0.92;
+  transition: opacity 0.15s ease;
+}
+
+.site-footer__link:hover {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.site-footer__link:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 2px;
+}
+
 .site-footer__copy {
   margin: 0;
   font-size: 0.875rem;
   font-weight: 400;
   opacity: 0.9;
-  justify-self: end;
-  text-align: end;
 }
 
 /* ── Hero ── */
@@ -169,6 +204,7 @@
   gap: 16px;
   max-width: var(--hero-text-max);
   justify-self: end;
+  transform: translateY(-20px);
 }
 
 .hero__title {
@@ -246,15 +282,28 @@
   width: min(110%, 560px);
   max-width: none;
   height: auto;
-  object-fit: contain;
-  transform: scale(1.08) translateX(28px);
+  /* Cover + slight overscale crop encoded / compositor black edges */
+  object-fit: cover;
+  object-position: center;
+  background-color: #3083f0;
+  transform: scale(1.12) translateX(28px);
   transform-origin: center center;
+  /* Trim hairline black bars that show on the right/bottom when scaled */
+  clip-path: inset(0.5% 1.25% 1.25% 0.5%);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
 
 .hero__bear--ready {
   opacity: 1;
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .hero__bear {
+    /* Narrower hero column: crop a bit more so edge bars stay hidden */
+    transform: scale(1.16) translateX(18px);
+    clip-path: inset(0.75% 1.5% 1.5% 0.5%);
+  }
 }
 
 /* ── News strip ── */
@@ -610,9 +659,17 @@
   }
 
   .site-footer__brand,
-  .site-footer__copy {
+  .site-footer__end {
     justify-self: center;
     text-align: center;
+  }
+
+  .site-footer__end {
+    align-items: center;
+  }
+
+  .site-footer__links-list {
+    justify-content: center;
   }
 
   .site-footer__logo {

@@ -80,6 +80,8 @@ Parent section / Section page / Current item
 | `/elections/:partyId` | `בחירות 2026` → `/elections` / {party} |
 | `/piplines` | `צינורות נתונים` |
 | `/piplines/docs/{id}` | `צינורות נתונים` → `/piplines` / תיעוד |
+| `/about` | `אודות` |
+| `/terms` | `תנאי שימוש` |
 
 ### Usage
 

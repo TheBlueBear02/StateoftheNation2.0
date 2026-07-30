@@ -66,6 +66,13 @@ def parse_fieldwork(fieldwork_raw: str, page_year_hint: int) -> tuple[date, date
 
     start = _parse_date_part(parts[0], page_year_hint)
     end = _parse_date_part(parts[-1], page_year_hint)
+    # "29 - 30 Jul" → start is day-only; inherit month/year from the end date.
+    if not start and end and parts[0].isdigit():
+        day = int(parts[0])
+        try:
+            start = date(end.year, end.month, day)
+        except ValueError as exc:
+            raise ValueError(f"Cannot parse date range: {fieldwork_raw}") from exc
     if not start or not end:
         raise ValueError(f"Cannot parse date range: {fieldwork_raw}")
 

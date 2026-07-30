@@ -3,6 +3,9 @@ import type { PollWithResults } from '../hooks/usePolls'
 
 export const KNESSET_SEATS = 120
 
+/** Parties below this average (or poll seats) are hidden from the top charts. */
+export const MIN_DISPLAY_SEATS = 4
+
 export const BLOC_COLORS: Record<PartyBloc, string> = {
   coalition: '#4890fd',
   opposition: '#e74c3c',
@@ -293,11 +296,11 @@ export function buildPartyTrendLines(
   if (pollsNewestFirst.length === 0) return []
 
   const chronological = [...pollsNewestFirst].reverse()
+  const nPolls = chronological.length
   const sums = new Map<
     number,
     {
       total: number
-      appearances: number
       name: string
       shortName: string | null
       color: string | null
@@ -307,15 +310,14 @@ export function buildPartyTrendLines(
 
   for (const poll of chronological) {
     for (const result of poll.results) {
-      if (result.seats === null) continue
+      // Below-threshold (null seats) counts as 0 toward the window average.
+      const seats = result.seats ?? 0
       const existing = sums.get(result.partyId)
       if (existing) {
-        existing.total += result.seats
-        existing.appearances += 1
+        existing.total += seats
       } else {
         sums.set(result.partyId, {
-          total: result.seats,
-          appearances: 1,
+          total: seats,
           name: result.partyName,
           shortName: result.partyShortName,
           color: result.partyColor,
@@ -332,7 +334,7 @@ export function buildPartyTrendLines(
       partyShortName: meta.shortName,
       partyColor: meta.color,
       partyLogoUrl: meta.logoUrl,
-      seatsAvg: meta.total / meta.appearances,
+      seatsAvg: meta.total / nPolls,
       seats: chronological.map((poll) => {
         const result = poll.results.find((r) => r.partyId === partyId)
         return result?.seats ?? 0
@@ -418,16 +420,12 @@ export function computePartyLastNTrend(
   })
   const trend = points.map((p) => p.seats)
 
-  const appearing = chronological.filter((poll) =>
-    poll.results.some((r) => r.partyId === partyId && r.seats !== null),
-  )
+  // Always divide by the full N-window; below-threshold / missing → 0 seats.
   const seatsAvg =
-    appearing.length === 0
-      ? 0
-      : appearing.reduce((sum, poll) => {
-          const seats = poll.results.find((r) => r.partyId === partyId)?.seats ?? 0
-          return sum + seats
-        }, 0) / appearing.length
+    chronological.reduce((sum, poll) => {
+      const seats = poll.results.find((r) => r.partyId === partyId)?.seats ?? 0
+      return sum + seats
+    }, 0) / chronological.length
 
   return {
     seatsAvg,
@@ -446,6 +444,7 @@ export function computeLastNAverage(
   const regular = selectRecentRegularPolls(polls, n, asOfDate)
   if (regular.length === 0) return []
 
+  const nPolls = regular.length
   const sums = new Map<
     number,
     {
@@ -455,35 +454,108 @@ export function computeLastNAverage(
       color: string | null
     }
   >()
-  const appearances = new Map<number, number>()
 
   for (const poll of regular) {
     for (const result of poll.results) {
-      if (result.seats === null) continue
+      // Below-threshold (null seats) counts as 0 — still divides by full N.
+      const seats = result.seats ?? 0
       const existing = sums.get(result.partyId)
       if (existing) {
-        existing.total += result.seats
+        existing.total += seats
       } else {
         sums.set(result.partyId, {
-          total: result.seats,
+          total: seats,
           name: result.partyName,
           shortName: result.partyShortName,
           color: result.partyColor,
         })
       }
-      appearances.set(result.partyId, (appearances.get(result.partyId) ?? 0) + 1)
     }
   }
 
-  return [...sums.entries()]
+  const averages = [...sums.entries()]
     .map(([partyId, { total, name, shortName, color }]) => ({
       partyId,
       partyName: name,
       partyShortName: shortName,
       partyColor: color,
       bloc: partyBlocs.get(partyId) ?? null,
-      seatsAvg: total / (appearances.get(partyId) ?? 1),
+      seatsAvg: total / nPolls,
     }))
+    .sort((a, b) => b.seatsAvg - a.seatsAvg)
+
+  return finalizeDisplayedSeatAverages(averages)
+}
+
+/**
+ * Drop parties under the display threshold, then assign integer seats that
+ * sum exactly to 120 (scale + largest-remainder).
+ */
+export function finalizeDisplayedSeatAverages(
+  parties: PartySeatAverage[],
+  {
+    minSeats = MIN_DISPLAY_SEATS,
+    targetTotal = KNESSET_SEATS,
+  }: { minSeats?: number; targetTotal?: number } = {},
+): PartySeatAverage[] {
+  const qualifying = parties.filter((party) => party.seatsAvg >= minSeats)
+  if (qualifying.length === 0) return []
+
+  const rawSum = qualifying.reduce((sum, party) => sum + party.seatsAvg, 0)
+  if (rawSum <= 0) return []
+
+  const scaled = qualifying.map((party) => ({
+    ...party,
+    seatsAvg: (party.seatsAvg / rawSum) * targetTotal,
+  }))
+
+  const floors = scaled.map((party) => {
+    const floor = Math.floor(party.seatsAvg + 1e-9)
+    return {
+      party,
+      floor,
+      fraction: party.seatsAvg - floor,
+    }
+  })
+
+  let allocated = floors.reduce((sum, row) => sum + row.floor, 0)
+  let remaining = targetTotal - allocated
+
+  // Guard against float edge cases where floors already overshoot.
+  if (remaining < 0) {
+    const byFloor = [...floors].sort(
+      (a, b) => b.floor - a.floor || b.fraction - a.fraction,
+    )
+    let deficit = -remaining
+    for (const row of byFloor) {
+      if (deficit <= 0) break
+      const reducible = Math.max(0, row.floor - minSeats)
+      const cut = Math.min(reducible, deficit)
+      row.floor -= cut
+      deficit -= cut
+    }
+    allocated = floors.reduce((sum, row) => sum + row.floor, 0)
+    remaining = targetTotal - allocated
+  }
+
+  const byFraction = [...floors].sort(
+    (a, b) =>
+      b.fraction - a.fraction ||
+      b.party.seatsAvg - a.party.seatsAvg ||
+      a.party.partyId - b.party.partyId,
+  )
+
+  const bonus = new Map<number, number>()
+  for (let i = 0; i < remaining && i < byFraction.length; i++) {
+    bonus.set(byFraction[i].party.partyId, 1)
+  }
+
+  return floors
+    .map(({ party, floor }) => ({
+      ...party,
+      seatsAvg: floor + (bonus.get(party.partyId) ?? 0),
+    }))
+    .filter((party) => party.seatsAvg >= minSeats)
     .sort((a, b) => b.seatsAvg - a.seatsAvg)
 }
 
@@ -491,7 +563,7 @@ export function computePollPartySeats(
   poll: PollWithResults,
   partyBlocs: Map<number, PartyBloc | null>,
 ): PartySeatAverage[] {
-  return poll.results
+  const parties = poll.results
     .filter((result) => result.seats !== null)
     .map((result) => ({
       partyId: result.partyId,
@@ -502,6 +574,8 @@ export function computePollPartySeats(
       seatsAvg: result.seats ?? 0,
     }))
     .sort((a, b) => b.seatsAvg - a.seatsAvg)
+
+  return finalizeDisplayedSeatAverages(parties)
 }
 
 export function sumBlocTotals(parties: PartySeatAverage[]): BlocTotals {

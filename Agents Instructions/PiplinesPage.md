@@ -35,6 +35,7 @@ Docs pages are `noindex` but **not** password-gated. The dashboard and all `/edi
 | `src/components/pipelines/PipelineUnlockGate.tsx` | Shared password gate |
 | `src/components/pipelines/PipelineRunLog.tsx` | Run history feed |
 | `src/hooks/usePipelineRuns.ts` | Loads `pipeline_runs` |
+| `src/hooks/usePipelineRunProgress.ts` | Live total + per-step timers on edit panels |
 | `src/content/pipelines/index.ts` | `PIPELINES` registry |
 | `src/content/pipelines/types.ts` | Includes `schedule`, `docsPath`, `editPath` |
 | `Layer 1 - Gathering Data/schema_pipeline_runs.sql` | Run-history table DDL |
@@ -60,6 +61,8 @@ Anon **read**; service-role **write**. Writers:
 
 - Polls CLI (`run_polls_pipeline.py`) — `source` from `PIPELINE_RUN_SOURCE` (default `cli`; GitHub Actions sets `github-actions`)
 - Polls / Knesset UI APIs — `source=ui`
+
+Polls edit UI (`/elections/polls/edit`) also shows a **diagnostics console** fed by `diagnostics` from `run_polls_pipeline_api.py` (rejected staging rows, parse/validation warnings).
 
 Apply `schema_pipeline_runs.sql` once in the Supabase SQL editor before the dashboard log can load.
 

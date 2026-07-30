@@ -5,6 +5,7 @@ import { formatFieldwork, type PollWithResults } from '../../hooks/usePolls'
 import {
   displayBlocBarGradientForParty,
   formatPollPublisher,
+  MIN_DISPLAY_SEATS,
   type PartySeatAverage,
 } from '../../lib/pollChartData'
 
@@ -56,9 +57,8 @@ export function LastPollsBarChart({
   selectedPollId,
   onPollSelect,
 }: LastPollsBarChartProps) {
-  const visible = parties.filter((p) => p.seatsAvg >= 0.5)
-  // Height uses rounded seats so parties showing the same label match visually
-  // (raw averages like 4.6 vs 5.2 both display as 5 but would otherwise differ).
+  const visible = parties.filter((p) => p.seatsAvg >= MIN_DISPLAY_SEATS)
+  // Heights use integer seats (already finalized to sum to 120 upstream).
   const maxSeats = Math.max(...visible.map((p) => Math.round(p.seatsAvg)), 1)
 
   const publisherLogos = sourcePolls.flatMap((poll) => {

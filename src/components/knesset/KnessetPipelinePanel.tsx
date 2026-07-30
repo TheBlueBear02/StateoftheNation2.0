@@ -1,12 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import {
+  formatPipelineElapsed,
+  usePipelineRunProgress,
+} from '../../hooks/usePipelineRunProgress'
 import {
   applyFactionLinks,
   KNESSET_STAGE_LABELS,
   previewFactionLinks,
   runKmImages,
-  runKnessetFullSync,
   runKnessetStage,
   type FactionLinkPreviewItem,
   type PipelineRunSummary,
@@ -20,11 +23,18 @@ type PanelPhase =
   | 'success'
   | 'error'
 
-function formatElapsed(seconds: number): string {
-  if (seconds <= 0) {
-    return 'מתחיל…'
+const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6] as const
+
+function mergeSummaries(parts: PipelineRunSummary[]): PipelineRunSummary {
+  const stages = parts.flatMap((part) => part.stages)
+  return {
+    stages,
+    totals: {
+      upserted: stages.reduce((sum, stage) => sum + stage.upserted, 0),
+      inserted: stages.reduce((sum, stage) => sum + stage.inserted, 0),
+      updated: stages.reduce((sum, stage) => sum + stage.updated, 0),
+    },
   }
-  return `${seconds} שנ'`
 }
 
 export function KnessetPipelinePanel({
@@ -34,66 +44,59 @@ export function KnessetPipelinePanel({
 }) {
   const [phase, setPhase] = useState<PanelPhase>('idle')
   const [message, setMessage] = useState<string | null>(null)
-  const [currentStage, setCurrentStage] = useState<number | null>(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [previewItems, setPreviewItems] = useState<FactionLinkPreviewItem[]>([])
   const [previewCount, setPreviewCount] = useState(0)
   const [hasPreview, setHasPreview] = useState(false)
   const [runSummary, setRunSummary] = useState<PipelineRunSummary | null>(null)
-
-  useEffect(() => {
-    if (phase !== 'running') {
-      return
-    }
-
-    const timer = window.setInterval(() => {
-      setElapsedSeconds((current) => current + 1)
-    }, 1000)
-
-    return () => {
-      window.clearInterval(timer)
-    }
-  }, [phase])
+  const progress = usePipelineRunProgress(phase === 'running')
 
   async function handleFullSync() {
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
-    setCurrentStage(null)
     setRunSummary(null)
+    progress.resetRun()
 
-    const result = await runKnessetFullSync()
-    if (!result.ok) {
-      setPhase('error')
-      setMessage(result.error)
-      return
+    const parts: PipelineRunSummary[] = []
+
+    for (const stage of STAGE_NUMBERS) {
+      progress.beginStep(stage)
+      const result = await runKnessetStage(stage)
+      if (!result.ok) {
+        progress.finishStep(stage)
+        setPhase('error')
+        setMessage(result.error)
+        return
+      }
+      progress.finishStep(stage)
+      parts.push(result.summary)
     }
 
-    setRunSummary(result.summary)
+    setRunSummary(mergeSummaries(parts))
     setPhase('success')
-    setCurrentStage(null)
-    setMessage(result.message)
+    progress.clearCurrent()
+    setMessage('סנכרון מלא הושלם')
     await onComplete()
   }
 
   async function handleRunStage(stage: number) {
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
-    setCurrentStage(stage)
     setRunSummary(null)
+    progress.resetRun()
+    progress.beginStep(stage)
 
     const result = await runKnessetStage(stage)
     if (!result.ok) {
+      progress.finishStep(stage)
       setPhase('error')
       setMessage(result.error)
-      setCurrentStage(null)
       return
     }
 
+    progress.finishStep(stage)
     setRunSummary(result.summary)
     setPhase('success')
-    setCurrentStage(null)
+    progress.clearCurrent()
     setMessage(result.message)
     await onComplete()
   }
@@ -101,8 +104,7 @@ export function KnessetPipelinePanel({
   async function handleFactionPreview() {
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
-    setCurrentStage(null)
+    progress.resetRun()
 
     const result = await previewFactionLinks()
     if (!result.ok) {
@@ -121,8 +123,8 @@ export function KnessetPipelinePanel({
   async function handleFactionApply() {
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
     setRunSummary(null)
+    progress.resetRun()
 
     const result = await applyFactionLinks()
     if (!result.ok) {
@@ -143,9 +145,8 @@ export function KnessetPipelinePanel({
   async function handleKmImages() {
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
-    setCurrentStage(null)
     setRunSummary(null)
+    progress.resetRun()
 
     const result = await runKmImages()
     if (!result.ok) {
@@ -163,6 +164,8 @@ export function KnessetPipelinePanel({
   }
 
   const running = phase === 'running'
+  const { currentStage, totalElapsedSeconds, stepElapsedSeconds, stepDurations } =
+    progress
 
   return (
     <section
@@ -180,19 +183,41 @@ export function KnessetPipelinePanel({
         </p>
       </div>
 
-      <div className="knesset-pipeline-panel__stages">
-        {Object.entries(KNESSET_STAGE_LABELS).map(([stageKey, label]) => {
-          const stage = Number(stageKey)
+      <div className="knesset-pipeline-panel__stages" aria-label="שלבי הצינור">
+        {STAGE_NUMBERS.map((stage) => {
+          const label = KNESSET_STAGE_LABELS[stage]
+          const isCurrent = running && currentStage === stage
+          const isDone = stepDurations[stage] !== undefined && !isCurrent
+          const duration = isCurrent
+            ? stepElapsedSeconds
+            : stepDurations[stage]
+
           return (
-            <div key={stage} className="knesset-pipeline-panel__stage-row">
+            <div
+              key={stage}
+              className={`knesset-pipeline-panel__stage-row${
+                isCurrent ? ' knesset-pipeline-panel__stage-row--running' : ''
+              }${isDone ? ' knesset-pipeline-panel__stage-row--done' : ''}`}
+            >
               <span className="knesset-pipeline-panel__stage-label">
+                {isCurrent ? (
+                  <span
+                    className="candidate-edit-card__pipeline-spinner knesset-pipeline-panel__stage-spinner"
+                    aria-hidden="true"
+                  />
+                ) : null}
                 {stage}. {label}
+                {duration !== undefined ? (
+                  <span className="knesset-pipeline-panel__stage-time">
+                    {formatPipelineElapsed(duration)}
+                  </span>
+                ) : null}
               </span>
               <button
                 type="button"
                 className="candidate-edit-card__collapse"
                 disabled={running}
-                onClick={() => handleRunStage(stage)}
+                onClick={() => void handleRunStage(stage)}
               >
                 הרץ
               </button>
@@ -206,11 +231,13 @@ export function KnessetPipelinePanel({
           type="button"
           className="candidate-edit-card__save"
           disabled={running}
-          onClick={handleFullSync}
+          onClick={() => void handleFullSync()}
         >
-          {running && currentStage === null
-            ? 'מריץ סנכרון מלא…'
-            : 'התחל סנכרון מלא'}
+          {running && currentStage !== null
+            ? `מריץ שלב ${currentStage}…`
+            : running
+              ? 'מריץ סנכרון מלא…'
+              : 'התחל סנכרון מלא'}
         </button>
       </div>
 
@@ -225,8 +252,8 @@ export function KnessetPipelinePanel({
             aria-hidden="true"
           />
           {currentStage
-            ? `שלב ${currentStage} מתוך 6 — ${KNESSET_STAGE_LABELS[currentStage]} (${formatElapsed(elapsedSeconds)})`
-            : `מריץ… (${formatElapsed(elapsedSeconds)})`}
+            ? `שלב ${currentStage} מתוך 6 — ${KNESSET_STAGE_LABELS[currentStage]} (${formatPipelineElapsed(stepElapsedSeconds)}) · סה״כ ${formatPipelineElapsed(totalElapsedSeconds)}`
+            : `מריץ… (${formatPipelineElapsed(totalElapsedSeconds)})`}
         </p>
       ) : null}
 
@@ -241,7 +268,7 @@ export function KnessetPipelinePanel({
             type="button"
             className="candidate-edit-card__collapse"
             disabled={running}
-            onClick={handleFactionPreview}
+            onClick={() => void handleFactionPreview()}
           >
             בדוק קישורי סיעות
           </button>
@@ -249,7 +276,7 @@ export function KnessetPipelinePanel({
             type="button"
             className="candidate-edit-card__save"
             disabled={running || !hasPreview}
-            onClick={handleFactionApply}
+            onClick={() => void handleFactionApply()}
           >
             החל קישורי סיעות
           </button>
@@ -257,7 +284,7 @@ export function KnessetPipelinePanel({
             type="button"
             className="candidate-edit-card__collapse"
             disabled={running}
-            onClick={handleKmImages}
+            onClick={() => void handleKmImages()}
           >
             עדכן תמונות
           </button>

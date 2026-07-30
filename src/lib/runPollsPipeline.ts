@@ -43,6 +43,20 @@ export type PipelineRunSummary = {
   }
 }
 
+export type PollsRejectedRow = {
+  id: number
+  error: string | null
+  section: string | null
+  fieldwork: string | null
+  pollster: string | null
+  publisher: string | null
+}
+
+export type PollsDiagnostics = {
+  lines: string[]
+  rejected: PollsRejectedRow[]
+}
+
 export type PollsStatusResult =
   | {
       ok: true
@@ -55,6 +69,8 @@ export type PollsStatusResult =
       lastPipelineAction: string | null
       lastPipelineStage: number | null
       lastRunSummary: PipelineRunSummary | null
+      diagnostics: PollsDiagnostics | null
+      recentRejected: PollsRejectedRow[]
     }
   | PipelineError
 
@@ -66,6 +82,7 @@ export type PollsStageResult =
       elapsedSeconds: number
       message: string
       summary: PipelineRunSummary
+      diagnostics?: PollsDiagnostics
     }
   | PipelineError
 
@@ -76,6 +93,7 @@ export type PollsFullSyncResult =
       message: string
       lastPipelineRunAt: string
       summary: PipelineRunSummary
+      diagnostics?: PollsDiagnostics
     }
   | PipelineError
 

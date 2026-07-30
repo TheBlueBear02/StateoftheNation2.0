@@ -9,6 +9,8 @@ Central reference for agents working on this repository. Use this file to unders
 | Module (Hebrew) | Route / anchor | Status |
 |-----------------|----------------|--------|
 | Homepage hub | `/` | Live |
+| אודות | `/about` | Live |
+| תנאי שימוש | `/terms` | Live |
 | הכנסת — Knesset hemicycle | `/knesset` | Live |
 | צינורות נתונים — Pipelines dashboard | `/piplines` | Live (password-gated, noindex) |
 | תיעוד צינורות | `/piplines/docs` | Live (noindex) |
@@ -67,6 +69,8 @@ StateoftheNation2.0/
 | URL | App file |
 |-----|----------|
 | `/` | `src/app/page.tsx` |
+| `/about` | `src/app/about/page.tsx` |
+| `/terms` | `src/app/terms/page.tsx` |
 | `/elections` | `src/app/elections/page.tsx` |
 | `/elections/polls` | `src/app/elections/polls/page.tsx` |
 | `/elections/polls/edit` | `src/app/elections/polls/edit/page.tsx` |
@@ -104,6 +108,8 @@ These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Loc
 │  src/app/layout.tsx (RTL, Heebo, root metadata)             │
 │    └─ App Router pages                                      │
 │         ├─ /           → App.tsx                            │
+│         ├─ /about      → views/AboutPage.tsx                │
+│         ├─ /terms      → views/TermsPage.tsx                │
 │         ├─ /government → views/GovernmentPage.tsx           │
 │         ├─ /knesset    → views/KnessetPage.tsx              │
 │         ├─ /elections… → views/Elections*.tsx               │
@@ -163,6 +169,7 @@ npm run lint
 | [SeoAndWebStandards.md](./SeoAndWebStandards.md) | Metadata, sitemap, robots, JSON-LD |
 | [GovernmentPage.md](./GovernmentPage.md) | `/government` |
 | [HomePage.md](./HomePage.md) | `/` |
+| [LegalPages.md](./LegalPages.md) | `/about`, `/terms` (footer only) |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` + `/knesset/edit` |
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` dashboard + `/piplines/docs` |
 | [ElectionsPage.md](./ElectionsPage.md) | `/elections` module |

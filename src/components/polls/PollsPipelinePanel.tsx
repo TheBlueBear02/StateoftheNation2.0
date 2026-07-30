@@ -3,92 +3,156 @@
 import { useEffect, useState } from 'react'
 import { KnessetRunSummary } from '../knesset/KnessetRunSummary'
 import {
+  formatPipelineElapsed,
+  usePipelineRunProgress,
+} from '../../hooks/usePipelineRunProgress'
+import {
   POLLS_STAGE_LABELS,
-  runPollsFullSync,
   runPollsStage,
+  type PollsDiagnostics,
   type PipelineRunSummary,
 } from '../../lib/runPollsPipeline'
 
 type PanelPhase = 'idle' | 'running' | 'success' | 'error'
 
-function formatElapsed(seconds: number): string {
-  if (seconds <= 0) {
-    return 'מתחיל…'
+const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6] as const
+
+function mergeSummaries(parts: PipelineRunSummary[]): PipelineRunSummary {
+  const stages = parts.flatMap((part) => part.stages)
+  return {
+    stages,
+    totals: {
+      upserted: stages.reduce((sum, stage) => sum + stage.upserted, 0),
+      inserted: stages.reduce((sum, stage) => sum + stage.inserted, 0),
+      updated: stages.reduce((sum, stage) => sum + stage.updated, 0),
+    },
   }
-  return `${seconds} שנ'`
+}
+
+function mergeDiagnostics(parts: PollsDiagnostics[]): PollsDiagnostics {
+  const lines: string[] = []
+  const seen = new Set<string>()
+  const rejected = parts.flatMap((part) => part.rejected ?? [])
+  for (const part of parts) {
+    for (const line of part.lines ?? []) {
+      if (!line || seen.has(line)) continue
+      seen.add(line)
+      lines.push(line)
+    }
+  }
+  return { lines, rejected }
+}
+
+function lineTone(line: string): 'error' | 'warning' | 'info' {
+  const upper = line.toUpperCase()
+  if (
+    upper.startsWith('ERROR') ||
+    upper.startsWith('REJECTED') ||
+    upper.includes(' FAILED')
+  ) {
+    return 'error'
+  }
+  if (upper.startsWith('WARNING') || upper.includes('WARNING')) {
+    return 'warning'
+  }
+  return 'info'
 }
 
 export function PollsPipelinePanel({
   onComplete,
+  initialDiagnostics = null,
 }: {
   onComplete: () => Promise<void>
+  initialDiagnostics?: PollsDiagnostics | null
 }) {
   const [phase, setPhase] = useState<PanelPhase>('idle')
   const [message, setMessage] = useState<string | null>(null)
-  const [currentStage, setCurrentStage] = useState<number | null>(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [runSummary, setRunSummary] = useState<PipelineRunSummary | null>(null)
+  const [diagnostics, setDiagnostics] = useState<PollsDiagnostics | null>(
+    initialDiagnostics,
+  )
   const [force, setForce] = useState(false)
   const [backfill, setBackfill] = useState(false)
+  const progress = usePipelineRunProgress(phase === 'running')
 
   useEffect(() => {
-    if (phase !== 'running') {
+    if (phase === 'running') {
       return
     }
-
-    const timer = window.setInterval(() => {
-      setElapsedSeconds((current) => current + 1)
-    }, 1000)
-
-    return () => {
-      window.clearInterval(timer)
-    }
-  }, [phase])
+    setDiagnostics(initialDiagnostics)
+  }, [initialDiagnostics, phase])
 
   async function handleFullSync() {
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
-    setCurrentStage(null)
     setRunSummary(null)
+    setDiagnostics(null)
+    progress.resetRun()
 
-    const result = await runPollsFullSync({ force, backfill })
-    if (!result.ok) {
-      setPhase('error')
-      setMessage(result.error)
-      return
+    const parts: PipelineRunSummary[] = []
+    const diagParts: PollsDiagnostics[] = []
+
+    for (const stage of STAGE_NUMBERS) {
+      progress.beginStep(stage)
+      const result = await runPollsStage(stage, { force, backfill })
+      if (!result.ok) {
+        progress.finishStep(stage)
+        setPhase('error')
+        setMessage(result.error)
+        setDiagnostics({
+          lines: [`ERROR  stage ${stage}  ${result.error}`],
+          rejected: [],
+        })
+        return
+      }
+      progress.finishStep(stage)
+      parts.push(result.summary)
+      if (result.diagnostics) {
+        diagParts.push(result.diagnostics)
+      }
     }
 
-    setRunSummary(result.summary)
+    setRunSummary(mergeSummaries(parts))
+    setDiagnostics(mergeDiagnostics(diagParts))
     setPhase('success')
-    setCurrentStage(null)
-    setMessage(result.message)
+    progress.clearCurrent()
+    setMessage('סנכרון סקרים הושלם')
     await onComplete()
   }
 
   async function handleRunStage(stage: number) {
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
-    setCurrentStage(stage)
     setRunSummary(null)
+    setDiagnostics(null)
+    progress.resetRun()
+    progress.beginStep(stage)
 
     const result = await runPollsStage(stage, { force, backfill })
     if (!result.ok) {
+      progress.finishStep(stage)
       setPhase('error')
       setMessage(result.error)
-      setCurrentStage(null)
+      setDiagnostics({
+        lines: [`ERROR  stage ${stage}  ${result.error}`],
+        rejected: [],
+      })
       return
     }
 
+    progress.finishStep(stage)
     setRunSummary(result.summary)
+    setDiagnostics(result.diagnostics ?? null)
     setPhase('success')
-    setCurrentStage(null)
+    progress.clearCurrent()
     setMessage(result.message)
     await onComplete()
   }
 
   const running = phase === 'running'
+  const { currentStage, totalElapsedSeconds, stepElapsedSeconds, stepDurations } =
+    progress
+  const consoleLines = diagnostics?.lines ?? []
 
   return (
     <section
@@ -130,13 +194,35 @@ export function PollsPipelinePanel({
         </label>
       </div>
 
-      <div className="knesset-pipeline-panel__stages">
-        {Object.entries(POLLS_STAGE_LABELS).map(([stageKey, label]) => {
-          const stage = Number(stageKey)
+      <div className="knesset-pipeline-panel__stages" aria-label="שלבי הצינור">
+        {STAGE_NUMBERS.map((stage) => {
+          const label = POLLS_STAGE_LABELS[stage]
+          const isCurrent = running && currentStage === stage
+          const isDone = stepDurations[stage] !== undefined && !isCurrent
+          const duration = isCurrent
+            ? stepElapsedSeconds
+            : stepDurations[stage]
+
           return (
-            <div key={stage} className="knesset-pipeline-panel__stage-row">
+            <div
+              key={stage}
+              className={`knesset-pipeline-panel__stage-row${
+                isCurrent ? ' knesset-pipeline-panel__stage-row--running' : ''
+              }${isDone ? ' knesset-pipeline-panel__stage-row--done' : ''}`}
+            >
               <span className="knesset-pipeline-panel__stage-label">
+                {isCurrent ? (
+                  <span
+                    className="candidate-edit-card__pipeline-spinner knesset-pipeline-panel__stage-spinner"
+                    aria-hidden="true"
+                  />
+                ) : null}
                 {stage}. {label}
+                {duration !== undefined ? (
+                  <span className="knesset-pipeline-panel__stage-time">
+                    {formatPipelineElapsed(duration)}
+                  </span>
+                ) : null}
               </span>
               <button
                 type="button"
@@ -158,9 +244,11 @@ export function PollsPipelinePanel({
           disabled={running}
           onClick={() => void handleFullSync()}
         >
-          {running && currentStage === null
-            ? 'מריץ סנכרון…'
-            : 'טען סקרים חדשים'}
+          {running && currentStage !== null
+            ? `מריץ שלב ${currentStage}…`
+            : running
+              ? 'מריץ סנכרון…'
+              : 'טען סקרים חדשים'}
         </button>
       </div>
 
@@ -175,8 +263,8 @@ export function PollsPipelinePanel({
             aria-hidden="true"
           />
           {currentStage
-            ? `שלב ${currentStage} מתוך 6 — ${POLLS_STAGE_LABELS[currentStage]} (${formatElapsed(elapsedSeconds)})`
-            : `מריץ… (${formatElapsed(elapsedSeconds)})`}
+            ? `שלב ${currentStage} מתוך 6 — ${POLLS_STAGE_LABELS[currentStage]} (${formatPipelineElapsed(stepElapsedSeconds)}) · סה״כ ${formatPipelineElapsed(totalElapsedSeconds)}`
+            : `מריץ… (${formatPipelineElapsed(totalElapsedSeconds)})`}
         </p>
       ) : null}
 
@@ -194,6 +282,45 @@ export function PollsPipelinePanel({
           {message}
         </p>
       ) : null}
+
+      <div
+        className="polls-pipeline-console"
+        aria-labelledby="polls-pipeline-console-title"
+      >
+        <div className="polls-pipeline-console__header">
+          <h3
+            id="polls-pipeline-console-title"
+            className="polls-pipeline-console__title"
+          >
+            קונסולת שגיאות / אזהרות
+          </h3>
+          <p className="polls-pipeline-console__hint">
+            דחיות נרמול, תוויות מפלגה לא ממופות, כשלי תאריך וולידציה מופיעים
+            כאן אחרי הרצה.
+          </p>
+        </div>
+        {consoleLines.length === 0 ? (
+          <p className="polls-pipeline-console__empty">
+            אין הודעות עדיין — הריצו סנכרון או שלב בודד.
+          </p>
+        ) : (
+          <pre
+            className="polls-pipeline-console__body"
+            role="log"
+            aria-live="polite"
+          >
+            {consoleLines.map((line, index) => (
+              <span
+                key={`${index}-${line.slice(0, 40)}`}
+                className={`polls-pipeline-console__line polls-pipeline-console__line--${lineTone(line)}`}
+              >
+                {line}
+                {'\n'}
+              </span>
+            ))}
+          </pre>
+        )}
+      </div>
     </section>
   )
 }

@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useState, type ChangeEvent } from 'react'
+import {
+  formatPipelineElapsed,
+  usePipelineRunProgress,
+} from '../../hooks/usePipelineRunProgress'
 import type { ElectionParty } from '../../lib/supabase'
 import {
   fetchPartyReviewQueue,
@@ -22,6 +26,8 @@ const STAGE_LABELS: Record<number, string> = {
   6: 'קישורי ויקיפדיה',
 }
 
+const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6] as const
+
 type PanelPhase =
   | 'idle'
   | 'previewing'
@@ -31,13 +37,6 @@ type PanelPhase =
   | 'error'
 
 type ReviewAction = 'approve' | 'new'
-
-function formatElapsed(seconds: number): string {
-  if (seconds <= 0) {
-    return 'מתחיל…'
-  }
-  return `${seconds} שנ'`
-}
 
 export function PartyPipelinePanel({
   party,
@@ -55,8 +54,9 @@ export function PartyPipelinePanel({
   >({})
   const [phase, setPhase] = useState<PanelPhase>('idle')
   const [message, setMessage] = useState<string | null>(null)
-  const [currentStage, setCurrentStage] = useState<number | null>(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const progress = usePipelineRunProgress(
+    phase === 'running' || phase === 'previewing',
+  )
 
   useEffect(() => {
     setListText('')
@@ -66,23 +66,10 @@ export function PartyPipelinePanel({
     setReviewActions({})
     setPhase('idle')
     setMessage(null)
-    setCurrentStage(null)
-    setElapsedSeconds(0)
+    progress.resetRun()
+    // Only reset when switching parties.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [party.id])
-
-  useEffect(() => {
-    if (phase !== 'running' && phase !== 'previewing') {
-      return
-    }
-
-    const timer = window.setInterval(() => {
-      setElapsedSeconds((current) => current + 1)
-    }, 1000)
-
-    return () => {
-      window.clearInterval(timer)
-    }
-  }, [phase])
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -107,7 +94,7 @@ export function PartyPipelinePanel({
 
     setPhase('previewing')
     setMessage(null)
-    setElapsedSeconds(0)
+    progress.resetRun()
 
     const result = await previewPartyPipelineList({
       partyId: party.id,
@@ -128,16 +115,17 @@ export function PartyPipelinePanel({
 
   async function runStages(fromStage: number) {
     for (let stage = fromStage; stage <= 6; stage += 1) {
-      setCurrentStage(stage)
-      setElapsedSeconds(0)
+      progress.beginStep(stage)
 
       const result = await runPartyPipelineStage(stage)
       if (!result.ok) {
+        progress.finishStep(stage)
         setPhase('error')
         setMessage(result.error)
-        setCurrentStage(null)
         return false
       }
+
+      progress.finishStep(stage)
 
       if (stage === 1) {
         const queueResult = await fetchPartyReviewQueue(party.id)
@@ -149,7 +137,7 @@ export function PartyPipelinePanel({
           }
           setReviewActions(initialActions)
           setPhase('review')
-          setCurrentStage(null)
+          progress.clearCurrent()
           setMessage(
             `${queueResult.items.length} שמות דורשים אישור לפני המשך העיבוד`,
           )
@@ -170,8 +158,7 @@ export function PartyPipelinePanel({
 
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
-    setCurrentStage(null)
+    progress.resetRun()
 
     const insertResult = await insertPartyPipelineList({
       partyId: party.id,
@@ -191,7 +178,7 @@ export function PartyPipelinePanel({
     }
 
     setPhase('success')
-    setCurrentStage(null)
+    progress.clearCurrent()
     setMessage('הצינור הושלם — המועמדים נטענו לרשימה')
     await onComplete()
   }
@@ -203,7 +190,7 @@ export function PartyPipelinePanel({
 
     setPhase('running')
     setMessage(null)
-    setElapsedSeconds(0)
+    progress.resetRun()
 
     const actions = reviewItems.map((item) => ({
       rawId: item.rawId,
@@ -238,13 +225,19 @@ export function PartyPipelinePanel({
     }
 
     setPhase('success')
-    setCurrentStage(null)
+    progress.clearCurrent()
     setMessage('הצינור הושלם — המועמדים נטענו לרשימה')
     await onComplete()
   }
 
   const running = phase === 'running' || phase === 'previewing'
   const partyLabel = party.shortName ?? party.name
+  const {
+    currentStage,
+    totalElapsedSeconds,
+    stepElapsedSeconds,
+    stepDurations,
+  } = progress
 
   return (
     <section
@@ -313,7 +306,7 @@ export function PartyPipelinePanel({
           type="button"
           className="candidate-edit-card__collapse"
           disabled={running || !listText.trim()}
-          onClick={handlePreview}
+          onClick={() => void handlePreview()}
         >
           {phase === 'previewing' ? 'בודק…' : 'בדוק רשימה'}
         </button>
@@ -323,30 +316,79 @@ export function PartyPipelinePanel({
             type="button"
             className="candidate-edit-card__save"
             disabled={running || !listText.trim()}
-            onClick={handleRunPipeline}
+            onClick={() => void handleRunPipeline()}
           >
-            {phase === 'running' ? 'מריץ צינור…' : 'התחל עיבוד'}
+            {phase === 'running' && currentStage !== null
+              ? `מריץ שלב ${currentStage}…`
+              : phase === 'running'
+                ? 'מריץ צינור…'
+                : 'התחל עיבוד'}
           </button>
         ) : (
           <button
             type="button"
             className="candidate-edit-card__save"
             disabled={running || reviewItems.length === 0}
-            onClick={handleResolveReview}
+            onClick={() => void handleResolveReview()}
           >
             {running ? 'מעבד…' : 'אשר והמשך'}
           </button>
         )}
       </div>
 
+      {(phase === 'running' ||
+        Object.keys(stepDurations).length > 0 ||
+        currentStage !== null) && (
+        <div className="knesset-pipeline-panel__stages" aria-label="שלבי הצינור">
+          {STAGE_NUMBERS.map((stage) => {
+            const isCurrent = phase === 'running' && currentStage === stage
+            const isDone = stepDurations[stage] !== undefined && !isCurrent
+            const duration = isCurrent
+              ? stepElapsedSeconds
+              : stepDurations[stage]
+
+            return (
+              <div
+                key={stage}
+                className={`knesset-pipeline-panel__stage-row knesset-pipeline-panel__stage-row--readonly${
+                  isCurrent ? ' knesset-pipeline-panel__stage-row--running' : ''
+                }${isDone ? ' knesset-pipeline-panel__stage-row--done' : ''}`}
+              >
+                <span className="knesset-pipeline-panel__stage-label">
+                  {isCurrent ? (
+                    <span
+                      className="candidate-edit-card__pipeline-spinner knesset-pipeline-panel__stage-spinner"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  {stage}. {STAGE_LABELS[stage]}
+                  {duration !== undefined ? (
+                    <span className="knesset-pipeline-panel__stage-time">
+                      {formatPipelineElapsed(duration)}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {running ? (
-        <p className="candidate-edit-card__pipeline-running" role="status" aria-live="polite">
-          <span className="candidate-edit-card__pipeline-spinner" aria-hidden="true" />
+        <p
+          className="candidate-edit-card__pipeline-running"
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            className="candidate-edit-card__pipeline-spinner"
+            aria-hidden="true"
+          />
           {currentStage
-            ? `שלב ${currentStage} מתוך 6 — ${STAGE_LABELS[currentStage]} (${formatElapsed(elapsedSeconds)})`
+            ? `שלב ${currentStage} מתוך 6 — ${STAGE_LABELS[currentStage]} (${formatPipelineElapsed(stepElapsedSeconds)}) · סה״כ ${formatPipelineElapsed(totalElapsedSeconds)}`
             : phase === 'previewing'
-              ? `בודק רשימה… (${formatElapsed(elapsedSeconds)})`
-              : `מעבד… (${formatElapsed(elapsedSeconds)})`}
+              ? `בודק רשימה… (${formatPipelineElapsed(totalElapsedSeconds)})`
+              : `מעבד… (${formatPipelineElapsed(totalElapsedSeconds)})`}
         </p>
       ) : null}
 

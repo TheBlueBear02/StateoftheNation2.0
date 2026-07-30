@@ -10,6 +10,7 @@ import {
   LastPollsBarChart,
 } from '../components/polls/LastPollsBarChart'
 import { PartyTrendChart } from '../components/polls/PartyTrendChart'
+import { AggregateHistoryChart } from '../components/polls/AggregateHistoryChart'
 import { usePolls } from '../hooks/usePolls'
 import {
   buildPollSnapshots,
@@ -169,6 +170,14 @@ export function ElectionsPollsPage() {
           <section className="polls-page__section polls-page__section--chart">
             <div className="container polls-page__inner">
               <BlocTrendChart snapshots={snapshots} />
+            </div>
+          </section>
+        )}
+
+        {!loading && !error && (
+          <section className="polls-page__section polls-page__section--chart">
+            <div className="container polls-page__inner">
+              <AggregateHistoryChart />
             </div>
           </section>
         )}

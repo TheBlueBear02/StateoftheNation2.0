@@ -14,10 +14,47 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 8px;
   background: #fafafa;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.knesset-pipeline-panel__stage-row--readonly {
+  justify-content: flex-start;
+}
+
+.knesset-pipeline-panel__stage-row--running {
+  border-color: var(--color-blue);
+  background: color-mix(in srgb, var(--color-blue) 8%, white);
+}
+
+.knesset-pipeline-panel__stage-row--done {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: #f3f3f3;
 }
 
 .knesset-pipeline-panel__stage-label {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   font-weight: 600;
+  min-width: 0;
+}
+
+.knesset-pipeline-panel__stage-spinner {
+  flex-shrink: 0;
+}
+
+.knesset-pipeline-panel__stage-time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}
+
+.knesset-pipeline-panel__stage-row--running .knesset-pipeline-panel__stage-time {
+  color: var(--color-blue-dark);
 }
 
 .knesset-pipeline-panel__post-sync {

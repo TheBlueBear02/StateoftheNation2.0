@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -36,6 +38,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from record_pipeline_run import record_pipeline_run  # noqa: E402
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    stream=sys.stderr,
+)
 
 STAGE_LABELS: dict[int, str] = {
     1: "משיכת ויקיפדיה",
@@ -55,6 +63,92 @@ TABLE_NAMES = [
 
 REVIEW_FILE = Path(__file__).resolve().parent / "review_queue.json"
 LAST_RUN_FILE = Path(__file__).resolve().parent / "pipeline_last_run.json"
+DIAGNOSTICS_LIMIT = 40
+
+
+class _ListLogHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.lines: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.lines.append(self.format(record))
+        except Exception:
+            self.handleError(record)
+
+
+@contextmanager
+def capture_warnings():
+    handler = _ListLogHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s  %(name)s  %(message)s"))
+    root = logging.getLogger()
+    root.addHandler(handler)
+    try:
+        yield handler.lines
+    finally:
+        root.removeHandler(handler)
+
+
+def recent_rejected_rows(sb, limit: int = 15) -> list[dict]:
+    rows = (
+        sb.table("raw_poll_rows")
+        .select("id, status, error, section, payload, updated_at, created_at")
+        .eq("status", "rejected")
+        .order("id", desc=True)
+        .limit(limit)
+        .execute()
+        .data
+    ) or []
+    out: list[dict] = []
+    for row in rows:
+        payload = row.get("payload") or {}
+        out.append(
+            {
+                "id": row.get("id"),
+                "error": row.get("error"),
+                "section": row.get("section"),
+                "fieldwork": payload.get("fieldwork_raw"),
+                "pollster": payload.get("pollster"),
+                "publisher": payload.get("publisher"),
+            }
+        )
+    return out
+
+
+def build_diagnostics(
+    log_lines: list[str],
+    *,
+    extra: list[str] | None = None,
+    rejected: list[dict] | None = None,
+) -> dict:
+    lines = list(extra or [])
+    lines.extend(log_lines)
+    if rejected:
+        for row in rejected:
+            lines.append(
+                "REJECTED  "
+                f"id={row.get('id')}  "
+                f"{row.get('fieldwork') or '?'} / "
+                f"{row.get('pollster') or '?'} / "
+                f"{row.get('publisher') or '?'} — "
+                f"{row.get('error') or 'unknown'}"
+            )
+    # Preserve order, drop exact dupes, cap length.
+    seen: set[str] = set()
+    unique: list[str] = []
+    for line in lines:
+        text = (line or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        unique.append(text)
+        if len(unique) >= DIAGNOSTICS_LIMIT:
+            break
+    return {
+        "lines": unique,
+        "rejected": rejected or [],
+    }
 
 
 def read_last_run() -> dict | None:
@@ -74,6 +168,7 @@ def record_last_run(
     action: str,
     stage: int | None = None,
     summary: dict | None = None,
+    diagnostics: dict | None = None,
 ) -> str:
     last_run_at = datetime.now().isoformat(timespec="seconds")
     payload: dict = {
@@ -84,6 +179,8 @@ def record_last_run(
         payload["stage"] = stage
     if summary is not None:
         payload["summary"] = summary
+    if diagnostics is not None:
+        payload["diagnostics"] = diagnostics
 
     with open(LAST_RUN_FILE, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2)
@@ -221,6 +318,7 @@ def cmd_status(sb, as_json: bool) -> None:
         if stamp and (db_last_success is None or stamp > db_last_success):
             db_last_success = stamp
 
+    rejected = recent_rejected_rows(sb)
     emit(
         {
             "ok": True,
@@ -233,6 +331,11 @@ def cmd_status(sb, as_json: bool) -> None:
             "lastPipelineAction": last_run.get("action") if last_run else None,
             "lastPipelineStage": last_run.get("stage") if last_run else None,
             "lastRunSummary": last_run.get("summary") if last_run else None,
+            "diagnostics": (
+                (last_run.get("diagnostics") if last_run else None)
+                or build_diagnostics([], rejected=rejected)
+            ),
+            "recentRejected": rejected,
         },
         as_json,
     )
@@ -244,142 +347,172 @@ def run_stage(
     *,
     backfill: bool = False,
     force: bool = False,
-) -> tuple[str, str, dict]:
+) -> tuple[str, str, dict, dict]:
     label = STAGE_LABELS[stage]
+    extra_lines: list[str] = []
+    include_rejected = stage in (3, 4)
 
-    if stage == 1:
-        fetched = fetch_wikipedia.run(sb, backfill=backfill, force=force, dry_run=False)
-        count = len(fetched)
-        summary = make_run_summary(
-            [
-                make_stage_summary(
-                    stage,
-                    label,
-                    [
-                        {
-                            "table": "pipeline_sync_state",
-                            "upserted": count,
-                            "inserted": count,
-                            "updated": 0,
-                        }
-                    ],
-                    note=f"נמשכו {count} דפים",
+    with capture_warnings() as log_lines:
+        if stage == 1:
+            fetched = fetch_wikipedia.run(
+                sb, backfill=backfill, force=force, dry_run=False
+            )
+            count = len(fetched)
+            summary = make_run_summary(
+                [
+                    make_stage_summary(
+                        stage,
+                        label,
+                        [
+                            {
+                                "table": "pipeline_sync_state",
+                                "upserted": count,
+                                "inserted": count,
+                                "updated": 0,
+                            }
+                        ],
+                        note=f"נמשכו {count} דפים",
+                    )
+                ]
+            )
+            message = f"נמשכו {count} דפי ויקיפדיה"
+
+        elif stage == 2:
+            inserted = parse_poll_tables.run(
+                sb, backfill=backfill, force=force, dry_run=False
+            )
+            if inserted == 0:
+                extra_lines.append(
+                    "INFO  stage 2  no new raw rows "
+                    "(table unchanged, or parse yielded 0 — see warnings above)"
                 )
-            ]
-        )
-        return label, f"נמשכו {count} דפי ויקיפדיה", summary
+            summary = make_run_summary(
+                [
+                    make_stage_summary(
+                        stage,
+                        label,
+                        [
+                            {
+                                "table": "raw_poll_rows",
+                                "upserted": inserted,
+                                "inserted": inserted,
+                                "updated": 0,
+                            }
+                        ],
+                    )
+                ]
+            )
+            message = f"הוכנסו {inserted} שורות גולמיות חדשות"
 
-    if stage == 2:
-        inserted = parse_poll_tables.run(
-            sb, backfill=backfill, force=force, dry_run=False
-        )
-        summary = make_run_summary(
-            [
-                make_stage_summary(
-                    stage,
-                    label,
-                    [
-                        {
-                            "table": "raw_poll_rows",
-                            "upserted": inserted,
-                            "inserted": inserted,
-                            "updated": 0,
-                        }
-                    ],
+        elif stage == 3:
+            resolved, rejected = resolve_poll_parties.run(sb, dry_run=False)
+            review_count = review_queue_count()
+            if rejected:
+                extra_lines.append(
+                    f"WARNING  stage 3  rejected {rejected} raw row(s) "
+                    f"(unmapped labels or empty party results)"
                 )
-            ]
-        )
-        return label, f"הוכנסו {inserted} שורות גולמיות חדשות", summary
+            summary = make_run_summary(
+                [
+                    make_stage_summary(
+                        stage,
+                        label,
+                        [
+                            {
+                                "table": "raw_poll_rows",
+                                "upserted": resolved + rejected,
+                                "inserted": resolved,
+                                "updated": rejected,
+                            }
+                        ],
+                        note=f"נדחו {rejected}; תור בדיקה {review_count}",
+                    )
+                ]
+            )
+            message = (
+                f"מופו {resolved} שורות, נדחו {rejected} "
+                f"(תור בדיקה: {review_count})"
+            )
 
-    if stage == 3:
-        resolved, rejected = resolve_poll_parties.run(sb, dry_run=False)
-        review_count = review_queue_count()
-        summary = make_run_summary(
-            [
-                make_stage_summary(
-                    stage,
-                    label,
-                    [
-                        {
-                            "table": "raw_poll_rows",
-                            "upserted": resolved + rejected,
-                            "inserted": resolved,
-                            "updated": rejected,
-                        }
-                    ],
-                    note=f"נדחו {rejected}; תור בדיקה {review_count}",
+        elif stage == 4:
+            processed = normalize_polls.run(sb, dry_run=False)
+            if processed == 0:
+                extra_lines.append(
+                    "INFO  stage 4  normalized 0 polls "
+                    "(no pending rows with resolved_parties)"
                 )
-            ]
-        )
-        return (
-            label,
-            f"מופו {resolved} שורות, נדחו {rejected} (תור בדיקה: {review_count})",
-            summary,
-        )
+            summary = make_run_summary(
+                [
+                    make_stage_summary(
+                        stage,
+                        label,
+                        [
+                            {
+                                "table": "polls",
+                                "upserted": processed,
+                                "inserted": processed,
+                                "updated": 0,
+                            }
+                        ],
+                    )
+                ]
+            )
+            message = f"נורמלו {processed} סקרים"
 
-    if stage == 4:
-        processed = normalize_polls.run(sb, dry_run=False)
-        summary = make_run_summary(
-            [
-                make_stage_summary(
-                    stage,
-                    label,
-                    [
-                        {
-                            "table": "polls",
-                            "upserted": processed,
-                            "inserted": processed,
-                            "updated": 0,
-                        }
-                    ],
-                )
-            ]
-        )
-        return label, f"נורמלו {processed} סקרים", summary
+        elif stage == 5:
+            as_of_dates = compute_aggregates.run(sb, dry_run=False)
+            count = len(as_of_dates)
+            summary = make_run_summary(
+                [
+                    make_stage_summary(
+                        stage,
+                        label,
+                        [
+                            {
+                                "table": "poll_aggregates",
+                                "upserted": count,
+                                "inserted": count,
+                                "updated": 0,
+                            }
+                        ],
+                        note=f"{count} תאריכי as_of",
+                    )
+                ]
+            )
+            message = f"חושבו ממוצעים ל־{count} תאריכים"
 
-    if stage == 5:
-        as_of_dates = compute_aggregates.run(sb, dry_run=False)
-        count = len(as_of_dates)
-        summary = make_run_summary(
-            [
-                make_stage_summary(
-                    stage,
-                    label,
-                    [
-                        {
-                            "table": "poll_aggregates",
-                            "upserted": count,
-                            "inserted": count,
-                            "updated": 0,
-                        }
-                    ],
-                    note=f"{count} תאריכי as_of",
-                )
-            ]
-        )
-        return label, f"חושבו ממוצעים ל־{count} תאריכים", summary
+        elif stage == 6:
+            exit_code, validation_lines = validate_polls.run(
+                sb, None, dry_run=False, full=backfill
+            )
+            ok = exit_code == 0
+            extra_lines.extend(validation_lines)
+            summary = make_run_summary(
+                [
+                    make_stage_summary(
+                        stage,
+                        label,
+                        [],
+                        note="עבר" if ok else "אזהרות/שגיאות — בדקו את קונסולת השגיאות",
+                    )
+                ]
+            )
+            message = (
+                "ולידציה עברה בהצלחה"
+                if ok
+                else "ולידציה דיווחה על אזהרות או שגיאות (הסנכרון הושלם)"
+            )
 
-    if stage == 6:
-        exit_code = validate_polls.run(sb, None, dry_run=False, full=backfill)
-        ok = exit_code == 0
-        summary = make_run_summary(
-            [
-                make_stage_summary(
-                    stage,
-                    label,
-                    [],
-                    note="עבר" if ok else "אזהרות/שגיאות — בדקו לוגים",
-                )
-            ]
-        )
-        message = (
-            "ולידציה עברה בהצלחה"
-            if ok
-            else "ולידציה דיווחה על אזהרות או שגיאות (הסנכרון הושלם)"
-        )
-        return label, message, summary
+        else:
+            raise ValueError(f"Invalid stage: {stage}")
 
-    raise ValueError(f"Invalid stage: {stage}")
+    rejected_rows = recent_rejected_rows(sb) if include_rejected else []
+    diagnostics = build_diagnostics(
+        log_lines,
+        extra=extra_lines,
+        rejected=rejected_rows if include_rejected else None,
+    )
+    return label, message, summary, diagnostics
 
 
 def cmd_stage(
@@ -396,7 +529,7 @@ def cmd_stage(
     start = time.time()
     started_at = datetime.now()
     try:
-        label, message, summary = run_stage(
+        label, message, summary, diagnostics = run_stage(
             sb, stage, backfill=backfill, force=force
         )
     except Exception as exc:
@@ -413,18 +546,24 @@ def cmd_stage(
         fail(str(exc), as_json)
 
     elapsed_seconds = int(time.time() - start)
-    last_run_at = record_last_run("stage", stage, summary)
+    last_run_at = record_last_run("stage", stage, summary, diagnostics)
     note = None
     if summary.get("stages"):
         note = summary["stages"][0].get("note")
     status = "warning" if note and ("אזהר" in note or "שגיא" in note) else "success"
+    if diagnostics.get("lines") and status == "success" and stage in (3, 4, 6):
+        if any(
+            line.startswith(("ERROR", "WARNING", "REJECTED"))
+            for line in diagnostics["lines"]
+        ):
+            status = "warning"
     record_pipeline_run(
         sb,
         pipeline="polls",
         action=f"stage-{stage}",
         status=status,
         message=message,
-        summary=summary,
+        summary={**summary, "diagnostics": diagnostics},
         source="ui",
         started_at=started_at,
     )
@@ -437,6 +576,7 @@ def cmd_stage(
             "message": message,
             "lastPipelineRunAt": last_run_at,
             "summary": summary,
+            "diagnostics": diagnostics,
         },
         as_json,
     )
@@ -453,14 +593,17 @@ def cmd_sync_full(
     started_at = datetime.now()
     stage_summaries: list[dict] = []
     messages: list[str] = []
+    all_log_lines: list[str] = []
+    all_extra: list[str] = []
 
     try:
         for stage in range(1, 7):
-            _, message, summary = run_stage(
+            _, message, summary, diagnostics = run_stage(
                 sb, stage, backfill=backfill, force=force
             )
             messages.append(message)
             stage_summaries.extend(summary.get("stages", []))
+            all_log_lines.extend(diagnostics.get("lines") or [])
     except Exception as exc:
         record_pipeline_run(
             sb,
@@ -474,18 +617,29 @@ def cmd_sync_full(
         )
         fail(str(exc), as_json)
 
+    rejected = recent_rejected_rows(sb)
+    diagnostics = build_diagnostics(
+        all_log_lines,
+        extra=all_extra,
+        rejected=rejected,
+    )
     summary = make_run_summary(stage_summaries)
     elapsed_seconds = int(time.time() - start)
-    last_run_at = record_last_run("sync-full", None, summary)
+    last_run_at = record_last_run("sync-full", None, summary, diagnostics)
     joined = "; ".join(messages)
     status = "warning" if any("אזהר" in m or "שגיא" in m for m in messages) else "success"
+    if diagnostics.get("lines") and any(
+        line.startswith(("ERROR", "WARNING", "REJECTED"))
+        for line in diagnostics["lines"]
+    ):
+        status = "warning"
     record_pipeline_run(
         sb,
         pipeline="polls",
         action="backfill" if backfill else "sync-full",
         status=status,
         message="סנכרון סקרים הושלם — " + joined,
-        summary=summary,
+        summary={**summary, "diagnostics": diagnostics},
         source="ui",
         started_at=started_at,
     )
@@ -496,6 +650,7 @@ def cmd_sync_full(
             "message": "סנכרון סקרים הושלם — " + joined,
             "lastPipelineRunAt": last_run_at,
             "summary": summary,
+            "diagnostics": diagnostics,
         },
         as_json,
     )

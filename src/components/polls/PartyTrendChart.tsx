@@ -326,6 +326,7 @@ export function PartyTrendChart({ polls }: PartyTrendChartProps) {
                 className={`polls-party-trend-legend__btn${
                   isSelected ? '' : ' polls-party-trend-legend__btn--hidden'
                 }`}
+                style={{ borderColor: color }}
                 onClick={() => handlePartyToggle(line.partyId)}
                 aria-pressed={isSelected}
                 aria-label={line.partyShortName ?? line.partyName}
