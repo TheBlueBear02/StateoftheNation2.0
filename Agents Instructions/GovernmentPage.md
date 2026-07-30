@@ -101,7 +101,7 @@ supabase
 
 ## Derived Client-Side
 
-- `officeName` — `offices.knesset_category_name`, else `offices.name`, else `משרד ללא שם`
+- `officeName` — prefers `offices.knesset_category_name` (OData mirror), else curated `offices.name`, else `משרד ללא שם`. Sync updates `knesset_category_name` only; curated `name` is preserved.
 - `roleTitle` — `duty_desc`, else office name; prefixes `מ"מ` when `is_acting`
 - `roleKind` from `src/lib/governmentStructure.ts`:
   - actual `ראש הממשלה` / `ראש הממשלה החלופי`

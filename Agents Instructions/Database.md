@@ -15,6 +15,7 @@ The schema is split into four logical groups:
 | **KPI data** | `indexes` · `index_data` | Seeded — dashboard page planned |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | Live — `/elections`, party detail, lists game, edit |
 | **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` | Live — `/elections/polls`, `/piplines` |
+| **Site** | `site_updates` | Live — homepage news strip |
 
 All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE.
 
@@ -62,7 +63,7 @@ The central person record. Every MK, minister, and election candidate across all
 | `email` | text | From Knesset OData |
 | `twitter_handle` | text | Manual / Wikidata enrichment |
 | `wikipedia_url` | text | `fetch_candidate_wiki_urls.py` (Stage 6) / manual |
-| `is_current` | boolean | Whether the person is a current MK — from `KNS_Person.IsCurrent` |
+| `is_current` | boolean | Whether the person is a current MK — from `KNS_Person.IsCurrent` (OData mirror). Public pages do **not** rely on this; they use membership/appointment date ranges. |
 | `created_at` | timestamptz | Row creation timestamp |
 
 **Data source:** `sync_knesset_data.py` → Knesset OData `KNS_Person`. Enriched by `enrich_wikidata.py` for election candidates. Upserted on `knesset_person_id`.
@@ -106,10 +107,10 @@ Parliamentary factions within a specific Knesset session. A faction is the post-
 | `short_name` | text | Short display name — manually set, not from OData |
 | `start_date` | date | When the faction formed |
 | `end_date` | date | When it dissolved — null if current |
-| `is_current` | boolean | True for active factions in the current Knesset |
-| `is_coalition` | boolean | True if part of the governing coalition — manually maintained |
-| `color` | text | Hex color for UI — manually set |
-| `logo_url` | text | Party logo URL — manually set |
+| `is_current` | boolean | OData `IsCurrent` mirror — UI prefers `end_date IS NULL` when it needs “open faction” |
+| `is_coalition` | boolean | True if part of the governing coalition — **manually maintained** (edit page / curated) |
+| `color` | text | Hex color for UI — manually set (faction branding; separate from ballot `election_parties.color`) |
+| `logo_url` | text | Party logo URL — manually set (faction branding; separate from ballot `election_parties.logo_url`) |
 | `created_at` | timestamptz | Row creation timestamp |
 
 **Data source:** `sync_knesset_data.py` → Knesset OData `KNS_Faction`. Upserted on `knesset_faction_id`. Fields NOT provided by the OData API and never overwritten by the sync: `color`, `logo_url`, `short_name`, `is_coalition`.
@@ -132,7 +133,6 @@ Records each person's membership as an MK in a specific Knesset, within a specif
 | `person_id` | bigint | FK → `people.id` |
 | `knesset_id` | bigint | FK → `knessets.id` |
 | `faction_id` | bigint | FK → `knesset_factions.id` |
-| `is_coalition` | boolean | Always `false` — not available from OData. Derive from `knesset_factions.is_coalition` instead. |
 | `start_date` | date | When this membership started |
 | `end_date` | date | When it ended — null if current |
 | `duty_desc` | text | Role description from OData |
@@ -147,6 +147,8 @@ Records each person's membership as an MK in a specific Knesset, within a specif
 
 **Notes:**
 - `end_date` comes from `KNS_PersonToPosition.FinishDate` (not `EndDate`) in the OData API.
+- Coalition status is **not** stored on memberships — use `knesset_factions.is_coalition` (joined via `faction_id`).
+- “Current MK” for a term snapshot is derived from date ranges (`end_date` null / overlapping ref date), not from a membership boolean.
 
 ---
 
@@ -178,8 +180,8 @@ Government ministries (משרדי ממשלה).
 |--------|------|-------------|
 | `id` | bigint | Primary key |
 | `knesset_category_id` | integer | `KNS_GovMinistry.GovMinistryID`. UNIQUE. |
-| `knesset_category_name` | text | Ministry name as returned by OData |
-| `name` | text | Display name in Hebrew |
+| `knesset_category_name` | text | Ministry name mirrored from OData `Name` on every sync |
+| `name` | text | Display name — set to OData `Name` on insert only; sync does **not** overwrite curated values |
 | `name_en` | text | English name — not available from OData, null |
 | `info` | text | Additional info — manually set |
 | `logo_url` | text | Ministry logo — manually set |
@@ -188,7 +190,7 @@ Government ministries (משרדי ממשלה).
 | `is_shown` | boolean | Whether to show on the dashboard |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_GovMinistry`. The OData entity does not have `NameEng` or `IsShown` fields — those are not populated by the sync.
+**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override. Frontend prefers `knesset_category_name`, then `name`.
 
 ---
 
@@ -205,7 +207,7 @@ Records each person's ministerial appointment in a specific government.
 | `office_id` | bigint | FK → `offices.id` |
 | `start_date` | date | Appointment start |
 | `end_date` | date | Appointment end — null if current |
-| `is_current` | boolean | Whether currently serving |
+| `is_current` | boolean | OData `IsCurrent` mirror — government page filters by appointment date ranges, not this flag |
 | `is_acting` | boolean | Always `false` — not available from OData |
 | `duty_desc` | text | Role description from OData |
 | `created_at` | timestamptz | Row creation timestamp |
@@ -271,7 +273,7 @@ One row per election event. Currently holds a single row for the 2026 election.
 | `year` | integer | Election year. UNIQUE. |
 | `date` | date | Election day |
 | `name` | text | Display name, e.g. `"בחירות לכנסת ה-26"` |
-| `knesset_number` | integer | Which Knesset this election seats |
+| `knesset_number` | integer | Which Knesset this election seats — FK → `knessets.knesset_number` |
 | `created_at` | timestamptz | Row creation timestamp |
 
 **Data source:** Manually inserted via seed SQL. One row, rarely changes.
@@ -293,8 +295,8 @@ Parties running on the ballot in a given election. Separate from `knesset_factio
 | `bloc` | text | `'coalition'` \| `'opposition'` \| `'unaligned'` — for poll bloc totals |
 | `first_polled_date` | date | First fieldwork date this party appeared in polls |
 | `last_polled_date` | date | Most recent fieldwork date |
-| `color` | text | Hex color for UI |
-| `logo_url` | text | Party logo URL |
+| `color` | text | Hex color for ballot UI — owned by election party row (not synced from factions) |
+| `logo_url` | text | Ballot / elections-page logo — owned by election party row |
 | `ballot_letter` | text | Hebrew ballot symbol — null until Elections Committee certifies lists |
 | `description` | text | Party description |
 | `created_at` | timestamptz | Row creation timestamp |
@@ -339,7 +341,7 @@ Ordered candidate list per party. One row per candidate per party.
 
 **Frontend access:**
 
-The elections frontend uses the public anon key for **SELECT only**. `elections`, `election_parties`, and `election_candidates` must be selectable by `anon`; otherwise the service-role pipeline can see rows while `/elections` renders an empty list. Writes from `/elections/edit` go through Next APIs with `SUPABASE_SERVICE_KEY` — do **not** grant anon UPDATE. If those grants were applied earlier, run `Layer 1 - Gathering Data/Elections/revoke_anon_update_policies.sql`.
+The elections frontend uses the public anon key for **SELECT only**. `elections`, `election_parties`, and `election_candidates` must be selectable by `anon`; otherwise the service-role pipeline can see rows while `/elections` renders an empty list. Writes from `/elections/edit` go through Next APIs with `SUPABASE_SERVICE_KEY` — do **not** grant anon UPDATE.
 
 ```sql
 alter table public.elections enable row level security;
@@ -369,7 +371,6 @@ to anon
 using (true);
 
 -- Do NOT grant UPDATE to anon. Edit saves use service role via API.
--- If anon UPDATE policies exist, apply revoke_anon_update_policies.sql.
 ```
 
 ---
@@ -416,6 +417,25 @@ Shared run history for the `/piplines` dashboard (all pipelines).
 **RLS:** anon/authenticated SELECT. Writes via service role only.
 
 **Schema file:** `Layer 1 - Gathering Data/schema_pipeline_runs.sql`
+
+### `site_updates`
+
+Homepage news-strip feed. Written by `emit_site_updates.py` at the end of successful pipeline runs (one LLM headline per run with meaningful changes).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `event_type` | text | e.g. `'polls_run'`, `'knesset_run'`, `'elections_run'` |
+| `headline` | text | Hebrew ticker text (gpt-4o) |
+| `href` | text | Site path, e.g. `/elections/polls`, `/knesset`, `/elections` |
+| `payload` | jsonb | Structured change facts sent to the model |
+| `occurred_at` | timestamptz | Event time |
+| `pipeline_run_id` | bigint | Optional link to `pipeline_runs.id` |
+| `dedupe_key` | text | UNIQUE — prevents duplicate headlines on re-runs |
+
+**RLS:** anon/authenticated SELECT. Writes via service role only.
+
+**Schema file:** `Layer 1 - Gathering Data/schema_site_updates.sql`
 
 ### `pipeline_sync_state`
 
@@ -476,8 +496,8 @@ Normalized poll header — one row per distinct poll.
 | `natural_key` | text | Unique poll identity |
 | `pollster` | text | Normalized English pollster name |
 | `pollster_he` | text | Hebrew pollster name |
-| `publisher` | text | Media outlet (English) |
-| `publisher_id` | bigint | FK → `poll_publishers.id` — optional link for channel logo |
+| `publisher` | text | Media outlet English name — pipeline identity string (matches `poll_publishers.name`) |
+| `publisher_id` | bigint | FK → `poll_publishers.id` — resolved at normalize time for logos; keep in sync with `publisher` |
 | `fieldwork_start` / `fieldwork_end` | date | Fieldwork date range |
 | `sample_size` | integer | Sample size |
 | `margin_of_error` | numeric | MOE |
@@ -485,6 +505,8 @@ Normalized poll header — one row per distinct poll.
 | `scenario_desc` | text | Scenario section label |
 | `source_url` | text | Original publication URL |
 | `source_revid` | bigint | Wikipedia revision |
+
+**Ownership:** `publisher` text is the natural identity from Wikipedia. `publisher_id` is denormalized FK set by `normalize_polls.py` via `resolve_publisher_id` (creates a stub `poll_publishers` row when missing). Logos live only on `poll_publishers`.
 
 ---
 
@@ -571,3 +593,52 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 | `link_factions.py` | `election_parties.knesset_faction_id` | Post-election — once per election |
 
 All sync writes are upserts. No script deletes data except `insert_raw_list.py` which removes `processed=false` rows for a party when re-inserting an updated list.
+
+---
+
+## Integrity constraints
+
+Live on Supabase (applied; one-shot migration scripts removed from the repo). Inventory:
+
+| Constraint | Purpose |
+|------------|---------|
+| `election_candidates` UNIQUE `(party_id, list_position)` / `(party_id, person_id)` | No duplicate list slots or people on one list |
+| `election_parties` UNIQUE `(election_id, short_name)` | Stable pipeline lookup key |
+| `poll_results` UNIQUE `(poll_id, party_id)` + `ON DELETE CASCADE` from `polls` | One result row per party per poll |
+| `poll_aggregates` UNIQUE `(election_id, party_id, as_of_date, method)` | Idempotent aggregate upserts |
+| `pipeline_sync_state` UNIQUE `(pipeline, resource)` | One revid cache row per resource |
+| `raw_poll_rows` UNIQUE `(natural_key, content_hash)` | Dedup staging payloads |
+| `raw_candidate_lists` partial UNIQUE `(party_id, list_position) WHERE processed = false` | No duplicate open staging slots; allows kept `processed=true` rows when re-inserting |
+| `pollster_house_effects` UNIQUE `(pollster, party_id, as_of_date)` | Idempotent house-effect upserts |
+| Partial unique on `knessets.is_active` / `governments.is_active` | At most one active term/government |
+| Date-order CHECKs | `end_date >= start_date` (or null end) on terms, memberships, appointments, factions, poll fieldwork |
+| Domain CHECKs | `people.gender`, poll seats `0..120`, `sample_size > 0`, aggregate `method`, `indexes.chart_type`, `list_position >= 1` |
+
+---
+
+## Performance indexes
+
+Live on Supabase (applied; one-shot migration scripts removed from the repo). Covers FK join columns and hot filters:
+
+| Area | Indexes |
+|------|---------|
+| Knesset / government | `knesset_memberships` (person, knesset, faction); `knesset_factions(knesset_id)`; `minister_appointments` (person, government, office); `governments(knesset_id)` |
+| Elections | `election_candidates` (election, person); confirmed parties by election; `people(full_name)`; raw list pending/party |
+| Polls | `polls` (election, fieldwork, regular, publisher); `poll_results(party_id)`; aggregates lookup; pending raw rows; aliases; lineage |
+| KPI | `indexes(office_id)`; `index_data(index_id, recorded_at)` |
+
+Unique constraints also provide leading-column indexes for several keys (e.g. `election_parties(election_id, short_name)`).
+
+---
+
+## Field ownership (anti-drift)
+
+| Topic | Source of truth | Notes |
+|-------|-----------------|-------|
+| Coalition | `knesset_factions.is_coalition` | Memberships do **not** store coalition |
+| Current MK / minister in UI | Date ranges (`end_date` null / overlapping snapshot) | `people.is_current` / `minister_appointments.is_current` / faction `is_current` are OData mirrors only |
+| Active knesset / government | `is_active` (+ partial unique index) | Keep in sync when terms change |
+| Office display name | `offices.name` (curated) vs `knesset_category_name` (OData) | Sync never overwrites existing `name` |
+| Poll publisher | `polls.publisher` text identity; `publisher_id` FK for logos | Normalize resolves/creates `poll_publishers` rows |
+| Party color / logo | Ballot: `election_parties`; chamber: `knesset_factions` | Intentional dual branding — do not auto-overwrite either from the other |
+| Election → Knesset | `elections.knesset_number` FK → `knessets.knesset_number` | Applied |

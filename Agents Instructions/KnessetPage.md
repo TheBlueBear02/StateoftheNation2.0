@@ -245,6 +245,7 @@ When `isDev` is true, the **צינור נתונים** panel runs OData sync:
 | 6 | חברויות ומינויים | `sync_positions` |
 
 - **התחל סנכרון מלא** runs stages 1–6 sequentially via `POST /api/knesset/pipeline/stage`
+- Stage 6 (and CLI `sync_all`) snapshots memberships/appointments before/after sync and calls `emit_knesset_run_update` when real field changes exist — homepage ticker links to `/knesset` (see [PiplinesPage.md](./PiplinesPage.md))
 - While running, the active stage row is highlighted with a spinner; each stage shows its own elapsed time, and the status line also shows total run time (`usePipelineRunProgress`)
 - Per-stage **הרץ** buttons run a single stage
 - Post-sync: **בדוק קישורי סיעות** / **החל קישורי סיעות** (`fix_faction_links_all` logic)

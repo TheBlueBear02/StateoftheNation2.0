@@ -35,6 +35,7 @@ import validate_polls
 from db import PIPELINE_NAME, get_supabase
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from emit_site_updates import emit_polls_run_update  # noqa: E402
 from record_pipeline_run import record_pipeline_run  # noqa: E402
 
 load_dotenv()
@@ -435,29 +436,37 @@ def run_stage(
             )
 
         elif stage == 4:
-            processed = normalize_polls.run(sb, dry_run=False)
+            stats = normalize_polls.run(sb, dry_run=False)
+            processed = int(stats.get("processed", 0))
+            inserted = int(stats.get("inserted", 0))
+            updated = int(stats.get("updated", 0))
             if processed == 0:
+                message = "אין שורות ממתינות לנרמול"
                 extra_lines.append(
                     "INFO  stage 4  normalized 0 polls "
                     "(no pending rows with resolved_parties)"
+                )
+            else:
+                message = (
+                    f"נורמלו {processed} סקרים ({inserted} חדשים, {updated} עודכנו)"
                 )
             summary = make_run_summary(
                 [
                     make_stage_summary(
                         stage,
-                        label,
+                        STAGE_LABELS[stage],
                         [
                             {
                                 "table": "polls",
                                 "upserted": processed,
-                                "inserted": processed,
-                                "updated": 0,
+                                "inserted": inserted,
+                                "updated": updated,
                             }
                         ],
+                        note=message,
                     )
                 ]
             )
-            message = f"נורמלו {processed} סקרים"
 
         elif stage == 5:
             as_of_dates = compute_aggregates.run(sb, dry_run=False)
@@ -567,6 +576,8 @@ def cmd_stage(
         source="ui",
         started_at=started_at,
     )
+    if stage == 4 and int(summary.get("totals", {}).get("inserted", 0) or 0) > 0:
+        emit_polls_run_update(sb, since=started_at)
     emit(
         {
             "ok": True,
@@ -643,6 +654,13 @@ def cmd_sync_full(
         source="ui",
         started_at=started_at,
     )
+    polls_inserted = 0
+    for stage_row in summary.get("stages") or []:
+        if int(stage_row.get("stage", 0) or 0) == 4:
+            polls_inserted = int(stage_row.get("inserted", 0) or 0)
+            break
+    if polls_inserted > 0:
+        emit_polls_run_update(sb, since=started_at)
     emit(
         {
             "ok": True,

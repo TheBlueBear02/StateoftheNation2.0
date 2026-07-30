@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 
 from supabase import Client
 
-from db import get_election_id, get_supabase
+from db import get_election_id, get_supabase, resolve_publisher_id
 
 log = logging.getLogger(__name__)
 
@@ -269,7 +269,8 @@ POLLSTER_HE = {
 }
 
 
-def run(sb: Client, dry_run: bool = False) -> int:
+def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
+    """Normalize pending raw rows. Returns counts: processed, inserted, updated."""
     election_id = get_election_id(sb)
     pending = (
         sb.table("raw_poll_rows")
@@ -280,6 +281,8 @@ def run(sb: Client, dry_run: bool = False) -> int:
     ) or []
 
     processed = 0
+    inserted = 0
+    updated = 0
     last_end_by_section: dict[str, date] = {}
 
     for row in pending:
@@ -320,6 +323,7 @@ def run(sb: Client, dry_run: bool = False) -> int:
             "pollster": pollster,
             "pollster_he": POLLSTER_HE.get(pollster),
             "publisher": publisher,
+            "publisher_id": None if dry_run else resolve_publisher_id(sb, publisher),
             "fieldwork_start": fw_start.isoformat(),
             "fieldwork_end": fw_end.isoformat(),
             "sample_size": sample_size,
@@ -354,9 +358,11 @@ def run(sb: Client, dry_run: bool = False) -> int:
                 ).execute()
             sb.table("poll_results").delete().eq("poll_id", poll_id).execute()
             sb.table("polls").update(poll_row).eq("id", poll_id).execute()
+            updated += 1
         else:
             result = sb.table("polls").insert(poll_row).execute()
             poll_id = result.data[0]["id"]
+            inserted += 1
 
         results = []
         by_party: dict[int, dict] = {}
@@ -429,8 +435,13 @@ def run(sb: Client, dry_run: bool = False) -> int:
     if not dry_run:
         dedupe_polls(sb, election_id)
 
-    log.info("Normalized %d poll rows", processed)
-    return processed
+    log.info(
+        "Normalized %d poll rows (%d inserted, %d updated)",
+        processed,
+        inserted,
+        updated,
+    )
+    return {"processed": processed, "inserted": inserted, "updated": updated}
 
 
 if __name__ == "__main__":

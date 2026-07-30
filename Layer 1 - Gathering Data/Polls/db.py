@@ -94,3 +94,36 @@ def party_id_by_normalized_short_name(sb: Client, election_id: int) -> dict[str,
         if key and key not in out:
             out[key] = row["id"]
     return out
+
+
+def resolve_publisher_id(sb: Client, publisher: str) -> int | None:
+    """
+    Resolve polls.publisher text → poll_publishers.id.
+
+    publisher text remains the pipeline identity string; publisher_id is the FK
+    used for logos / display. Creates a stub publisher row when missing.
+    """
+    name = (publisher or "").strip()
+    if not name:
+        return None
+
+    existing = (
+        sb.table("poll_publishers")
+        .select("id")
+        .eq("name", name)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if existing:
+        return existing[0]["id"]
+
+    inserted = (
+        sb.table("poll_publishers")
+        .insert({"name": name})
+        .execute()
+        .data
+    )
+    if not inserted:
+        return None
+    return inserted[0]["id"]

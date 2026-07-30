@@ -1,8 +1,0 @@
--- DEPRECATED — do not apply.
--- Anon UPDATE on people / election_candidates / election_parties is retired.
--- Use revoke_anon_update_policies.sql instead.
---
--- /elections/edit now saves through Next Route Handlers
--- (/api/elections/update-candidate, /api/elections/update-party) using
--- SUPABASE_SERVICE_KEY server-side. Public pages use anon SELECT only.
--- Python pipelines continue to use SUPABASE_SERVICE_KEY.

@@ -72,6 +72,8 @@ Null source data is displayed honestly with coverage labels or empty states; the
 
 The election data pipeline runs six stages: resolve candidates, general Wikidata enrichment, generate descriptions, geocode cities, `fetch_candidate_birthdates.py` for any remaining null `people.birth_date` values, then `fetch_candidate_wiki_urls.py` for any remaining null `people.wikipedia_url` values. Those final two stages update only their target field on `people`, so frontend age coverage and **קרא עוד** links improve without changing candidate descriptions, cities, map coordinates, gender, or images.
 
+After a successful non-dry-run that created new candidates, orchestrators call `emit_elections_run_update` so the homepage news strip can link to `/elections` (see [PiplinesPage.md](./PiplinesPage.md)).
+
 The frontend uses `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy `VITE_SUPABASE_ANON_KEY` still mapped in `next.config`), not the service key. If service-role scripts can see parties but `/elections` shows an empty list, check public `select` policies for `elections`, `election_parties`, and `election_candidates` (see [Database.md](./Database.md)).
 
 ## List Rating Game (`/elections/lists`)
@@ -184,7 +186,7 @@ When a candidate's `city` is edited and saved, `latitude` / `longitude` are clea
 
 Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` in `.env`.
 
-**Saves (dev + production):** `/elections/edit` always writes through `/api/elections/update-candidate` and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which use `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret` / `x-pipeline-edit-secret`. These two routes are available in production without `ENABLE_PIPELINE_API`; Python pipeline/enrich/geocode routes stay dev-only (or opt-in). Anon UPDATE on `people` / `election_candidates` / `election_parties` must be revoked — apply `Layer 1 - Gathering Data/Elections/revoke_anon_update_policies.sql` after deploying this path. Hosting must set `SUPABASE_SERVICE_KEY` and the edit secret env vars.
+**Saves (dev + production):** `/elections/edit` always writes through `/api/elections/update-candidate` and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which use `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret` / `x-pipeline-edit-secret`. These two routes are available in production without `ENABLE_PIPELINE_API`; Python pipeline/enrich/geocode routes stay dev-only (or opt-in). Anon has SELECT only on elections tables — no anon UPDATE. Hosting must set `SUPABASE_SERVICE_KEY` and the edit secret env vars.
 
 ## Seats Trend (party hero)
 
@@ -240,7 +242,7 @@ Manual checks:
 - `/elections` loads all parties and card links, plus the all-parties residence map with party filter.
 - `/elections/[partyId]` renders a breadcrumb (`בחירות 2026 / {party}` linking back to `/elections`), the party header, live seats trend from last 5 polls, stats, candidate list, and map.
 - Parties without candidate rows show empty candidate/map states.
-- `/elections/edit` requires `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` (or shared `PIPELINE_EDIT_SECRET`), unlocks with the password, and can save a candidate field change via `/api/elections/update-candidate` when `SUPABASE_SERVICE_KEY` is set (anon UPDATE must be revoked).
+- `/elections/edit` requires `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` (or shared `PIPELINE_EDIT_SECRET`), unlocks with the password, and can save a candidate field change via `/api/elections/update-candidate` when `SUPABASE_SERVICE_KEY` is set.
 - `/elections/edit` party panel can save party name, color, logo, ballot letter, and description for the selected party via `/api/elections/update-party`.
 - In dev, **השלם מידע** on a card with missing fields fills the form from pipeline preview; save persists to Supabase.
 - In dev, for a party with 0–2 candidates, the party pipeline panel can paste a list, preview it, run all six stages, resolve review-queue items, and load candidate cards.

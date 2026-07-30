@@ -11,7 +11,6 @@ type KnessetFactionRow = {
   is_coalition: boolean | null
   start_date: string | null
   end_date: string | null
-  is_current: boolean | null
 }
 
 export type KnessetFactionOption = {
@@ -24,6 +23,7 @@ export type KnessetFactionOption = {
   isCoalition: boolean | null
   startDate: string | null
   endDate: string | null
+  /** Derived: no end_date means the faction is still open. */
   isCurrent: boolean
 }
 
@@ -45,7 +45,7 @@ function normalizeFaction(row: KnessetFactionRow): KnessetFactionOption {
     isCoalition: row.is_coalition,
     startDate: row.start_date,
     endDate: row.end_date,
-    isCurrent: row.is_current ?? false,
+    isCurrent: row.end_date == null,
   }
 }
 
@@ -80,7 +80,7 @@ export function useKnessetFactions(knessetId: number | null): UseKnessetFactions
       const { data, error: queryError } = await supabase
         .from('knesset_factions')
         .select(
-          'id, knesset_faction_id, name, short_name, color, logo_url, is_coalition, start_date, end_date, is_current',
+          'id, knesset_faction_id, name, short_name, color, logo_url, is_coalition, start_date, end_date',
         )
         .eq('knesset_id', knessetId)
         .order('name', { ascending: true })
@@ -126,7 +126,7 @@ export function useKnessetFactions(knessetId: number | null): UseKnessetFactions
     const { data, error: queryError } = await supabase
       .from('knesset_factions')
       .select(
-        'id, knesset_faction_id, name, short_name, color, logo_url, is_coalition, start_date, end_date, is_current',
+        'id, knesset_faction_id, name, short_name, color, logo_url, is_coalition, start_date, end_date',
       )
       .eq('knesset_id', knessetId)
       .order('name', { ascending: true })

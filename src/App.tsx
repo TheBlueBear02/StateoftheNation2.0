@@ -3,19 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from './components/SiteLayout'
+import { useSiteUpdates } from './hooks/useSiteUpdates'
 
 const HERO_BUTTONS = [
   { label: 'בחירות 2026', to: '/elections' },
   { label: 'הממשלה', to: '/government' },
   { label: 'סקרי מנדטים', to: '/elections/polls' },
   { label: 'הכנסת', to: '/knesset' },
-] as const
-
-const NEWS_ITEMS = [
-  'נתניהו: "הממשלה פועלת למען ביטחון האזרחים"',
-  'N12: סקר חדש מצביע על שינוי במפה הפוליטית',
-  'C14: דיון סוער בכנסת על תקציב המדינה',
-  'מצב האומה: דשבורד ממשלה מציג נתונים עדכניים מכל המשרדים',
 ] as const
 
 const DASHBOARD_ICONS = [
@@ -31,6 +25,7 @@ const HERO_VIDEO_SRC =
 function App() {
   const heroVideoRef = useRef<HTMLVideoElement>(null)
   const [heroVideoReady, setHeroVideoReady] = useState(false)
+  const { items: newsItems } = useSiteUpdates()
 
   useEffect(() => {
     const video = heroVideoRef.current
@@ -40,6 +35,7 @@ function App() {
   }, [])
 
   const revealHeroVideo = () => setHeroVideoReady(true)
+  const tickerItems = [...newsItems, ...newsItems]
 
   return (
     <SiteLayout>
@@ -95,12 +91,16 @@ function App() {
           </div>
         </section>
 
-        <aside className="news-strip" aria-label="חדשות">
+        <aside className="news-strip" aria-label="עדכונים">
           <div className="news-strip__track">
-            {[...NEWS_ITEMS, ...NEWS_ITEMS].map((headline, index) => (
-              <span key={`${headline}-${index}`} className="news-strip__item">
-                {headline}
-              </span>
+            {tickerItems.map((item, index) => (
+              <Link
+                key={`${item.key}-${index}`}
+                href={item.href}
+                className="news-strip__item"
+              >
+                {item.headline}
+              </Link>
             ))}
           </div>
         </aside>

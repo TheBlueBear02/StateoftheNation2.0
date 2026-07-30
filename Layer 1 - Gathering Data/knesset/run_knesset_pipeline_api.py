@@ -30,6 +30,11 @@ import fix_faction_links_all as faction_links
 import load_all_knesset_data as sync
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from emit_site_updates import (  # noqa: E402
+    diff_knesset_positions,
+    emit_knesset_run_update,
+    snapshot_knesset_positions,
+)
 from record_pipeline_run import record_pipeline_run  # noqa: E402
 
 load_dotenv()
@@ -274,6 +279,7 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict]:
         return STAGE_LABELS[stage], f"נטענו {count} ממשלות מהמסד (ללא OData)", summary
 
     if stage == 6:
+        before = snapshot_knesset_positions(sb)
         position_stats = sync.sync_positions(
             sb,
             people_map,
@@ -282,6 +288,10 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict]:
             gov_map,
             office_map,
         )
+        after = snapshot_knesset_positions(sb)
+        changes = diff_knesset_positions(before, after)
+        if changes:
+            emit_knesset_run_update(sb, changes=changes)
         entries = [
             position_stats["knesset_memberships"],
             position_stats["knesset_memberships_faction_id"],

@@ -17,6 +17,8 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -27,6 +29,12 @@ import generate_descriptions
 import geocode_cities
 import insert_raw_list
 import resolve_candidates
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from emit_site_updates import (  # noqa: E402
+    count_new_election_candidates,
+    emit_elections_run_update,
+)
 
 load_dotenv()
 
@@ -172,10 +180,13 @@ def cmd_insert(args) -> None:
 def cmd_stage(args) -> None:
     sb = insert_raw_list.get_supabase()
     stage = args.stage
+    started_at = datetime.now()
 
     try:
         if stage == 1:
             resolve_candidates.run(sb, dry_run=False)
+            if count_new_election_candidates(sb, since=started_at) > 0:
+                emit_elections_run_update(sb, since=started_at)
             review_count = len(load_review_queue())
             emit({
                 "ok": True,
@@ -313,7 +324,10 @@ def cmd_resolve_review(args) -> None:
     save_review_queue(queue)
 
     try:
+        started_at = datetime.now()
         resolve_candidates.run_approve(sb, dry_run=False)
+        if count_new_election_candidates(sb, since=started_at) > 0:
+            emit_elections_run_update(sb, since=started_at)
     except Exception as exc:
         fail(str(exc), args.json)
         return

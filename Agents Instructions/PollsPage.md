@@ -35,7 +35,9 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 
 Schema: `schema_polls.sql` (apply manually in Supabase).
 
-Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel). Review-queue alerts create a GitHub issue without a required label (`continue-on-error`). Validation: seat sum ±1 and ops alerts (staleness/volume) log warnings but exit 0 so scheduled runs stay green; harder data errors still fail and roll back that run’s aggregates.
+Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel). Needs `OPENAI_API_KEY` secret for homepage ticker emission (missing key skips emit). Review-queue alerts create a GitHub issue without a required label (`continue-on-error`). Validation: seat sum ±1 and ops alerts (staleness/volume) log warnings but exit 0 so scheduled runs stay green; harder data errors still fail and roll back that run’s aggregates.
+
+After a successful non-error run that inserted new polls, the orchestrator calls `emit_polls_run_update` (see [PiplinesPage.md](./PiplinesPage.md)) so the homepage news strip can link to `/elections/polls`.
 
 ## Dev Edit UI (`/elections/polls/edit`)
 

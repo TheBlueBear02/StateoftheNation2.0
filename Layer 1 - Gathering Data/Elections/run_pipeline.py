@@ -31,6 +31,7 @@ import sys
 import logging
 import argparse
 from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 from supabase import create_client
@@ -41,6 +42,12 @@ import generate_descriptions
 import geocode_cities
 import fetch_candidate_birthdates
 import fetch_candidate_wiki_urls
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from emit_site_updates import (  # noqa: E402
+    count_new_election_candidates,
+    emit_elections_run_update,
+)
 
 load_dotenv()
 
@@ -112,6 +119,9 @@ def main():
 
     elapsed = (datetime.now() - start).seconds
     log.info("═══ Pipeline complete in %dm %ds ═══", elapsed // 60, elapsed % 60)
+
+    if not args.dry_run and count_new_election_candidates(sb, since=start) > 0:
+        emit_elections_run_update(sb, since=start)
 
 
 if __name__ == "__main__":

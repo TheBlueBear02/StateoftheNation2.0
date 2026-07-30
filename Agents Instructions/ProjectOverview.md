@@ -98,8 +98,11 @@ Page UI lives in `src/views/*` (and `src/App.tsx` for home). App Router `page.ts
 | `knesset/` | OData sync (`load_all_knesset_data.py`), faction fixes, images |
 | `Elections/` | Candidate list pipeline + `run_party_pipeline_api.py` |
 | `Polls/` | Wikipedia scrape → normalize → aggregates; GitHub Actions cron |
+| (shared) | `record_pipeline_run.py` (ops log) · `emit_site_updates.py` (homepage ticker) |
 
 These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Local Next Route Handlers spawn Python only when `NODE_ENV=development` or `ENABLE_PIPELINE_API=1`.
+
+**Pipeline finish hooks:** after successful non-dry-run work, orchestrators call `record_pipeline_run` (ops) and `emit_site_updates` collectors (homepage news strip). See [PiplinesPage.md](./PiplinesPage.md). Required for every existing and future pipeline.
 
 ## Application Architecture
 
@@ -136,7 +139,7 @@ NEXT_PUBLIC_PIPELINE_EDIT_SECRET=...  # shared unlock for /piplines + all /edit 
 NEXT_PUBLIC_ELECTIONS_EDIT_SECRET=... # fallback alias (or VITE_ / ELECTIONS_EDIT_SECRET)
 NEXT_PUBLIC_KNESSET_EDIT_SECRET=...   # fallback alias (or VITE_ / KNESSET_EDIT_SECRET)
 SUPABASE_SERVICE_KEY=...              # pipelines + local edit APIs
-OPENAI_API_KEY=...                    # elections enrichment
+OPENAI_API_KEY=...                    # elections enrichment + homepage site_updates headlines
 ENABLE_PIPELINE_API=1                 # optional: allow Python APIs outside development
 ```
 

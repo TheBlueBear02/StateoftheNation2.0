@@ -41,6 +41,14 @@ import xml.etree.ElementTree as ET
 import requests
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from emit_site_updates import (  # noqa: E402
+    diff_knesset_positions,
+    emit_knesset_run_update,
+    snapshot_knesset_positions,
+)
 
 load_dotenv()
 
@@ -465,22 +473,31 @@ def sync_offices(sb: Client) -> dict[int, int]:
     Source:   KNS_GovMinistry
     Verified: GovMinistryID · Name · IsActive
     Note:     NameEng and IsShown do NOT exist in the live API.
+
+    Ownership:
+      knesset_category_name — always mirrored from OData Name
+      name — display override; set on insert only, never overwritten by sync
+      is_active — mirrored from OData
     """
     log.info("── syncing offices ──")
     raw = fetch_odata("KNS_GovMinistry")
 
-    rows = [
-        {
-            "knesset_category_id":   r["GovMinistryID"],
+    existing_keys = set(load_id_map(sb, "offices", "knesset_category_id").keys())
+    rows = []
+    for r in raw:
+        category_id = r.get("GovMinistryID")
+        if category_id is None:
+            continue
+        row = {
+            "knesset_category_id":   category_id,
             "knesset_category_name": r.get("Name"),
-            "name":                  r.get("Name"),
             "is_active":             bool(r.get("IsActive", True)),
         }
-        for r in raw
-        if r.get("GovMinistryID") is not None
-    ]
+        # Preserve curated display names on existing rows.
+        if category_id not in existing_keys:
+            row["name"] = r.get("Name")
+        rows.append(row)
 
-    existing_keys = set(load_id_map(sb, "offices", "knesset_category_id").keys())
     stats = upsert(sb, "offices", rows, "knesset_category_id", existing_keys)
     return load_id_map(sb, "offices", "knesset_category_id"), stats
 
@@ -549,7 +566,6 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
             "knesset_position_id": r["PersonToPositionID"],
             "person_id":           person_id,
             "knesset_id":          knesset_id,
-            "is_coalition":        False,   # not in OData — set via knesset_factions.is_coalition
             "start_date":          r.get("StartDate"),
             "end_date":            r.get("FinishDate"),  # ← FinishDate, NOT EndDate
             "duty_desc":           r.get("DutyDesc"),
@@ -655,7 +671,12 @@ def sync_all(sb: Client) -> None:
     faction_map, _ = sync_factions(sb, knesset_map)
     office_map, _ = sync_offices(sb)
     gov_map = sync_governments(sb)
+    before = snapshot_knesset_positions(sb)
     sync_positions(sb, people_map, knesset_map, faction_map, gov_map, office_map)
+    after = snapshot_knesset_positions(sb)
+    changes = diff_knesset_positions(before, after)
+    if changes:
+        emit_knesset_run_update(sb, changes=changes)
 
     elapsed = (datetime.now() - start).seconds
     log.info("═══ Sync complete in %dm %ds ═══", elapsed // 60, elapsed % 60)
@@ -701,14 +722,23 @@ def main():
         fm = load_id_map(sb, "knesset_factions", "knesset_faction_id")
         gm = load_id_map(sb, "governments",      "government_number")
         om = load_id_map(sb, "offices",          "knesset_category_id")
+
+        def sync_positions_with_emit() -> None:
+            before = snapshot_knesset_positions(sb)
+            sync_positions(sb, pm, km, fm, gm, om)
+            after = snapshot_knesset_positions(sb)
+            changes = diff_knesset_positions(before, after)
+            if changes:
+                emit_knesset_run_update(sb, changes=changes)
+
         {
             "knessets":              lambda: sync_knessets(sb),
             "people":                lambda: sync_people(sb),
             "knesset_factions":      lambda: sync_factions(sb, km),
             "offices":               lambda: sync_offices(sb),
             "governments":           lambda: sync_governments(sb),
-            "knesset_memberships":   lambda: sync_positions(sb, pm, km, fm, gm, om),
-            "minister_appointments": lambda: sync_positions(sb, pm, km, fm, gm, om),
+            "knesset_memberships":   sync_positions_with_emit,
+            "minister_appointments": sync_positions_with_emit,
         }[args.table]()
     else:
         sync_all(sb)

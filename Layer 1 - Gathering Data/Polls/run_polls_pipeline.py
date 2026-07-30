@@ -43,6 +43,7 @@ import validate_polls
 from db import get_supabase
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from emit_site_updates import emit_polls_run_update  # noqa: E402
 from record_pipeline_run import record_pipeline_run  # noqa: E402
 
 load_dotenv()
@@ -86,6 +87,7 @@ def main() -> None:
     as_of_dates = None
     exit_code = 0
     run_error: str | None = None
+    polls_inserted = 0
 
     try:
         if not args.stage or args.stage == 1:
@@ -102,7 +104,8 @@ def main() -> None:
 
         if not args.stage or args.stage == 4:
             log.info("─── Stage 4: normalize polls ───")
-            normalize_polls.run(sb, args.dry_run)
+            norm_stats = normalize_polls.run(sb, args.dry_run)
+            polls_inserted = int(norm_stats.get("inserted", 0))
 
         if not args.stage or args.stage == 5:
             log.info("─── Stage 5: compute aggregates ───")
@@ -137,6 +140,9 @@ def main() -> None:
             source=source,
             started_at=start,
         )
+        # Homepage ticker only when this run inserted new poll rows
+        if status != "error" and polls_inserted > 0:
+            emit_polls_run_update(sb, since=start)
 
     sys.exit(exit_code)
 

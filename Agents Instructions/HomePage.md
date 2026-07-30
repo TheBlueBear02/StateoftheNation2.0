@@ -37,6 +37,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/app/page.tsx` | Homepage route + metadata |
 | `src/app/layout.tsx` | RTL (`lang="he"` `dir="rtl"`), Heebo via `next/font`, root metadata, Vercel Analytics |
 | `src/App.tsx` | Homepage body — section markup and static content arrays |
+| `src/hooks/useSiteUpdates.ts` | Loads `site_updates` for the news strip (static fallback if empty) |
 | `src/components/SiteHeader.tsx` | Shared header; hidden on homepage mobile (≤900px) |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue); legal links to `/about` and `/terms` only |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
@@ -111,7 +112,8 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 - Black background, white text, blue dot separators.
 - Full-bleed edge-to-edge (no `.container`) — intentional marquee effect.
-- Headlines from `NEWS_ITEMS` in `App.tsx` (static placeholder copy).
+- Headlines from `site_updates` via `useSiteUpdates` (written by pipeline finish hooks in `emit_site_updates.py`). Each item is a `Link` to its `href` (e.g. `/elections/polls`, `/knesset`).
+- Static fallback copy is used only when the table is empty or the query fails.
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
 - CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
 
@@ -155,7 +157,8 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 ## State Management
 
-- Homepage content is static arrays in `App.tsx`.
+- Homepage project teasers remain static in `App.tsx`.
+- News strip loads live rows from `site_updates` (`src/hooks/useSiteUpdates.ts`); see [PiplinesPage.md](./PiplinesPage.md) for the mandatory pipeline finish-hook.
 - The **בחירות 2026** hero CTA routes to the `/elections` module documented in `Agents Instructions/ElectionsPage.md`.
 - Knesset page uses `useKnessetMembers` hook with Supabase (see `Agents Instructions/KnessetPage.md`).
 
@@ -180,7 +183,6 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 ## Future Work
 
 - Wire remaining placeholder hero buttons to real routes.
-- Replace `NEWS_ITEMS` with live news feed API.
 - Replace dashboard CSS placeholder with final dashboard screenshot/asset.
 - Replace polls CSS bar-chart placeholder with a final polls page screenshot/asset.
 
