@@ -5,6 +5,8 @@ import type { NextConfig } from 'next'
  * does not need to be rewritten during the migration.
  */
 const nextConfig: NextConfig = {
+  // Allow phone / LAN access to Next.js dev HMR and assets.
+  allowedDevOrigins: ['192.168.1.25'],
   env: {
     NEXT_PUBLIC_SUPABASE_URL:
       process.env.NEXT_PUBLIC_SUPABASE_URL ||

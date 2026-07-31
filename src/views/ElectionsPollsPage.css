@@ -250,6 +250,7 @@
 }
 
 .polls-bar-chart__bar {
+  --bar-color: var(--color-blue);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -257,8 +258,8 @@
   padding-block-end: 12px;
   background: linear-gradient(
     to top,
-    color-mix(in srgb, var(--color-blue) 55%, black) 0%,
-    var(--color-blue) 65%
+    color-mix(in srgb, var(--bar-color) 55%, black) 0%,
+    var(--bar-color) 65%
   );
   transition: filter 0.15s ease;
 }
@@ -376,40 +377,53 @@
     grid-template-columns: 1fr;
   }
 
+  .polls-chart--bars .polls-chart__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .polls-chart--bars .polls-chart__n-picker {
+    margin-inline: auto;
+    align-self: center;
+  }
+
+  /* Horizontal (sideways) party bars — Maariv-style mobile layout */
   .polls-bar-chart-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-block-end: 8px;
+    overflow: visible;
+    padding-block: 4px 8px;
   }
 
   .polls-bar-chart {
-    --poll-bar-column-width: 34px;
-    min-width: max(100%, calc(var(--poll-bar-columns, 10) * var(--poll-bar-column-width)));
-    gap: 3px;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    /* Labels on the left, bars grow right (matches common Israeli poll charts). */
+    direction: ltr;
   }
 
   .polls-bar-chart__column {
-    flex: 0 0 var(--poll-bar-column-width);
-    max-width: var(--poll-bar-column-width);
-    gap: 6px;
-  }
-
-  .polls-bar-chart__bar {
-    max-width: 26px;
-    padding-block-end: 8px;
-  }
-
-  .polls-bar-chart__value {
-    font-size: 0.8rem;
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    max-width: none;
+    gap: 0;
+    min-height: 28px;
   }
 
   .polls-bar-chart__label {
+    order: 1;
     display: flex;
-    align-items: flex-end;
-    justify-content: center;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 0 clamp(4.5rem, 28vw, 7.5rem);
+    width: auto;
     min-height: 0;
-    width: 100%;
-    max-height: 5.75rem;
+    max-height: none;
+    padding-inline-end: 8px;
+    border-inline-end: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 0.78rem;
+    text-align: end;
     overflow: hidden;
   }
 
@@ -419,15 +433,44 @@
 
   .polls-bar-chart__label-text--mobile {
     display: block;
-    font-size: 0.58rem;
+    font-size: inherit;
     font-weight: 700;
-    line-height: 1.05;
-    writing-mode: vertical-rl;
+    line-height: 1.15;
+    writing-mode: horizontal-tb;
     text-orientation: mixed;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-height: 5.5rem;
+    max-height: none;
+  }
+
+  .polls-bar-chart__plot {
+    order: 2;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    height: 28px !important;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .polls-bar-chart__bar {
+    height: 100% !important;
+    width: max(var(--bar-pct, 0%), 1.75rem);
+    max-width: 100%;
+    padding-block-end: 0;
+    padding-inline-start: 7px;
+    align-items: center;
+    justify-content: flex-start;
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--bar-color) 55%, black) 0%,
+      var(--bar-color) 65%
+    );
+  }
+
+  .polls-bar-chart__value {
+    font-size: 0.85rem;
   }
 }
 

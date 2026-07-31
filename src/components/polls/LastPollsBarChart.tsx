@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { formatFieldwork, type PollWithResults } from '../../hooks/usePolls'
 import {
-  displayBlocBarGradientForParty,
+  displayBlocColorForParty,
   formatPollPublisher,
   MIN_DISPLAY_SEATS,
   type PartySeatAverage,
@@ -183,15 +183,12 @@ export function LastPollsBarChart({
           className="polls-bar-chart"
           role="list"
           aria-label={chartAriaLabel}
-          style={{ ['--poll-bar-columns' as string]: visible.length }}
         >
           {visible.map((party) => {
             const displaySeats = Math.round(party.seatsAvg)
-            const height = Math.max(
-              (displaySeats / maxSeats) * PLOT_HEIGHT,
-              MIN_BAR_HEIGHT,
-            )
-            const mobileLabel = party.partyShortName ?? party.partyName
+            const fillRatio = displaySeats / maxSeats
+            const height = Math.max(fillRatio * PLOT_HEIGHT, MIN_BAR_HEIGHT)
+            const label = party.partyShortName ?? party.partyName
 
             return (
               <Link
@@ -209,7 +206,8 @@ export function LastPollsBarChart({
                     className="polls-bar-chart__bar"
                     style={{
                       height: `${height}px`,
-                      background: displayBlocBarGradientForParty(party),
+                      ['--bar-color' as string]: displayBlocColorForParty(party),
+                      ['--bar-pct' as string]: `${fillRatio * 100}%`,
                     }}
                   >
                     <span className="polls-bar-chart__value">{displaySeats}</span>
@@ -217,10 +215,10 @@ export function LastPollsBarChart({
                 </div>
                 <p className="polls-bar-chart__label" aria-hidden="true">
                   <span className="polls-bar-chart__label-text polls-bar-chart__label-text--desktop">
-                    {party.partyName}
+                    {label}
                   </span>
                   <span className="polls-bar-chart__label-text polls-bar-chart__label-text--mobile">
-                    {mobileLabel}
+                    {label}
                   </span>
                 </p>
               </Link>
