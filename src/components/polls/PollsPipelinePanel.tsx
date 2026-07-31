@@ -9,13 +9,16 @@ import {
 import {
   POLLS_STAGE_LABELS,
   runPollsStage,
+  savePollsSiteUpdate,
   type PollsDiagnostics,
+  type PollsSiteUpdate,
   type PipelineRunSummary,
 } from '../../lib/runPollsPipeline'
 
 type PanelPhase = 'idle' | 'running' | 'success' | 'error'
 
-const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6] as const
+const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6, 7] as const
+const TOTAL_STAGES = STAGE_NUMBERS.length
 
 function mergeSummaries(parts: PipelineRunSummary[]): PipelineRunSummary {
   const stages = parts.flatMap((part) => part.stages)
@@ -58,6 +61,13 @@ function lineTone(line: string): 'error' | 'warning' | 'info' {
   return 'info'
 }
 
+function wordCount(text: string): number {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
 export function PollsPipelinePanel({
   onComplete,
   initialDiagnostics = null,
@@ -73,6 +83,12 @@ export function PollsPipelinePanel({
   )
   const [force, setForce] = useState(false)
   const [backfill, setBackfill] = useState(false)
+  const [siteUpdate, setSiteUpdate] = useState<PollsSiteUpdate | null>(null)
+  const [headlineDraft, setHeadlineDraft] = useState('')
+  const [savingHeadline, setSavingHeadline] = useState(false)
+  const [headlineSaveMessage, setHeadlineSaveMessage] = useState<string | null>(
+    null,
+  )
   const progress = usePipelineRunProgress(phase === 'running')
 
   useEffect(() => {
@@ -82,19 +98,36 @@ export function PollsPipelinePanel({
     setDiagnostics(initialDiagnostics)
   }, [initialDiagnostics, phase])
 
+  function applySiteUpdate(next: PollsSiteUpdate | null | undefined) {
+    if (!next?.headline) {
+      return
+    }
+    setSiteUpdate(next)
+    setHeadlineDraft(next.headline)
+    setHeadlineSaveMessage(null)
+  }
+
   async function handleFullSync() {
     setPhase('running')
     setMessage(null)
     setRunSummary(null)
     setDiagnostics(null)
+    setSiteUpdate(null)
+    setHeadlineDraft('')
+    setHeadlineSaveMessage(null)
     progress.resetRun()
 
+    const syncStartedAt = new Date().toISOString()
     const parts: PipelineRunSummary[] = []
     const diagParts: PollsDiagnostics[] = []
 
     for (const stage of STAGE_NUMBERS) {
       progress.beginStep(stage)
-      const result = await runPollsStage(stage, { force, backfill })
+      const result = await runPollsStage(stage, {
+        force,
+        backfill,
+        ...(stage === 7 ? { since: syncStartedAt } : {}),
+      })
       if (!result.ok) {
         progress.finishStep(stage)
         setPhase('error')
@@ -109,6 +142,9 @@ export function PollsPipelinePanel({
       parts.push(result.summary)
       if (result.diagnostics) {
         diagParts.push(result.diagnostics)
+      }
+      if (result.siteUpdate) {
+        applySiteUpdate(result.siteUpdate)
       }
     }
 
@@ -125,6 +161,9 @@ export function PollsPipelinePanel({
     setMessage(null)
     setRunSummary(null)
     setDiagnostics(null)
+    if (stage === 7) {
+      setHeadlineSaveMessage(null)
+    }
     progress.resetRun()
     progress.beginStep(stage)
 
@@ -143,16 +182,51 @@ export function PollsPipelinePanel({
     progress.finishStep(stage)
     setRunSummary(result.summary)
     setDiagnostics(result.diagnostics ?? null)
+    if (result.siteUpdate) {
+      applySiteUpdate(result.siteUpdate)
+    } else if (stage === 7) {
+      setSiteUpdate(null)
+      setHeadlineDraft('')
+    }
     setPhase('success')
     progress.clearCurrent()
     setMessage(result.message)
     await onComplete()
   }
 
+  async function handleSaveHeadline() {
+    if (!siteUpdate?.id) {
+      setHeadlineSaveMessage('אין עדכון לשמירה')
+      return
+    }
+    const nextHeadline = headlineDraft.trim()
+    if (!nextHeadline) {
+      setHeadlineSaveMessage('חסרה כותרת')
+      return
+    }
+
+    setSavingHeadline(true)
+    setHeadlineSaveMessage(null)
+    const result = await savePollsSiteUpdate(siteUpdate.id, nextHeadline)
+    setSavingHeadline(false)
+
+    if (!result.ok) {
+      setHeadlineSaveMessage(result.error)
+      return
+    }
+
+    setSiteUpdate(result.siteUpdate)
+    setHeadlineDraft(result.siteUpdate.headline)
+    setHeadlineSaveMessage('הכותרת נשמרה')
+  }
+
   const running = phase === 'running'
   const { currentStage, totalElapsedSeconds, stepElapsedSeconds, stepDurations } =
     progress
   const consoleLines = diagnostics?.lines ?? []
+  const headlineDirty =
+    Boolean(siteUpdate) && headlineDraft.trim() !== (siteUpdate?.headline ?? '')
+  const draftWordCount = wordCount(headlineDraft)
 
   return (
     <section
@@ -169,7 +243,8 @@ export function PollsPipelinePanel({
           העדכנית ביותר (Seat projections) — בלי טבלאות ארכיון ותרחישים.
           שורות שכבר קיימות במסד לא נכנסות מחדש לתור. סמנו &quot;כפייה&quot;
           כדי למשוך מחדש גם כש־revid לא השתנה, או &quot;backfill&quot; לכל
-          הטבלאות וכל ארבעת דפי הויקיפדיה.
+          הטבלאות וכל ארבעת דפי הויקיפדיה. שלב 7 יוצר כותרת לפס החדשות בדף
+          הבית כשיש סקרים חדשים.
         </p>
       </div>
 
@@ -263,7 +338,7 @@ export function PollsPipelinePanel({
             aria-hidden="true"
           />
           {currentStage
-            ? `שלב ${currentStage} מתוך 6 — ${POLLS_STAGE_LABELS[currentStage]} (${formatPipelineElapsed(stepElapsedSeconds)}) · סה״כ ${formatPipelineElapsed(totalElapsedSeconds)}`
+            ? `שלב ${currentStage} מתוך ${TOTAL_STAGES} — ${POLLS_STAGE_LABELS[currentStage]} (${formatPipelineElapsed(stepElapsedSeconds)}) · סה״כ ${formatPipelineElapsed(totalElapsedSeconds)}`
             : `מריץ… (${formatPipelineElapsed(totalElapsedSeconds)})`}
         </p>
       ) : null}
@@ -281,6 +356,74 @@ export function PollsPipelinePanel({
         >
           {message}
         </p>
+      ) : null}
+
+      {siteUpdate ? (
+        <div
+          className="polls-site-update"
+          aria-labelledby="polls-site-update-title"
+        >
+          <div className="polls-site-update__header">
+            <h3 id="polls-site-update-title" className="polls-site-update__title">
+              עדכון לפס החדשות בדף הבית
+            </h3>
+            <p className="polls-site-update__hint">
+              הכותרת נשמרה אוטומטית אחרי יצירה. אפשר לערוך ולשמור מחדש. מומלץ עד
+              8 מילים. קישור: {siteUpdate.href}
+            </p>
+          </div>
+          <label className="polls-site-update__label" htmlFor="polls-site-update-headline">
+            כותרת
+          </label>
+          <textarea
+            id="polls-site-update-headline"
+            className="polls-site-update__textarea"
+            rows={2}
+            value={headlineDraft}
+            disabled={running || savingHeadline || !siteUpdate.id}
+            onChange={(event) => {
+              setHeadlineDraft(event.target.value)
+              setHeadlineSaveMessage(null)
+            }}
+          />
+          <div className="polls-site-update__meta">
+            <span
+              className={
+                draftWordCount > 8
+                  ? 'polls-site-update__words polls-site-update__words--warn'
+                  : 'polls-site-update__words'
+              }
+            >
+              {draftWordCount} מילים
+            </span>
+            <button
+              type="button"
+              className="candidate-edit-card__save"
+              disabled={
+                running ||
+                savingHeadline ||
+                !siteUpdate.id ||
+                !headlineDraft.trim() ||
+                !headlineDirty
+              }
+              onClick={() => void handleSaveHeadline()}
+            >
+              {savingHeadline ? 'שומר…' : 'שמור כותרת'}
+            </button>
+          </div>
+          {headlineSaveMessage ? (
+            <p
+              className={
+                headlineSaveMessage === 'הכותרת נשמרה'
+                  ? 'candidate-edit-card__status candidate-edit-card__status--success'
+                  : 'candidate-edit-card__status candidate-edit-card__status--error'
+              }
+              role="status"
+            >
+              {headlineSaveMessage}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div

@@ -465,6 +465,8 @@ Staging table for parsed Wikipedia poll rows.
 | `content_hash` | text | SHA-256 of payload |
 | `natural_key` | text | SHA-256 of raw fieldwork\|pollster\|publisher\|section |
 | `status` | text | `'pending'` \| `'processed'` \| `'superseded'` \| `'rejected'` |
+| `error` | text | Rejection / processing error message (nullable) |
+| `created_at` | timestamptz | Insert time — no `updated_at` on this table |
 
 **Convention note:** Unlike `raw_candidate_lists.processed` (boolean), this table uses a four-state `status` text column because `superseded` and `rejected` are load-bearing states.
 

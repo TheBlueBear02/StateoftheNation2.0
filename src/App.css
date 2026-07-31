@@ -334,6 +334,20 @@
   text-decoration: none;
 }
 
+.news-strip__when {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.news-strip__sep {
+  margin-inline: 0.45em;
+  opacity: 0.55;
+}
+
+.news-strip__headline {
+  min-width: 0;
+}
+
 .news-strip__item:hover {
   text-decoration: underline;
   text-underline-offset: 3px;

@@ -13,6 +13,7 @@ export const maxDuration = 300
 const STATUS_TIMEOUT_MS = 120_000
 const STAGE_TIMEOUT_MS = 600_000
 const FULL_SYNC_TIMEOUT_MS = 1_800_000
+const SAVE_SITE_UPDATE_TIMEOUT_MS = 60_000
 
 const POLLS_DIR = path.join(process.cwd(), 'Layer 1 - Gathering Data', 'Polls')
 
@@ -60,10 +61,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         stage?: number
         backfill?: boolean
         force?: boolean
+        since?: string
       }
       const stage = Number(body?.stage)
 
-      if (!Number.isInteger(stage) || stage < 1 || stage > 6) {
+      if (!Number.isInteger(stage) || stage < 1 || stage > 7) {
         return jsonError('מספר שלב לא תקין', 400)
       }
 
@@ -79,6 +81,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
       if (body?.force) {
         args.push('--force')
+      }
+      if (body?.since && typeof body.since === 'string') {
+        args.push('--since', body.since)
       }
 
       const result = await runPythonScript(POLLS_DIR, args, {
@@ -106,12 +111,46 @@ export async function POST(request: NextRequest, context: RouteContext) {
       })
       return jsonOk(result, result.ok ? 200 : 400)
     }
+
+    if (route === 'site-update') {
+      const body = (await request.json()) as {
+        id?: number
+        headline?: string
+      }
+      const updateId = Number(body?.id)
+      const headline = typeof body?.headline === 'string' ? body.headline.trim() : ''
+
+      if (!Number.isInteger(updateId) || updateId < 1) {
+        return jsonError('מזהה עדכון לא תקין', 400)
+      }
+      if (!headline) {
+        return jsonError('חסרה כותרת', 400)
+      }
+
+      const result = await runPythonScript(
+        POLLS_DIR,
+        [
+          'run_polls_pipeline_api.py',
+          'save-site-update',
+          '--update-id',
+          String(updateId),
+          '--headline',
+          headline,
+          '--json',
+        ],
+        { timeoutMs: SAVE_SITE_UPDATE_TIMEOUT_MS },
+      )
+      return jsonOk(result, result.ok ? 200 : 400)
+    }
   } catch {
     if (route === 'pipeline/stage') {
       return jsonError('שגיאת שרת בעת הרצת שלב', 500)
     }
     if (route === 'pipeline/sync-full') {
       return jsonError('שגיאת שרת בעת סנכרון סקרים', 500)
+    }
+    if (route === 'site-update') {
+      return jsonError('שגיאת שרת בעת שמירת עדכון', 500)
     }
     return jsonError('שגיאת שרת', 500)
   }

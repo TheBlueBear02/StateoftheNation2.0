@@ -25,12 +25,20 @@ const HERO_VIDEO_SRC =
 function App() {
   const heroVideoRef = useRef<HTMLVideoElement>(null)
   const [heroVideoReady, setHeroVideoReady] = useState(false)
+  const [heroVideoFailed, setHeroVideoFailed] = useState(false)
   const { items: newsItems } = useSiteUpdates()
 
   useEffect(() => {
     const video = heroVideoRef.current
     if (!video) return
+
     video.muted = true
+
+    // Cached videos may already be past loadeddata before React listeners attach
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setHeroVideoReady(true)
+    }
+
     void video.play().catch(() => {})
   }, [])
 
@@ -69,24 +77,40 @@ function App() {
             </div>
 
             <div className="hero__visual">
-              <video
-                ref={heroVideoRef}
-                className={`hero__bear${heroVideoReady ? ' hero__bear--ready' : ''}`}
-                src={HERO_VIDEO_SRC}
-                autoPlay
-                muted
-                playsInline
-                preload="auto"
-                aria-label="דוב מצב האומה מאחורי דוכן נאומים"
-                width={419}
-                height={320}
-                onLoadedData={(event) => {
-                  revealHeroVideo()
-                  void event.currentTarget.play().catch(() => {})
-                }}
-                onCanPlay={revealHeroVideo}
-                onPlaying={revealHeroVideo}
-              />
+              {heroVideoFailed ? (
+                <img
+                  className="hero__bear hero__bear--ready"
+                  src="/hero-bear-image.svg"
+                  alt="דוב מצב האומה מאחורי דוכן נאומים"
+                  width={419}
+                  height={320}
+                />
+              ) : (
+                <video
+                  ref={heroVideoRef}
+                  className={`hero__bear${heroVideoReady ? ' hero__bear--ready' : ''}`}
+                  src={HERO_VIDEO_SRC}
+                  poster="/hero-bear-image.svg"
+                  autoPlay
+                  muted
+                  playsInline
+                  preload="auto"
+                  aria-label="דוב מצב האומה מאחורי דוכן נאומים"
+                  width={419}
+                  height={320}
+                  onLoadedData={(event) => {
+                    revealHeroVideo()
+                    void event.currentTarget.play().catch(() => {})
+                  }}
+                  onLoadedMetadata={revealHeroVideo}
+                  onCanPlay={revealHeroVideo}
+                  onPlaying={revealHeroVideo}
+                  onError={() => {
+                    setHeroVideoFailed(true)
+                    setHeroVideoReady(true)
+                  }}
+                />
+              )}
             </div>
           </div>
         </section>
@@ -99,7 +123,15 @@ function App() {
                 href={item.href}
                 className="news-strip__item"
               >
-                {item.headline}
+                {item.whenLabel ? (
+                  <>
+                    <span className="news-strip__when">{item.whenLabel}</span>
+                    <span className="news-strip__sep" aria-hidden="true">
+                      |
+                    </span>
+                  </>
+                ) : null}
+                <span className="news-strip__headline">{item.headline}</span>
               </Link>
             ))}
           </div>

@@ -63,6 +63,67 @@
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.knesset-site-update {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fafafa;
+}
+
+.knesset-site-update__header {
+  margin-bottom: 12px;
+}
+
+.knesset-site-update__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.knesset-site-update__hint {
+  margin: 6px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.knesset-site-update__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.knesset-site-update__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: #fff;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.knesset-site-update__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.knesset-site-update__words {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.knesset-site-update__words--warn {
+  color: #b54708;
+  font-weight: 600;
+}
+
 .knesset-pipeline-panel__subheading {
   margin: 0 0 8px;
   font-size: 1.05rem;

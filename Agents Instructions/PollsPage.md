@@ -29,6 +29,7 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 | `normalize_polls.py` | 4 | `polls` + `poll_results` |
 | `compute_aggregates.py` | 5 | `last3` + `weighted` |
 | `validate_polls.py` | 6 | hard gates + ops alerts |
+| (API stage 7) | 7 | `emit_polls_run_update` → homepage `site_updates` headline (editable in UI) |
 | `seed_parties.py` | one-off | confirmed + historical + polled_only parties (ישר is confirmed; נועם and בית ציוני are polled_only). Matches by *normalized* `short_name` (quote/dash variants) so it never recreates ש״ס / ש"ס duplicates; merges any existing quote-variant dupes into the preferred row |
 | `seed_party_aliases.py` | one-off | English labels + lineage |
 | `seed_poll_publishers.sql` | one-off | Distinct `polls.publisher` → `poll_publishers` + `publisher_id` backfill |
@@ -37,7 +38,7 @@ Schema: `schema_polls.sql` (apply manually in Supabase).
 
 Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel). Needs `OPENAI_API_KEY` secret for homepage ticker emission (missing key skips emit). Review-queue alerts create a GitHub issue without a required label (`continue-on-error`). Validation: seat sum ±1 and ops alerts (staleness/volume) log warnings but exit 0 so scheduled runs stay green; harder data errors still fail and roll back that run’s aggregates.
 
-After a successful non-error run that inserted new polls, the orchestrator calls `emit_polls_run_update` (see [PiplinesPage.md](./PiplinesPage.md)) so the homepage news strip can link to `/elections/polls`.
+After a successful non-error CLI run that inserted new polls, the orchestrator calls `emit_polls_run_update` (see [PiplinesPage.md](./PiplinesPage.md)) so the homepage news strip can link to `/elections/polls`. In the edit UI, that emit is **stage 7** (`יצירת עדכון`) instead of an invisible post-hook after stage 4.
 
 ## Dev Edit UI (`/elections/polls/edit`)
 
@@ -48,9 +49,10 @@ Shows:
 - Table counts (`polls`, `poll_results`, `raw_poll_rows`, `poll_aggregates`)
 - Pending raw rows and `review_queue.json` size
 - Per-page Wikipedia revid / last success
-- Full sync button (**טען סקרים חדשים**) — runs stages 1–6 sequentially via `POST /api/polls/pipeline/stage` (incremental by default: main wiki page, **latest Seat projections table only**, insert new staging rows only). Active stage is highlighted with a live per-step timer plus total run time (`usePipelineRunProgress`)
-- Optional per-stage run, `--force` (re-fetch wiki), and `--backfill` (all seat + scenario tables on all four wiki pages; full validation)
-- **Error / warning console** on the edit panel — shows stage diagnostics after each run (parse warnings, rejected `raw_poll_rows` with reason, validation errors). Fed by `diagnostics` / `recentRejected` from the polls pipeline API (`run_polls_pipeline_api.py`)
+- Full sync button (**טען סקרים חדשים**) — runs stages 1–7 sequentially via `POST /api/polls/pipeline/stage` (incremental by default: main wiki page, **latest Seat projections table only**, insert new staging rows only). Active stage is highlighted with a live per-step timer plus total run time (`usePipelineRunProgress`). Stage 7 receives the sync start timestamp as `since` so it only considers polls inserted during that run
+- Optional per-stage run, `--force` (re-fetch wiki), and `--backfill` (all seat + scenario tables on all four wiki pages; full validation). Standalone stage 7 uses the last `polls_run` ticker time (or a 48h lookback) when `since` is omitted
+- **Site update editor** — after stage 7 creates a `site_updates` row, the panel shows the generated Hebrew headline in an editable textarea with word count and **שמור כותרת** (`POST /api/polls/site-update`)
+- **Error / warning console** on the edit panel — shows stage diagnostics after each run (parse warnings, rejected `raw_poll_rows` with reason, validation errors). Fed by `diagnostics` / `recentRejected` from the polls pipeline API (`run_polls_pipeline_api.py`); rejected-row fetch uses `created_at` only (`raw_poll_rows` has no `updated_at`)
 
 Requires `npm run dev` (or `ENABLE_PIPELINE_API`), `SUPABASE_SERVICE_KEY`, and `PIPELINE_EDIT_SECRET` / `NEXT_PUBLIC_PIPELINE_EDIT_SECRET` (or legacy elections/knesset secrets). Next.js route: `src/app/api/polls/[...path]/route.ts` → `/api/polls/*`.
 
@@ -61,14 +63,14 @@ Requires `npm run dev` (or `ENABLE_PIPELINE_API`), `SUPABASE_SERVICE_KEY`, and `
 | `src/hooks/usePolls.ts` | Recent polls with joined results (includes party `bloc`, logo/color with confirmed-party + faction branding fallback) |
 | `src/hooks/usePollAggregates.ts` | Weighted/last3 aggregates + daily trend series from `poll_aggregates` |
 | `src/lib/pollChartData.ts` | Last-N average, per-party last-N trend, multi-party trend lines, bloc totals, per-poll snapshots for charts |
-| `src/lib/runPollsPipeline.ts` | Dev API client for status / sync / stage |
+| `src/lib/runPollsPipeline.ts` | Dev API client for status / sync / stage / save site-update |
 | `src/components/polls/LastPollsBarChart.tsx` | Vertical bar chart — average of last 5 polls (horizontal bars on mobile ≤720px) |
 | `src/components/polls/BlocDistributionBar.tsx` | Single horizontal stacked bar — coalition / unaligned / opposition |
 | `src/components/polls/PartyTrendChart.tsx` | Multi-party seat line chart for a publisher (random on load) |
 | `src/components/polls/AggregateHistoryChart.tsx` | Daily weighted average lines from `poll_aggregates` (logo legend + party-color borders) |
 | `src/components/polls/PartyStackedColumnChart.tsx` | 100% stacked columns per poll date + party legend (not currently shown on the page) |
 | `src/components/polls/BlocTrendChart.tsx` | Horizontal stacked bars per poll date by bloc |
-| `src/components/polls/PollsPipelinePanel.tsx` | Pipeline runner panel on edit page (includes error/warning console) |
+| `src/components/polls/PollsPipelinePanel.tsx` | Pipeline runner panel on edit page (stages 1–7, site-update editor, error/warning console) |
 | `src/hooks/usePipelineRunProgress.ts` | Shared live total + per-step timers for pipeline panels |
 | `src/views/ElectionsPollsPage.tsx` / `.css` | Polls page UI |
 | `src/views/ElectionsPollsEditPage.tsx` / `.css` | Password-gated pipeline edit UI |

@@ -7,6 +7,8 @@ Subcommands return JSON on the last stdout line when --json is passed.
 Usage:
   python run_polls_pipeline_api.py status --json
   python run_polls_pipeline_api.py stage --stage 1 --json
+  python run_polls_pipeline_api.py stage --stage 7 --since 2026-07-31T12:00:00+00:00 --json
+  python run_polls_pipeline_api.py save-site-update --update-id 12 --headline "כותרת" --json
   python run_polls_pipeline_api.py sync-full --json
   python run_polls_pipeline_api.py sync-full --force --json
   python run_polls_pipeline_api.py sync-full --backfill --json
@@ -35,7 +37,10 @@ import validate_polls
 from db import PIPELINE_NAME, get_supabase
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from emit_site_updates import emit_polls_run_update  # noqa: E402
+from emit_site_updates import (  # noqa: E402
+    emit_polls_run_update,
+    update_site_update_headline,
+)
 from record_pipeline_run import record_pipeline_run  # noqa: E402
 
 load_dotenv()
@@ -53,6 +58,7 @@ STAGE_LABELS: dict[int, str] = {
     4: "נרמול סקרים",
     5: "חישוב ממוצעים",
     6: "ולידציה",
+    7: "יצירת עדכון",
 }
 
 TABLE_NAMES = [
@@ -94,7 +100,7 @@ def capture_warnings():
 def recent_rejected_rows(sb, limit: int = 15) -> list[dict]:
     rows = (
         sb.table("raw_poll_rows")
-        .select("id, status, error, section, payload, updated_at, created_at")
+        .select("id, status, error, section, payload, created_at")
         .eq("status", "rejected")
         .order("id", desc=True)
         .limit(limit)
@@ -348,10 +354,12 @@ def run_stage(
     *,
     backfill: bool = False,
     force: bool = False,
-) -> tuple[str, str, dict, dict]:
+    since: datetime | None = None,
+) -> tuple[str, str, dict, dict, dict | None]:
     label = STAGE_LABELS[stage]
     extra_lines: list[str] = []
     include_rejected = stage in (3, 4)
+    site_update: dict | None = None
 
     with capture_warnings() as log_lines:
         if stage == 1:
@@ -512,6 +520,37 @@ def run_stage(
                 else "ולידציה דיווחה על אזהרות או שגיאות (הסנכרון הושלם)"
             )
 
+        elif stage == 7:
+            site_update = emit_polls_run_update(sb, since=since)
+            wrote = 1 if site_update else 0
+            if site_update:
+                message = f"נוצר עדכון לדף הבית: {site_update.get('headline')}"
+                note = message
+            else:
+                message = "אין סקרים חדשים או יצירת הכותרת נכשלה — לא נשמר עדכון"
+                note = message
+                extra_lines.append(
+                    "INFO  stage 7  no site_updates row "
+                    "(no new polls in window, missing OPENAI_API_KEY, or LLM failure)"
+                )
+            summary = make_run_summary(
+                [
+                    make_stage_summary(
+                        stage,
+                        label,
+                        [
+                            {
+                                "table": "site_updates",
+                                "upserted": wrote,
+                                "inserted": wrote,
+                                "updated": 0,
+                            }
+                        ],
+                        note=note,
+                    )
+                ]
+            )
+
         else:
             raise ValueError(f"Invalid stage: {stage}")
 
@@ -521,7 +560,7 @@ def run_stage(
         extra=extra_lines,
         rejected=rejected_rows if include_rejected else None,
     )
-    return label, message, summary, diagnostics
+    return label, message, summary, diagnostics, site_update
 
 
 def cmd_stage(
@@ -531,15 +570,16 @@ def cmd_stage(
     *,
     backfill: bool,
     force: bool,
+    since: datetime | None = None,
 ) -> None:
-    if stage < 1 or stage > 6:
-        fail("מספר שלב לא תקין (1–6)", as_json)
+    if stage < 1 or stage > 7:
+        fail("מספר שלב לא תקין (1–7)", as_json)
 
     start = time.time()
     started_at = datetime.now()
     try:
-        label, message, summary, diagnostics = run_stage(
-            sb, stage, backfill=backfill, force=force
+        label, message, summary, diagnostics, site_update = run_stage(
+            sb, stage, backfill=backfill, force=force, since=since
         )
     except Exception as exc:
         record_pipeline_run(
@@ -560,7 +600,7 @@ def cmd_stage(
     if summary.get("stages"):
         note = summary["stages"][0].get("note")
     status = "warning" if note and ("אזהר" in note or "שגיא" in note) else "success"
-    if diagnostics.get("lines") and status == "success" and stage in (3, 4, 6):
+    if diagnostics.get("lines") and status == "success" and stage in (3, 4, 6, 7):
         if any(
             line.startswith(("ERROR", "WARNING", "REJECTED"))
             for line in diagnostics["lines"]
@@ -576,18 +616,35 @@ def cmd_stage(
         source="ui",
         started_at=started_at,
     )
-    if stage == 4 and int(summary.get("totals", {}).get("inserted", 0) or 0) > 0:
-        emit_polls_run_update(sb, since=started_at)
+    payload: dict = {
+        "ok": True,
+        "stage": stage,
+        "label": label,
+        "elapsedSeconds": elapsed_seconds,
+        "message": message,
+        "lastPipelineRunAt": last_run_at,
+        "summary": summary,
+        "diagnostics": diagnostics,
+    }
+    if site_update is not None:
+        payload["siteUpdate"] = site_update
+    emit(payload, as_json)
+
+
+def cmd_save_site_update(sb, update_id: int, headline: str, as_json: bool) -> None:
+    if update_id < 1:
+        fail("מזהה עדכון לא תקין", as_json)
+    text = (headline or "").strip()
+    if not text:
+        fail("חסרה כותרת", as_json)
+    saved = update_site_update_headline(sb, update_id=update_id, headline=text)
+    if not saved:
+        fail("שמירת הכותרת נכשלה", as_json)
     emit(
         {
             "ok": True,
-            "stage": stage,
-            "label": label,
-            "elapsedSeconds": elapsed_seconds,
-            "message": message,
-            "lastPipelineRunAt": last_run_at,
-            "summary": summary,
-            "diagnostics": diagnostics,
+            "message": "הכותרת נשמרה",
+            "siteUpdate": saved,
         },
         as_json,
     )
@@ -606,15 +663,22 @@ def cmd_sync_full(
     messages: list[str] = []
     all_log_lines: list[str] = []
     all_extra: list[str] = []
+    site_update: dict | None = None
 
     try:
-        for stage in range(1, 7):
-            _, message, summary, diagnostics = run_stage(
-                sb, stage, backfill=backfill, force=force
+        for stage in range(1, 8):
+            _, message, summary, diagnostics, stage_site_update = run_stage(
+                sb,
+                stage,
+                backfill=backfill,
+                force=force,
+                since=started_at if stage == 7 else None,
             )
             messages.append(message)
             stage_summaries.extend(summary.get("stages", []))
             all_log_lines.extend(diagnostics.get("lines") or [])
+            if stage_site_update is not None:
+                site_update = stage_site_update
     except Exception as exc:
         record_pipeline_run(
             sb,
@@ -654,24 +718,17 @@ def cmd_sync_full(
         source="ui",
         started_at=started_at,
     )
-    polls_inserted = 0
-    for stage_row in summary.get("stages") or []:
-        if int(stage_row.get("stage", 0) or 0) == 4:
-            polls_inserted = int(stage_row.get("inserted", 0) or 0)
-            break
-    if polls_inserted > 0:
-        emit_polls_run_update(sb, since=started_at)
-    emit(
-        {
-            "ok": True,
-            "elapsedSeconds": elapsed_seconds,
-            "message": "סנכרון סקרים הושלם — " + joined,
-            "lastPipelineRunAt": last_run_at,
-            "summary": summary,
-            "diagnostics": diagnostics,
-        },
-        as_json,
-    )
+    payload: dict = {
+        "ok": True,
+        "elapsedSeconds": elapsed_seconds,
+        "message": "סנכרון סקרים הושלם — " + joined,
+        "lastPipelineRunAt": last_run_at,
+        "summary": summary,
+        "diagnostics": diagnostics,
+    }
+    if site_update is not None:
+        payload["siteUpdate"] = site_update
+    emit(payload, as_json)
 
 
 def check_env() -> None:
@@ -684,16 +741,28 @@ def check_env() -> None:
         raise RuntimeError(f"Missing env vars: {', '.join(missing)}")
 
 
+def _parse_since(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Polls pipeline API for edit UI")
     parser.add_argument(
         "command",
-        choices=["status", "stage", "sync-full"],
+        choices=["status", "stage", "sync-full", "save-site-update"],
         help="API command",
     )
-    parser.add_argument("--stage", type=int, choices=[1, 2, 3, 4, 5, 6])
+    parser.add_argument("--stage", type=int, choices=[1, 2, 3, 4, 5, 6, 7])
     parser.add_argument("--backfill", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--since", type=str, default=None)
+    parser.add_argument("--update-id", type=int, default=None)
+    parser.add_argument("--headline", type=str, default=None)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -713,13 +782,27 @@ def main() -> None:
     if args.command == "stage":
         if args.stage is None:
             fail("חסר --stage", args.json)
+        since = None
+        try:
+            since = _parse_since(args.since)
+        except ValueError:
+            fail("ערך --since לא תקין", args.json)
         cmd_stage(
             sb,
             args.stage,
             args.json,
             backfill=args.backfill,
             force=args.force,
+            since=since,
         )
+        return
+
+    if args.command == "save-site-update":
+        if args.update_id is None:
+            fail("חסר --update-id", args.json)
+        if args.headline is None:
+            fail("חסרה --headline", args.json)
+        cmd_save_site_update(sb, args.update_id, args.headline, args.json)
         return
 
     if args.command == "sync-full":

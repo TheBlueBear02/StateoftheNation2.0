@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from supabase import Client
@@ -99,14 +99,15 @@ def emit_pipeline_site_update(
     facts: dict[str, Any],
     dedupe_key: str,
     pipeline_run_id: int | None = None,
-) -> None:
-    """Insert one homepage ticker row. Never raises."""
+    headline_override: str | None = None,
+) -> dict[str, Any] | None:
+    """Insert one homepage ticker row. Never raises. Returns the saved row or None."""
     try:
         if _facts_are_empty(facts):
-            return
-        if not os.environ.get("OPENAI_API_KEY"):
+            return None
+        if not headline_override and not os.environ.get("OPENAI_API_KEY"):
             log.warning("OPENAI_API_KEY missing — skip site_updates emit")
-            return
+            return None
 
         payload = {
             **facts,
@@ -114,9 +115,11 @@ def emit_pipeline_site_update(
             "page": page_label_he,
             "href": href,
         }
-        headline = _generate_headline(page_label_he=page_label_he, facts=payload)
+        headline = (headline_override or "").strip() or _generate_headline(
+            page_label_he=page_label_he, facts=payload
+        )
         if not headline:
-            return
+            return None
 
         row = {
             "event_type": event_type,
@@ -128,9 +131,78 @@ def emit_pipeline_site_update(
             "occurred_at": datetime.now(timezone.utc).isoformat(),
         }
         sb.table("site_updates").upsert(row, on_conflict="dedupe_key").execute()
+        saved = (
+            sb.table("site_updates")
+            .select("id, event_type, headline, href, payload, dedupe_key, occurred_at")
+            .eq("dedupe_key", dedupe_key)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
         log.info("site_updates: %s → %s", event_type, headline)
+        return saved[0] if saved else {**row, "id": None}
     except Exception as exc:
         log.warning("Failed to emit site_updates row: %s", exc)
+        return None
+
+
+def update_site_update_headline(
+    sb: Client,
+    *,
+    update_id: int,
+    headline: str,
+) -> dict[str, Any] | None:
+    """Update an existing site_updates headline. Never raises."""
+    try:
+        text = (headline or "").strip()
+        if not text:
+            return None
+        if _word_count(text) > 8:
+            log.warning("site_updates headline exceeded 8 words: %s", text)
+        sb.table("site_updates").update({"headline": text}).eq("id", update_id).execute()
+        rows = (
+            sb.table("site_updates")
+            .select("id, event_type, headline, href, payload, dedupe_key, occurred_at")
+            .eq("id", update_id)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        return rows[0] if rows else None
+    except Exception as exc:
+        log.warning("Failed to update site_updates headline: %s", exc)
+        return None
+
+
+def resolve_polls_emit_since(
+    sb: Client,
+    *,
+    since: datetime | None = None,
+    lookback_hours: int = 48,
+) -> datetime:
+    """Pick the emit window start: explicit since, else last polls ticker, else lookback."""
+    if since is not None:
+        return since if since.tzinfo else since.replace(tzinfo=timezone.utc)
+    try:
+        rows = (
+            sb.table("site_updates")
+            .select("occurred_at")
+            .eq("event_type", "polls_run")
+            .order("occurred_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        if rows and rows[0].get("occurred_at"):
+            stamp = rows[0]["occurred_at"]
+            if isinstance(stamp, str):
+                return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except Exception as exc:
+        log.warning("resolve_polls_emit_since lookup failed: %s", exc)
+    return datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
 
 
 # ── Polls collector ───────────────────────────────────────────────────────────
@@ -138,12 +210,17 @@ def emit_pipeline_site_update(
 def emit_polls_run_update(
     sb: Client,
     *,
-    since: datetime,
+    since: datetime | None = None,
     pipeline_run_id: int | None = None,
-) -> None:
-    """Emit one summary if new non-scenario polls were created since `since`."""
+    headline_override: str | None = None,
+) -> dict[str, Any] | None:
+    """Emit one summary if new non-scenario polls were created since `since`.
+
+    Returns the saved site_updates row, or None if skipped.
+    """
     try:
-        since_iso = since.astimezone(timezone.utc).isoformat() if since.tzinfo else since.replace(tzinfo=timezone.utc).isoformat()
+        since_dt = resolve_polls_emit_since(sb, since=since)
+        since_iso = since_dt.astimezone(timezone.utc).isoformat()
         rows = (
             sb.table("polls")
             .select(
@@ -158,7 +235,7 @@ def emit_polls_run_update(
             or []
         )
         if not rows:
-            return
+            return None
 
         publishers: dict[str, str] = {}
         try:
@@ -196,7 +273,7 @@ def emit_polls_run_update(
 
         poll_ids = sorted(str(r["id"]) for r in rows)
         dedupe = f"polls:{since_iso}:{','.join(poll_ids)}"
-        emit_pipeline_site_update(
+        return emit_pipeline_site_update(
             sb,
             event_type="polls_run",
             href="/elections/polls",
@@ -208,9 +285,11 @@ def emit_polls_run_update(
             },
             dedupe_key=dedupe[:500],
             pipeline_run_id=pipeline_run_id,
+            headline_override=headline_override,
         )
     except Exception as exc:
         log.warning("emit_polls_run_update failed: %s", exc)
+        return None
 
 
 # ── Knesset collector ─────────────────────────────────────────────────────────
@@ -343,15 +422,19 @@ def emit_knesset_run_update(
     after: dict[str, dict[str, Any]] | None = None,
     changes: list[dict[str, Any]] | None = None,
     pipeline_run_id: int | None = None,
-) -> bool:
-    """Emit one summary from membership/appointment diffs. Returns True if emitted."""
+    headline_override: str | None = None,
+) -> dict[str, Any] | None:
+    """Emit one summary from membership/appointment diffs.
+
+    Returns the saved site_updates row, or None if skipped.
+    """
     try:
         if changes is None:
             if before is None or after is None:
-                return False
+                return None
             changes = diff_knesset_positions(before, after)
         if not changes:
-            return False
+            return None
 
         changes = changes[:MAX_FACTS_ITEMS]
         person_ids = {
@@ -369,7 +452,7 @@ def emit_knesset_run_update(
             for c in changes
         ]
         dedupe = f"knesset:{hash('|'.join(keys)) & 0xFFFFFFFFFFFFFFFF:x}"
-        emit_pipeline_site_update(
+        return emit_pipeline_site_update(
             sb,
             event_type="knesset_run",
             href="/knesset",
@@ -381,11 +464,11 @@ def emit_knesset_run_update(
             },
             dedupe_key=dedupe,
             pipeline_run_id=pipeline_run_id,
+            headline_override=headline_override,
         )
-        return True
     except Exception as exc:
         log.warning("emit_knesset_run_update failed: %s", exc)
-        return False
+        return None
 
 
 # ── Elections collector ───────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ const TABLE_LABELS: Record<string, string> = {
   raw_poll_rows: 'שורות גולמיות',
   polls: 'סקרים',
   poll_aggregates: 'ממוצעים',
+  site_updates: 'עדכוני אתר',
 }
 
 function formatTableLabel(table: string | undefined): string {

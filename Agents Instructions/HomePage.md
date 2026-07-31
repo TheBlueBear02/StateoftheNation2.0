@@ -46,7 +46,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `public/header-logo 3.svg` | Header logo (desktop / non-home) |
 | `public/while-logo-nobg.svg` | White logo used as homepage hero title |
 | `public/white logo.svg` | White footer logo |
-| `public/hero-bear-image.svg` | Unused leftover still (was hero poster; video has no poster) |
+| `public/hero-bear-image.svg` | Hero video poster + load-error fallback |
 | Supabase `site-assets/bear-hero-video2.mp4` | Desktop hero bear video (not in git) |
 
 ## Layout primitive: `.container`
@@ -94,7 +94,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - `.hero__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, visual second — in RTL this places text on the right and bear on the left.
 - Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center), nudged up with `translateY(-20px)` (video column stays put). Column `gap: 16px` between title logo, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
 - Bear column: `justify-content: flex-start` (faces toward center).
-- **Visual (desktop):** muted `<video>` from Supabase Storage (`site-assets/bear-hero-video2.mp4`), plays once (no loop). No poster image — video stays `opacity: 0` until first frame (`onLoadedData` / `onCanPlay` / `onPlaying`), then fades in (`.hero__bear--ready`). Explicit `play()` on mount/`loadeddata` so autoplay is reliable. File is large (~17MB), so first paint can take a moment. Autoplay + `playsInline` + `preload="auto"`. Sized larger than the grid column (`width: min(110%, 560px)`, `scale(1.12) translateX(28px)` + light `clip-path` inset) with `object-fit: cover` and hero-blue video background so scaled/narrow viewports do not show black letterbox edges on the right/bottom. Overflow visible on `.hero__visual`. Still hidden on mobile via `.hero__visual`.
+- **Visual (desktop):** muted `<video>` from Supabase Storage (`site-assets/bear-hero-video2.mp4`), plays once (no loop). Poster `/hero-bear-image.svg`. Video stays `opacity: 0` until ready (`onLoadedMetadata` / `onLoadedData` / `onCanPlay` / `onPlaying`, plus a mount-time `readyState` check so cached videos do not miss the event). On load error, falls back to the poster `<img>`. Explicit `play()` on mount/`loadeddata` so autoplay is reliable. File is large (~17MB), so first paint can take a moment. Autoplay + `playsInline` + `preload="auto"`. Sized larger than the grid column (`width: min(110%, 560px)`, `scale(1.12) translateX(28px)` + light `clip-path` inset) with `object-fit: cover` and hero-blue video background so scaled/narrow viewports do not show black letterbox edges on the right/bottom. Overflow visible on `.hero__visual`. Still hidden on mobile via `.hero__visual` (`display: none` at ≤900px).
 - **Title:** `/while-logo-nobg.svg` inside the `h1` (desktop and mobile) — brand mark replaces the text headline; `alt="מצב האומה"`.
 - **Subtitle:** הבית של המידע הפוליטי בישראל
 - **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): 2×2 grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (640px) so buttons read wider.
@@ -113,7 +113,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Black background, white text, blue dot separators.
 - Full-bleed edge-to-edge (no `.container`) — intentional marquee effect.
 - Headlines from `site_updates` via `useSiteUpdates` (written by pipeline finish hooks in `emit_site_updates.py`). Each item is a `Link` to its `href` (e.g. `/elections/polls`, `/knesset`).
-- Static fallback copy is used only when the table is empty or the query fails.
+- DB items show a Jerusalem local stamp before the headline: `HH:mm | …` for updates from today, otherwise `D.M HH:mm | …` (e.g. `15:00 | כותרת` / `30.7 15:00 | כותרת`). Static defaults have no timestamp.
+- Feed composition: up to **10** latest DB rows (`occurred_at` desc), then pad with the static default headlines until 10 total (or until defaults run out). Defaults are skipped when their headline already appears in the DB set. On query failure (or missing Supabase config), the strip shows defaults only.
+- The track renders `newsItems` twice for a seamless CSS marquee loop — that is intentional duplication for animation, not a second fetch.
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
 - CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
 

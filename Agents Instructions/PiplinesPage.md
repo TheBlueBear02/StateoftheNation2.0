@@ -64,7 +64,7 @@ Anon **read**; service-role **write**. Writers:
 - Polls CLI (`run_polls_pipeline.py`) — `source` from `PIPELINE_RUN_SOURCE` (default `cli`; GitHub Actions sets `github-actions`)
 - Polls / Knesset UI APIs — `source=ui`
 
-Polls edit UI (`/elections/polls/edit`) also shows a **diagnostics console** fed by `diagnostics` from `run_polls_pipeline_api.py` (rejected staging rows, parse/validation warnings).
+Polls edit UI (`/elections/polls/edit`) also shows a **diagnostics console** fed by `diagnostics` from `run_polls_pipeline_api.py` (rejected staging rows, parse/validation warnings), plus **stage 7** (`יצירת עדכון`) that emits a homepage ticker row and lets you edit/save the headline. Knesset edit UI (`/knesset/edit`) has the same stage-7 pattern: stage 6 records position diffs; stage 7 emits and exposes the editable headline.
 
 Apply `schema_pipeline_runs.sql` once in the Supabase SQL editor before the dashboard log can load.
 

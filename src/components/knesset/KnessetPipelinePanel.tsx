@@ -11,7 +11,9 @@ import {
   previewFactionLinks,
   runKmImages,
   runKnessetStage,
+  saveKnessetSiteUpdate,
   type FactionLinkPreviewItem,
+  type KnessetSiteUpdate,
   type PipelineRunSummary,
 } from '../../lib/runKnessetPipeline'
 import { KnessetRunSummary } from './KnessetRunSummary'
@@ -23,7 +25,8 @@ type PanelPhase =
   | 'success'
   | 'error'
 
-const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6] as const
+const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6, 7] as const
+const TOTAL_STAGES = STAGE_NUMBERS.length
 
 function mergeSummaries(parts: PipelineRunSummary[]): PipelineRunSummary {
   const stages = parts.flatMap((part) => part.stages)
@@ -37,6 +40,13 @@ function mergeSummaries(parts: PipelineRunSummary[]): PipelineRunSummary {
   }
 }
 
+function wordCount(text: string): number {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
 export function KnessetPipelinePanel({
   onComplete,
 }: {
@@ -48,12 +58,30 @@ export function KnessetPipelinePanel({
   const [previewCount, setPreviewCount] = useState(0)
   const [hasPreview, setHasPreview] = useState(false)
   const [runSummary, setRunSummary] = useState<PipelineRunSummary | null>(null)
+  const [siteUpdate, setSiteUpdate] = useState<KnessetSiteUpdate | null>(null)
+  const [headlineDraft, setHeadlineDraft] = useState('')
+  const [savingHeadline, setSavingHeadline] = useState(false)
+  const [headlineSaveMessage, setHeadlineSaveMessage] = useState<string | null>(
+    null,
+  )
   const progress = usePipelineRunProgress(phase === 'running')
+
+  function applySiteUpdate(next: KnessetSiteUpdate | null | undefined) {
+    if (!next?.headline) {
+      return
+    }
+    setSiteUpdate(next)
+    setHeadlineDraft(next.headline)
+    setHeadlineSaveMessage(null)
+  }
 
   async function handleFullSync() {
     setPhase('running')
     setMessage(null)
     setRunSummary(null)
+    setSiteUpdate(null)
+    setHeadlineDraft('')
+    setHeadlineSaveMessage(null)
     progress.resetRun()
 
     const parts: PipelineRunSummary[] = []
@@ -69,6 +97,9 @@ export function KnessetPipelinePanel({
       }
       progress.finishStep(stage)
       parts.push(result.summary)
+      if (result.siteUpdate) {
+        applySiteUpdate(result.siteUpdate)
+      }
     }
 
     setRunSummary(mergeSummaries(parts))
@@ -82,6 +113,9 @@ export function KnessetPipelinePanel({
     setPhase('running')
     setMessage(null)
     setRunSummary(null)
+    if (stage === 7) {
+      setHeadlineSaveMessage(null)
+    }
     progress.resetRun()
     progress.beginStep(stage)
 
@@ -95,10 +129,42 @@ export function KnessetPipelinePanel({
 
     progress.finishStep(stage)
     setRunSummary(result.summary)
+    if (result.siteUpdate) {
+      applySiteUpdate(result.siteUpdate)
+    } else if (stage === 7) {
+      setSiteUpdate(null)
+      setHeadlineDraft('')
+    }
     setPhase('success')
     progress.clearCurrent()
     setMessage(result.message)
     await onComplete()
+  }
+
+  async function handleSaveHeadline() {
+    if (!siteUpdate?.id) {
+      setHeadlineSaveMessage('אין עדכון לשמירה')
+      return
+    }
+    const nextHeadline = headlineDraft.trim()
+    if (!nextHeadline) {
+      setHeadlineSaveMessage('חסרה כותרת')
+      return
+    }
+
+    setSavingHeadline(true)
+    setHeadlineSaveMessage(null)
+    const result = await saveKnessetSiteUpdate(siteUpdate.id, nextHeadline)
+    setSavingHeadline(false)
+
+    if (!result.ok) {
+      setHeadlineSaveMessage(result.error)
+      return
+    }
+
+    setSiteUpdate(result.siteUpdate)
+    setHeadlineDraft(result.siteUpdate.headline)
+    setHeadlineSaveMessage('הכותרת נשמרה')
   }
 
   async function handleFactionPreview() {
@@ -166,6 +232,9 @@ export function KnessetPipelinePanel({
   const running = phase === 'running'
   const { currentStage, totalElapsedSeconds, stepElapsedSeconds, stepDurations } =
     progress
+  const headlineDirty =
+    Boolean(siteUpdate) && headlineDraft.trim() !== (siteUpdate?.headline ?? '')
+  const draftWordCount = wordCount(headlineDraft)
 
   return (
     <section
@@ -179,7 +248,8 @@ export function KnessetPipelinePanel({
         </h2>
         <p className="party-pipeline-panel__intro">
           הריצו סנכרון מלא או שלב בודד. שלב 5 טוען ממשלות מהמסד בלבד (ללא OData).
-          לאחר הסנכרון, בדקו והחילו קישורי סיעות חסרים.
+          שלב 6 שומר שינויי חברויות/מינויים; שלב 7 יוצר כותרת לפס החדשות בדף
+          הבית. לאחר הסנכרון, בדקו והחילו קישורי סיעות חסרים.
         </p>
       </div>
 
@@ -252,9 +322,83 @@ export function KnessetPipelinePanel({
             aria-hidden="true"
           />
           {currentStage
-            ? `שלב ${currentStage} מתוך 6 — ${KNESSET_STAGE_LABELS[currentStage]} (${formatPipelineElapsed(stepElapsedSeconds)}) · סה״כ ${formatPipelineElapsed(totalElapsedSeconds)}`
+            ? `שלב ${currentStage} מתוך ${TOTAL_STAGES} — ${KNESSET_STAGE_LABELS[currentStage]} (${formatPipelineElapsed(stepElapsedSeconds)}) · סה״כ ${formatPipelineElapsed(totalElapsedSeconds)}`
             : `מריץ… (${formatPipelineElapsed(totalElapsedSeconds)})`}
         </p>
+      ) : null}
+
+      {siteUpdate ? (
+        <div
+          className="knesset-site-update"
+          aria-labelledby="knesset-site-update-title"
+        >
+          <div className="knesset-site-update__header">
+            <h3
+              id="knesset-site-update-title"
+              className="knesset-site-update__title"
+            >
+              עדכון לפס החדשות בדף הבית
+            </h3>
+            <p className="knesset-site-update__hint">
+              הכותרת נשמרה אוטומטית אחרי יצירה. אפשר לערוך ולשמור מחדש. מומלץ עד
+              8 מילים. קישור: {siteUpdate.href}
+            </p>
+          </div>
+          <label
+            className="knesset-site-update__label"
+            htmlFor="knesset-site-update-headline"
+          >
+            כותרת
+          </label>
+          <textarea
+            id="knesset-site-update-headline"
+            className="knesset-site-update__textarea"
+            rows={2}
+            value={headlineDraft}
+            disabled={running || savingHeadline || !siteUpdate.id}
+            onChange={(event) => {
+              setHeadlineDraft(event.target.value)
+              setHeadlineSaveMessage(null)
+            }}
+          />
+          <div className="knesset-site-update__meta">
+            <span
+              className={
+                draftWordCount > 8
+                  ? 'knesset-site-update__words knesset-site-update__words--warn'
+                  : 'knesset-site-update__words'
+              }
+            >
+              {draftWordCount} מילים
+            </span>
+            <button
+              type="button"
+              className="candidate-edit-card__save"
+              disabled={
+                running ||
+                savingHeadline ||
+                !siteUpdate.id ||
+                !headlineDraft.trim() ||
+                !headlineDirty
+              }
+              onClick={() => void handleSaveHeadline()}
+            >
+              {savingHeadline ? 'שומר…' : 'שמור כותרת'}
+            </button>
+          </div>
+          {headlineSaveMessage ? (
+            <p
+              className={
+                headlineSaveMessage === 'הכותרת נשמרה'
+                  ? 'candidate-edit-card__status candidate-edit-card__status--success'
+                  : 'candidate-edit-card__status candidate-edit-card__status--error'
+              }
+              role="status"
+            >
+              {headlineSaveMessage}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="knesset-pipeline-panel__post-sync">

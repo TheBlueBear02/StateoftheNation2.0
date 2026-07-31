@@ -7,6 +7,8 @@ Subcommands return JSON on the last stdout line when --json is passed.
 Usage:
   python run_knesset_pipeline_api.py status --json
   python run_knesset_pipeline_api.py stage --stage 1 --json
+  python run_knesset_pipeline_api.py stage --stage 7 --json
+  python run_knesset_pipeline_api.py save-site-update --update-id 12 --headline "כותרת" --json
   python run_knesset_pipeline_api.py faction-preview --json
   python run_knesset_pipeline_api.py faction-apply --json
   python run_knesset_pipeline_api.py images --json
@@ -34,6 +36,7 @@ from emit_site_updates import (  # noqa: E402
     diff_knesset_positions,
     emit_knesset_run_update,
     snapshot_knesset_positions,
+    update_site_update_headline,
 )
 from record_pipeline_run import record_pipeline_run  # noqa: E402
 
@@ -53,6 +56,7 @@ STAGE_LABELS: dict[int, str] = {
     4: "משרדים",
     5: "ממשלות",
     6: "חברויות ומינויים",
+    7: "יצירת עדכון",
 }
 
 TABLE_NAMES = [
@@ -67,6 +71,33 @@ TABLE_NAMES = [
 
 PREVIEW_ITEM_LIMIT = 50
 LAST_RUN_FILE = Path(__file__).resolve().parent / "pipeline_last_run.json"
+PENDING_SITE_UPDATE_FILE = (
+    Path(__file__).resolve().parent / "pending_site_update.json"
+)
+
+
+def read_pending_site_update() -> list[dict]:
+    if not PENDING_SITE_UPDATE_FILE.is_file():
+        return []
+    try:
+        data = json.loads(PENDING_SITE_UPDATE_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    if isinstance(data, dict):
+        changes = data.get("changes")
+        return changes if isinstance(changes, list) else []
+    return []
+
+
+def write_pending_site_update(changes: list[dict]) -> None:
+    payload = {
+        "captured_at": datetime.now().isoformat(timespec="seconds"),
+        "changes": changes,
+    }
+    PENDING_SITE_UPDATE_FILE.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def read_last_run() -> dict | None:
@@ -229,20 +260,22 @@ def cmd_status(sb, as_json: bool) -> None:
     )
 
 
-def run_stage(sb, stage: int) -> tuple[str, str, dict]:
+def run_stage(sb, stage: int) -> tuple[str, str, dict, dict | None]:
+    site_update: dict | None = None
+
     if stage == 1:
         _, stats = sync.sync_knessets(sb)
         summary = make_run_summary(
             [make_stage_summary(stage, STAGE_LABELS[stage], [stats])]
         )
-        return STAGE_LABELS[stage], "סנכרון כנסות הושלם", summary
+        return STAGE_LABELS[stage], "סנכרון כנסות הושלם", summary, None
 
     if stage == 2:
         _, stats = sync.sync_people(sb)
         summary = make_run_summary(
             [make_stage_summary(stage, STAGE_LABELS[stage], [stats])]
         )
-        return STAGE_LABELS[stage], "סנכרון אנשים הושלם", summary
+        return STAGE_LABELS[stage], "סנכרון אנשים הושלם", summary, None
 
     knesset_map = sync.load_id_map(sb, "knessets", "knesset_number")
     people_map = sync.load_id_map(sb, "people", "knesset_person_id")
@@ -255,14 +288,14 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict]:
         summary = make_run_summary(
             [make_stage_summary(stage, STAGE_LABELS[stage], [stats])]
         )
-        return STAGE_LABELS[stage], "סנכרון סיעות הושלם", summary
+        return STAGE_LABELS[stage], "סנכרון סיעות הושלם", summary, None
 
     if stage == 4:
         _, stats = sync.sync_offices(sb)
         summary = make_run_summary(
             [make_stage_summary(stage, STAGE_LABELS[stage], [stats])]
         )
-        return STAGE_LABELS[stage], "סנכרון משרדים הושלם", summary
+        return STAGE_LABELS[stage], "סנכרון משרדים הושלם", summary, None
 
     if stage == 5:
         count = len(sync.sync_governments(sb))
@@ -276,7 +309,12 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict]:
                 )
             ]
         )
-        return STAGE_LABELS[stage], f"נטענו {count} ממשלות מהמסד (ללא OData)", summary
+        return (
+            STAGE_LABELS[stage],
+            f"נטענו {count} ממשלות מהמסד (ללא OData)",
+            summary,
+            None,
+        )
 
     if stage == 6:
         before = snapshot_knesset_positions(sb)
@@ -290,8 +328,7 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict]:
         )
         after = snapshot_knesset_positions(sb)
         changes = diff_knesset_positions(before, after)
-        if changes:
-            emit_knesset_run_update(sb, changes=changes)
+        write_pending_site_update(changes)
         entries = [
             position_stats["knesset_memberships"],
             position_stats["knesset_memberships_faction_id"],
@@ -300,19 +337,61 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict]:
         summary = make_run_summary(
             [make_stage_summary(stage, STAGE_LABELS[stage], entries)]
         )
-        return STAGE_LABELS[stage], "סנכרון חברויות ומינויים הושלם", summary
+        note = (
+            f"{len(changes)} שינויים ממתינים לעדכון דף הבית"
+            if changes
+            else "אין שינויי חברויות/מינויים לעדכון דף הבית"
+        )
+        summary["stages"][0]["note"] = note
+        return STAGE_LABELS[stage], "סנכרון חברויות ומינויים הושלם", summary, None
+
+    if stage == 7:
+        changes = read_pending_site_update()
+        site_update = (
+            emit_knesset_run_update(sb, changes=changes) if changes else None
+        )
+        wrote = 1 if site_update else 0
+        if site_update:
+            message = f"נוצר עדכון לדף הבית: {site_update.get('headline')}"
+            note = message
+        elif not changes:
+            message = (
+                "אין שינויי חברויות/מינויים ממתינים — הריצו שלב 6 תחילה"
+            )
+            note = message
+        else:
+            message = "יצירת הכותרת נכשלה — לא נשמר עדכון"
+            note = message
+        summary = make_run_summary(
+            [
+                make_stage_summary(
+                    stage,
+                    STAGE_LABELS[stage],
+                    [
+                        {
+                            "table": "site_updates",
+                            "upserted": wrote,
+                            "inserted": wrote,
+                            "updated": 0,
+                        }
+                    ],
+                    note=note,
+                )
+            ]
+        )
+        return STAGE_LABELS[stage], message, summary, site_update
 
     raise ValueError(f"Invalid stage: {stage}")
 
 
 def cmd_stage(sb, stage: int, as_json: bool) -> None:
-    if stage < 1 or stage > 6:
-        fail("מספר שלב לא תקין (1–6)", as_json)
+    if stage < 1 or stage > 7:
+        fail("מספר שלב לא תקין (1–7)", as_json)
 
     start = time.time()
     started_at = datetime.now()
     try:
-        label, message, summary = run_stage(sb, stage)
+        label, message, summary, site_update = run_stage(sb, stage)
     except Exception as exc:
         record_pipeline_run(
             sb,
@@ -338,15 +417,34 @@ def cmd_stage(sb, stage: int, as_json: bool) -> None:
         source="ui",
         started_at=started_at,
     )
+    payload: dict = {
+        "ok": True,
+        "stage": stage,
+        "label": label,
+        "elapsedSeconds": elapsed_seconds,
+        "message": message,
+        "lastPipelineRunAt": last_run_at,
+        "summary": summary,
+    }
+    if site_update is not None:
+        payload["siteUpdate"] = site_update
+    emit(payload, as_json)
+
+
+def cmd_save_site_update(sb, update_id: int, headline: str, as_json: bool) -> None:
+    if update_id < 1:
+        fail("מזהה עדכון לא תקין", as_json)
+    text = (headline or "").strip()
+    if not text:
+        fail("חסרה כותרת", as_json)
+    saved = update_site_update_headline(sb, update_id=update_id, headline=text)
+    if not saved:
+        fail("שמירת הכותרת נכשלה", as_json)
     emit(
         {
             "ok": True,
-            "stage": stage,
-            "label": label,
-            "elapsedSeconds": elapsed_seconds,
-            "message": message,
-            "lastPipelineRunAt": last_run_at,
-            "summary": summary,
+            "message": "הכותרת נשמרה",
+            "siteUpdate": saved,
         },
         as_json,
     )
@@ -356,11 +454,14 @@ def cmd_sync_full(sb, as_json: bool) -> None:
     start = time.time()
     started_at = datetime.now()
     stage_summaries: list[dict] = []
+    site_update: dict | None = None
 
     try:
-        for stage in range(1, 7):
-            _, _, summary = run_stage(sb, stage)
+        for stage in range(1, 8):
+            _, _, summary, stage_site_update = run_stage(sb, stage)
             stage_summaries.extend(summary.get("stages", []))
+            if stage_site_update is not None:
+                site_update = stage_site_update
     except Exception as exc:
         record_pipeline_run(
             sb,
@@ -387,16 +488,16 @@ def cmd_sync_full(sb, as_json: bool) -> None:
         source="ui",
         started_at=started_at,
     )
-    emit(
-        {
-            "ok": True,
-            "elapsedSeconds": elapsed_seconds,
-            "message": "סנכרון מלא הושלם",
-            "lastPipelineRunAt": last_run_at,
-            "summary": summary,
-        },
-        as_json,
-    )
+    payload: dict = {
+        "ok": True,
+        "elapsedSeconds": elapsed_seconds,
+        "message": "סנכרון מלא הושלם",
+        "lastPipelineRunAt": last_run_at,
+        "summary": summary,
+    }
+    if site_update is not None:
+        payload["siteUpdate"] = site_update
+    emit(payload, as_json)
 
 
 def load_faction_plan(sb) -> tuple[list[faction_links.PlannedUpdate], Counter[str]]:
@@ -607,12 +708,15 @@ def main() -> None:
             "status",
             "stage",
             "sync-full",
+            "save-site-update",
             "faction-preview",
             "faction-apply",
             "images",
         ],
     )
-    parser.add_argument("--stage", type=int, help="Sync stage number (1–6)")
+    parser.add_argument("--stage", type=int, help="Sync stage number (1–7)")
+    parser.add_argument("--update-id", type=int, default=None)
+    parser.add_argument("--headline", type=str, default=None)
     parser.add_argument("--json", action="store_true", help="Emit JSON on stdout")
     args = parser.parse_args()
 
@@ -631,6 +735,14 @@ def main() -> None:
         if args.stage is None:
             fail("חסר --stage", as_json)
         cmd_stage(sb, args.stage, as_json)
+        return
+
+    if args.command == "save-site-update":
+        if args.update_id is None:
+            fail("חסר --update-id", as_json)
+        if args.headline is None:
+            fail("חסרה --headline", as_json)
+        cmd_save_site_update(sb, args.update_id, args.headline, as_json)
         return
 
     if args.command == "sync-full":

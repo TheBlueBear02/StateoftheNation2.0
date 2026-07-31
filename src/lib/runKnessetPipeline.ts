@@ -39,6 +39,16 @@ export type PipelineRunSummary = {
   }
 }
 
+export type KnessetSiteUpdate = {
+  id: number | null
+  event_type: string
+  headline: string
+  href: string
+  payload?: Record<string, unknown> | null
+  dedupe_key?: string
+  occurred_at?: string
+}
+
 export type KnessetStatusResult =
   | {
       ok: true
@@ -59,6 +69,7 @@ export type KnessetStageResult =
       elapsedSeconds: number
       message: string
       summary: PipelineRunSummary
+      siteUpdate?: KnessetSiteUpdate | null
     }
   | PipelineError
 
@@ -69,6 +80,15 @@ export type KnessetFullSyncResult =
       message: string
       lastPipelineRunAt: string
       summary: PipelineRunSummary
+      siteUpdate?: KnessetSiteUpdate | null
+    }
+  | PipelineError
+
+export type KnessetSaveSiteUpdateResult =
+  | {
+      ok: true
+      message: string
+      siteUpdate: KnessetSiteUpdate
     }
   | PipelineError
 
@@ -180,6 +200,23 @@ export async function runKnessetFullSync(): Promise<KnessetFullSyncResult> {
   return parseResponse(response)
 }
 
+export async function saveKnessetSiteUpdate(
+  id: number,
+  headline: string,
+): Promise<KnessetSaveSiteUpdateResult> {
+  if (!isDev) {
+    return devOnlyError()
+  }
+
+  const response = await fetch('/api/knesset/site-update', {
+    method: 'POST',
+    headers: getEditHeaders(),
+    body: JSON.stringify({ id, headline }),
+  })
+
+  return parseResponse(response)
+}
+
 export async function previewFactionLinks(): Promise<FactionLinkPreviewResult> {
   if (!isDev) {
     return devOnlyError()
@@ -226,4 +263,5 @@ export const KNESSET_STAGE_LABELS: Record<number, string> = {
   4: 'משרדים',
   5: 'ממשלות',
   6: 'חברויות ומינויים',
+  7: 'יצירת עדכון',
 }

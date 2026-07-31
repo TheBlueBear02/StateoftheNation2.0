@@ -57,6 +57,16 @@ export type PollsDiagnostics = {
   rejected: PollsRejectedRow[]
 }
 
+export type PollsSiteUpdate = {
+  id: number | null
+  event_type: string
+  headline: string
+  href: string
+  payload?: Record<string, unknown> | null
+  dedupe_key?: string
+  occurred_at?: string
+}
+
 export type PollsStatusResult =
   | {
       ok: true
@@ -83,6 +93,7 @@ export type PollsStageResult =
       message: string
       summary: PipelineRunSummary
       diagnostics?: PollsDiagnostics
+      siteUpdate?: PollsSiteUpdate | null
     }
   | PipelineError
 
@@ -94,12 +105,22 @@ export type PollsFullSyncResult =
       lastPipelineRunAt: string
       summary: PipelineRunSummary
       diagnostics?: PollsDiagnostics
+      siteUpdate?: PollsSiteUpdate | null
+    }
+  | PipelineError
+
+export type PollsSaveSiteUpdateResult =
+  | {
+      ok: true
+      message: string
+      siteUpdate: PollsSiteUpdate
     }
   | PipelineError
 
 export type PollsRunOptions = {
   backfill?: boolean
   force?: boolean
+  since?: string
 }
 
 function getEditHeaders(): Record<string, string> {
@@ -158,6 +179,7 @@ export async function runPollsStage(
       stage,
       backfill: Boolean(options.backfill),
       force: Boolean(options.force),
+      ...(options.since ? { since: options.since } : {}),
     }),
   })
 
@@ -183,6 +205,23 @@ export async function runPollsFullSync(
   return parseResponse(response)
 }
 
+export async function savePollsSiteUpdate(
+  id: number,
+  headline: string,
+): Promise<PollsSaveSiteUpdateResult> {
+  if (!isDev) {
+    return devOnlyError()
+  }
+
+  const response = await fetch('/api/polls/site-update', {
+    method: 'POST',
+    headers: getEditHeaders(),
+    body: JSON.stringify({ id, headline }),
+  })
+
+  return parseResponse(response)
+}
+
 export const POLLS_STAGE_LABELS: Record<number, string> = {
   1: 'משיכת ויקיפדיה',
   2: 'פירוק טבלאות',
@@ -190,4 +229,5 @@ export const POLLS_STAGE_LABELS: Record<number, string> = {
   4: 'נרמול סקרים',
   5: 'חישוב ממוצעים',
   6: 'ולידציה',
+  7: 'יצירת עדכון',
 }

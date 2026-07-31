@@ -242,12 +242,13 @@ When `isDev` is true, the **צינור נתונים** panel runs OData sync:
 | 3 | סיעות | `sync_factions` |
 | 4 | משרדים | `sync_offices` |
 | 5 | ממשלות | `sync_governments` (DB only) |
-| 6 | חברויות ומינויים | `sync_positions` |
+| 6 | חברויות ומינויים | `sync_positions` — snapshots diffs into `pending_site_update.json` |
+| 7 | יצירת עדכון | `emit_knesset_run_update` from pending diffs → homepage `site_updates` (editable in UI) |
 
-- **התחל סנכרון מלא** runs stages 1–6 sequentially via `POST /api/knesset/pipeline/stage`
-- Stage 6 (and CLI `sync_all`) snapshots memberships/appointments before/after sync and calls `emit_knesset_run_update` when real field changes exist — homepage ticker links to `/knesset` (see [PiplinesPage.md](./PiplinesPage.md))
+- **התחל סנכרון מלא** runs stages 1–7 sequentially via `POST /api/knesset/pipeline/stage`
+- Stage 6 no longer emits the ticker itself in the edit UI — it only records membership/appointment field diffs. Stage 7 generates the Hebrew headline and shows an editable textarea (**שמור כותרת** → `POST /api/knesset/site-update`). CLI `sync_all` still emits immediately after positions sync (see [PiplinesPage.md](./PiplinesPage.md))
 - While running, the active stage row is highlighted with a spinner; each stage shows its own elapsed time, and the status line also shows total run time (`usePipelineRunProgress`)
-- Per-stage **הרץ** buttons run a single stage
+- Per-stage **הרץ** buttons run a single stage. Standalone stage 7 needs a prior stage 6 that left pending changes
 - Post-sync: **בדוק קישורי סיעות** / **החל קישורי סיעות** (`fix_faction_links_all` logic)
 - **עדכן תמונות** runs `km_images` logic (hardcoded to `public/images/KM Images/הכנסת ה25`)
 
