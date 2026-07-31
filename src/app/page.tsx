@@ -4,7 +4,9 @@ import { JsonLd } from '@/components/seo/JsonLd'
 import { getSiteUrl } from '@/lib/runtimeEnv'
 
 export const metadata: Metadata = {
-  title: 'מצב האומה',
+  title: {
+    absolute: 'מצב האומה | State of the Nation IL',
+  },
   description:
     'הבית של המידע הפוליטי בישראל — כנסת, ממשלה, בחירות 2026 וסקרי מנדטים.',
   alternates: { canonical: '/' },
@@ -18,7 +20,7 @@ export default function Page() {
         data={{
           '@context': 'https://schema.org',
           '@type': 'WebSite',
-          name: 'מצב האומה',
+          name: 'מצב האומה | State of the Nation IL',
           url: siteUrl,
           inLanguage: 'he',
           description:

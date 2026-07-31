@@ -53,7 +53,7 @@ StateoftheNation2.0/
 │   ├── App.tsx              # Homepage body
 │   ├── App.css
 │   └── index.css            # Global tokens (Heebo via next/font)
-├── public/                  # Static assets (logos, MK photos, favicon)
+├── public/                  # Static assets (logos, MK photos, site_icon.png favicon)
 ├── Layer 1 - Gathering Data/
 │   ├── Elections/           # Candidate enrichment pipeline
 │   ├── knesset/             # Knesset OData sync

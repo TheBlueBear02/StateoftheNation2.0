@@ -17,26 +17,27 @@ const siteUrl = getSiteUrl()
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'מצב האומה',
+    default: 'מצב האומה | State of the Nation IL',
     template: '%s | מצב האומה',
   },
   description:
     'הבית של המידע הפוליטי בישראל — כנסת, ממשלה, בחירות 2026 וסקרי מנדטים.',
   icons: {
-    icon: '/favicon.svg',
+    icon: [{ url: '/site_icon.png', type: 'image/png' }],
+    apple: '/site_icon.png',
   },
   openGraph: {
     type: 'website',
     locale: 'he_IL',
     siteName: 'מצב האומה',
-    title: 'מצב האומה',
+    title: 'מצב האומה | State of the Nation IL',
     description:
       'הבית של המידע הפוליטי בישראל — כנסת, ממשלה, בחירות 2026 וסקרי מנדטים.',
     url: siteUrl,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'מצב האומה',
+    title: 'מצב האומה | State of the Nation IL',
     description:
       'הבית של המידע הפוליטי בישראל — כנסת, ממשלה, בחירות 2026 וסקרי מנדטים.',
   },
