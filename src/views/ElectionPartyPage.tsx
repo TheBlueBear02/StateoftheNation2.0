@@ -6,6 +6,7 @@ import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
 import { CandidateList } from '../components/elections/CandidateList'
 import { CandidateMap } from '../components/elections/CandidateMap'
+import { ListsGamePromo } from '../components/elections/ListsGamePromo'
 import { SeatsTrend } from '../components/elections/SeatsTrend'
 import { StatsBar } from '../components/elections/StatsBar'
 import { useElectionCandidates } from '../hooks/useElectionCandidates'
@@ -33,6 +34,9 @@ export function ElectionPartyPage() {
   } = useElectionCandidates(party?.id ?? null)
 
   const partyName = party?.shortName ?? party?.name ?? 'מפלגה'
+  const showFullNameSubtitle = Boolean(
+    party?.shortName && party.name.trim() !== party.shortName.trim(),
+  )
   const accentColor = party?.color ?? '#4890fd'
   const style = { '--party-color': accentColor } as CSSProperties
   const loading = partiesLoading || (Boolean(party) && candidatesLoading)
@@ -65,7 +69,11 @@ export function ElectionPartyPage() {
 
           {party && !error ? (
             <>
-              <header className="party-hero">
+              <header
+                className={`party-hero${
+                  showFullNameSubtitle ? '' : ' party-hero--name-centered'
+                }`}
+              >
                 <div className="party-hero__logo-wrap">
                   {party.logoUrl ? (
                     <img className="party-hero__logo" src={party.logoUrl} alt="" />
@@ -75,8 +83,12 @@ export function ElectionPartyPage() {
                 </div>
 
                 <div className="party-hero__content">
-                  <h1 className="party-hero__title">{partyName}</h1>
-                  <p className="party-hero__subtitle">{party.name}</p>
+                  <div className="party-hero__heading">
+                    <h1 className="party-hero__title">{partyName}</h1>
+                    {showFullNameSubtitle ? (
+                      <p className="party-hero__subtitle">{party.name}</p>
+                    ) : null}
+                  </div>
                   {party.description ? (
                     <p className="party-hero__description">{party.description}</p>
                   ) : null}
@@ -101,6 +113,10 @@ export function ElectionPartyPage() {
             </>
           ) : null}
         </div>
+
+        {party && !error ? (
+          <ListsGamePromo titleId="party-lists-game-title" />
+        ) : null}
       </main>
     </SiteLayout>
   )

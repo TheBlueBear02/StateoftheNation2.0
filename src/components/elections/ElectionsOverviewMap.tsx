@@ -41,6 +41,9 @@ export function ElectionsOverviewMap({
   const [selectedPartyIds, setSelectedPartyIds] = useState<Set<number>>(
     () => new Set(),
   )
+  const [brokenLogoIds, setBrokenLogoIds] = useState<Set<number>>(
+    () => new Set(),
+  )
   const [hoveredPin, setHoveredPin] = useState<OverviewProjectedPin | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
 
@@ -92,6 +95,15 @@ export function ElectionsOverviewMap({
     setSelectedPartyIds(new Set())
   }
 
+  function handleLogoError(partyId: number) {
+    setBrokenLogoIds((current) => {
+      if (current.has(partyId)) return current
+      const next = new Set(current)
+      next.add(partyId)
+      return next
+    })
+  }
+
   function handleMove(event: MouseEvent<SVGGElement>) {
     setTooltipPosition({ x: event.clientX, y: event.clientY })
   }
@@ -111,7 +123,7 @@ export function ElectionsOverviewMap({
       aria-labelledby="elections-overview-map-title"
     >
       <div className="party-detail-card__header">
-        <p className="party-detail-card__eyebrow">מפה</p>
+        <p className="party-detail-card__eyebrow">על המפה</p>
         <h2 id="elections-overview-map-title" className="party-detail-card__title">
           איפה גרים המועמדים
         </h2>
@@ -141,9 +153,8 @@ export function ElectionsOverviewMap({
             </div>
           </div>
 
-          <div
+          <ul
             className="elections-overview-map__party-list"
-            role="group"
             aria-label="בחירת מפלגות להצגה על המפה"
           >
             {partiesWithPins.map((party) => {
@@ -151,38 +162,48 @@ export function ElectionsOverviewMap({
               const accentColor = party.color ?? '#4890fd'
               const isSelected = selectedPartyIds.has(party.id)
               const pinCount = getPartyPinCount(pins, party.id)
+              const logoUrl = party.logoUrl
+              const showLogo = Boolean(logoUrl) && !brokenLogoIds.has(party.id)
 
               return (
-                <label
-                  key={party.id}
-                  className={`elections-overview-map__party-option${
-                    isSelected ? ' elections-overview-map__party-option--selected' : ''
-                  }`}
-                  style={{ '--party-color': accentColor } as CSSProperties}
-                >
-                  <input
-                    type="checkbox"
-                    className="elections-overview-map__party-checkbox"
-                    checked={isSelected}
+                <li key={party.id}>
+                  <button
+                    type="button"
+                    className={`elections-overview-map__party-btn${
+                      isSelected
+                        ? ''
+                        : ' elections-overview-map__party-btn--hidden'
+                    }`}
+                    style={{ borderColor: accentColor }}
+                    onClick={() => toggleParty(party.id)}
                     disabled={loading}
-                    onChange={() => toggleParty(party.id)}
-                  />
-                  <span
-                    className="elections-overview-map__party-swatch"
-                    aria-hidden="true"
-                  />
-                  <span className="elections-overview-map__party-copy">
-                    <span className="elections-overview-map__party-name">
-                      {partyName}
-                    </span>
-                    <span className="elections-overview-map__party-count">
-                      {pinCount} מועמדים
-                    </span>
-                  </span>
-                </label>
+                    aria-pressed={isSelected}
+                    aria-label={`${partyName}, ${pinCount} מועמדים`}
+                    title={
+                      isSelected
+                        ? `הסר את ${partyName}`
+                        : `הוסף את ${partyName}`
+                    }
+                  >
+                    {showLogo && logoUrl ? (
+                      <img
+                        className="elections-overview-map__party-logo"
+                        src={logoUrl}
+                        alt=""
+                        onError={() => handleLogoError(party.id)}
+                      />
+                    ) : (
+                      <span
+                        className="elections-overview-map__party-swatch"
+                        style={{ backgroundColor: accentColor }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                </li>
               )
             })}
-          </div>
+          </ul>
         </div>
       ) : null}
 

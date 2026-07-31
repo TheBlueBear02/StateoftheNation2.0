@@ -65,7 +65,7 @@ export function CandidateMap({
       ) : null}
 
       <div className="party-detail-card__header">
-        <p className="party-detail-card__eyebrow">מפה</p>
+        <p className="party-detail-card__eyebrow">על המפה</p>
         <h2 id="candidate-map-title" className="party-detail-card__title">
           איפה גרים המועמדים
         </h2>

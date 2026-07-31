@@ -84,7 +84,7 @@ function toNumber(value: string | number | null): number | null {
   return Number.isFinite(next) ? next : null
 }
 
-function calculateAge(birthDate: string | null): number | null {
+export function calculateAge(birthDate: string | null): number | null {
   if (!birthDate) {
     return null
   }

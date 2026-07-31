@@ -45,7 +45,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/components/elections/PartyCard.tsx` | Clickable portrait card (same UI as the lists-game party picker): full-bleed leader photo/initials, bottom gradient overlay with name + leader line, party logo pinned top-start |
 | `src/components/elections/SeatsTrend.tsx` | Party-hero last-5-polls average + sparkline from `polls` / `poll_results` |
 | `src/components/elections/StatsBar.tsx` | Average age, % new MKs, and % women stat blocks |
-| `src/components/elections/CandidateList.tsx` | Ordered candidate cards with photo/initial fallback; shows 9 by default and loads 9 more per click |
+| `src/components/elections/ListsGamePromo.tsx` | Homepage-style lists-game teaser linking to `/elections/lists`; reused on `/elections/[partyId]` |
 | `src/components/elections/CandidateMap.tsx` | Public Israel map SVG with one projected dot per geocoded candidate |
 | `src/components/elections/ElectionsOverviewMap.tsx` | All-parties map on `/elections` with per-party color pins and checkbox filter (default: all parties) |
 | `src/components/elections/CandidateMapTooltip.tsx` | Fixed-position map tooltip matching the Knesset page style, showing city instead of faction |
@@ -56,7 +56,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 
 ## Data Flow
 
-`useElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר (promoted from polled_only); נועם stays `polled_only` (on the ballot in theory but not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero links to `/elections/polls` for weighted poll averages.
+`useElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר (promoted from polled_only); נועם stays `polled_only` (on the ballot in theory but not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero has no subtitle; under the election date it links to `/elections/polls` (weighted poll averages) and `/elections/lists` (list rating game).
 
 `useElectionCandidates(partyId)` loads ordered `election_candidates` joined to `people`. It then queries `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merges overlapping terms with `computeMemberTenureStats`, and attaches `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
 
@@ -195,7 +195,7 @@ Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `ELECTIONS_EDIT_SECRET` / `N
 - Takes the 5 most recent non-scenario polls with `fieldwork_end` on or before today (Jerusalem), same filter as `/elections/polls`.
 - **Average:** mean of that party's seats across polls where it appeared with a non-null seat count (rounded for display).
 - **Sparkline:** chronological seat points (oldest → newest) for those same polls; missing results render as `0`. Hovering a point shows a fixed tooltip with seats, fieldwork dates, pollster, publisher, and sample size (same metadata pattern as the polls bloc chart). Larger invisible hit targets make the small dots easy to hover.
-- Label: **ממוצע N הסקרים האחרונים**; link to `/elections/polls`. Empty / error states show `—` without a chart.
+- Label under the seat count: **מנדטים בממוצע בN הסקרים האחרונים**; link to `/elections/polls`. Empty / error states show `—` without a chart. There is no separate top label above the seat count.
 
 Rendered as a compact block in the party detail hero (visual left column on desktop).
 
@@ -212,7 +212,7 @@ Pins use the party color, render larger than the original static dots, and expos
 
 ## All-Parties Overview Map (`/elections`)
 
-Below the party grid, `ElectionsOverviewMap` shows geocoded candidates from every party on the same Israel SVG. Each pin uses its party color. A checkbox filter lists only parties that have at least one geocoded candidate; **all such parties are selected by default**. Users can toggle individual parties or use **בחר הכל** / **נקה**. The coverage label reads **מציג X מועמדים מ-Y מפלגות** when at least one party is selected. Tooltips show candidate name, party name, city, and MK tenure when available.
+Below the party grid, `ElectionsOverviewMap` shows geocoded candidates from every party on the same Israel SVG. Each pin uses its party color. A logo filter (same pattern as the polls party-trend legend) lists only parties that have at least one geocoded candidate; **all such parties are selected by default**. Each control is a party logo button (color swatch fallback if `logo_url` is missing or fails to load); deselected logos render greyed out. Users can toggle individual parties or use **בחר הכל** / **נקה**. The coverage label reads **מציג X מועמדים מ-Y מפלגות** when at least one party is selected. Tooltips show candidate name, party name, city, and MK tenure when available.
 
 ## Styling
 
@@ -222,12 +222,12 @@ The module follows [DesignLanguage.md](./DesignLanguage.md):
 - White cards, subtle borders, no border radius.
 - Page and hero backgrounds are flat white (no soft blue gradient washes), per [DesignLanguage.md](./DesignLanguage.md). The election date renders as plain bold text, without a chip background or border.
 - The party list section header shows only the title **המפלגות המתמודדות**; it does not include explanatory copy under the title.
-- Below the party grid, the overview map uses the same card header as the party detail map (**איפה גרים המועמדים**); party filter chips use each party color as a swatch.
+- Below the party grid, the overview map uses the same card header as the party detail map (**איפה גרים המועמדים**); on mobile (≤760px) only the blue eyebrow **על המפה** is shown. Party filter controls are logo buttons (polls-style), with a party-color swatch fallback.
 - The party index grid matches the lists-game picker: `auto-fill` columns (`minmax(140px, 1fr)`) on desktop, three columns on mobile (≤720px).
 - Party cards reuse the lists-game portrait UI: `3 / 4` aspect ratio, full-bleed leader photo (or initials fallback), dark bottom gradient overlay with short name + **בראשות {leader}**, and a small white party-logo badge pinned top-start. Cards have no border; hover lifts with a hard offset shadow.
 - Party color is passed through CSS custom property `--party-color` and tints the media background behind initials / missing photos.
-- The `/elections/[partyId]` party detail sections are borderless; section separation comes from spacing and white backgrounds rather than boxed outlines or hero side accents. The party hero uses three desktop columns: logo, party copy, and the seats trend on the visual left. The hero title is capped at `4rem`, wraps within the middle column (`min-width: 0` + `overflow-wrap: anywhere`), and must not overlap the seats column; the compact seats block keeps an opaque white background and sits above adjacent content when columns are tight. Stats blocks are centered within their cells and have no border.
-- Candidate list cards use larger borderless full-height portrait/initial columns that sit flush against the card side with no edge padding; the list position number sits as an overlay in the visual top-left corner. Former MKs also show tenure under the city line in smaller muted text (`0.8rem`, e.g. `3.4 שנים בכנסת`). When `election_candidates.city` is null, the city line shows **לא ידוע מקום מגורים**. When a candidate has both a generated description and `people.wikipedia_url`, the description ends with an external **קרא עוד** link to the Hebrew Wikipedia article.
+- The `/elections/[partyId]` party detail sections are borderless; section separation comes from spacing and white backgrounds rather than boxed outlines or hero side accents. On mobile (≤760px), section headers show only the blue eyebrow labels (**במספרים**, **הרשימה**, **על המפה**); desktop keeps the secondary titles. The party hero uses three desktop columns: logo, party copy, and the seats trend on the visual left. The hero title uses `shortName` (fallback: `name`); the full `name` is shown as a subtitle only when it differs from `shortName`. On mobile (≤760px), the logo and title sit on one row with a compact ~72px logo; when no full-name subtitle is shown, the title is vertically centered with the logo (`party-hero--name-centered`); seats trend spans full width below with the seat count and caption **מנדטים בממוצע בN הסקרים האחרונים** on one row (caption to the visual left of the number in RTL), then a full-width sparkline, then a centered **לכל הסקרים** link under the chart. The hero title is capped at about `4.4rem`, wraps within the middle column (`min-width: 0` + `overflow-wrap: anywhere`), and must not overlap the seats column; the compact seats block keeps an opaque white background and sits above adjacent content when columns are tight. Stats blocks are centered within their cells and have no border; on mobile the three stats stay in one row with tighter padding and smaller type. Below the map, the page includes the homepage lists-game promo (`ListsGamePromo`) linking to `/elections/lists`.
+- Candidate list cards use larger borderless full-height portrait/initial columns that sit flush against the card side with no edge padding; the list position number sits as an overlay in the visual top-left corner. Former MKs also show tenure under the city line in smaller muted text (`0.8rem`, e.g. `3.4 שנים בכנסת`). When `election_candidates.city` is null, the city line shows **לא ידוע מקום מגורים**. When `people.wikipedia_url` is set, an external **קרא עוד** link is shown (on desktop under the description). On mobile (≤760px), cards switch to the elections-index portrait style (`3 / 4` aspect, full-bleed photo, bottom gradient): list number top-left, bottom overlay with **name · age**, tenure line, and **קרא עוד**; city/description/new-MK tag are hidden in that layout.
 - Mobile layouts collapse to one column.
 
 ## Verification

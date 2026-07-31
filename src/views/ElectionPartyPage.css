@@ -1,7 +1,7 @@
 .election-party-page__main {
   --party-color: var(--color-blue);
 
-  padding-block: clamp(24px, 4vw, 56px);
+  padding-block: 0;
   background: var(--color-white);
 }
 
@@ -9,6 +9,7 @@
   display: flex;
   flex-direction: column;
   gap: clamp(18px, 3vw, 28px);
+  padding-block: clamp(24px, 4vw, 56px);
 }
 
 .election-party-page__error,
@@ -21,7 +22,7 @@
 .party-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) minmax(160px, 220px);
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) minmax(160px, 220px);
   gap: clamp(18px, 4vw, 36px);
   align-items: center;
   padding: clamp(22px, 4vw, 42px);
@@ -56,10 +57,14 @@
   max-width: 100%;
 }
 
+.party-hero__heading {
+  min-width: 0;
+}
+
 .party-hero__title {
   margin: 0;
   max-width: 100%;
-  font-size: clamp(2.4rem, 5vw, 4rem);
+  font-size: clamp(2.7rem, 5.5vw, 4.4rem);
   font-weight: 800;
   line-height: 1.08;
   color: var(--color-text);
@@ -131,10 +136,6 @@
   font-size: clamp(2.7rem, 5vw, 4.25rem);
 }
 
-.party-hero .seats-trend__label {
-  font-size: 0.78rem;
-}
-
 .party-hero .seats-trend__caption {
   font-size: 0.9rem;
 }
@@ -143,12 +144,6 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-}
-
-.seats-trend__label {
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-  font-weight: 700;
 }
 
 .seats-trend__value {
@@ -310,12 +305,14 @@
   padding-inline-end: 14px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fafafa;
+  overflow: hidden;
 }
 
 .candidate-card__position {
   position: absolute;
   inset-block-start: 8px;
   inset-inline-end: 8px;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -328,17 +325,34 @@
   text-align: center;
 }
 
-.candidate-card__photo {
-  display: flex;
+.candidate-card__media {
+  position: relative;
+  display: block;
   align-self: stretch;
-  align-items: center;
-  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  background: var(--party-soft, rgba(72, 144, 253, 0.16));
+}
+
+.candidate-card__photo {
+  display: block;
   width: 100%;
   height: 100%;
-  background: var(--party-soft, rgba(72, 144, 253, 0.16));
   color: var(--color-text);
   font-weight: 800;
   object-fit: cover;
+  object-position: top center;
+}
+
+.candidate-card__photo--initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--party-soft, rgba(72, 144, 253, 0.16));
+}
+
+.candidate-card__gradient {
+  display: none;
 }
 
 .candidate-card__body {
@@ -350,8 +364,20 @@
   padding-block: 14px;
 }
 
+.candidate-card__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
 .candidate-card__name {
   font-weight: 800;
+}
+
+.candidate-card__age {
+  display: none;
+  font-weight: 700;
 }
 
 .candidate-card__city,
@@ -372,6 +398,7 @@
 }
 
 .candidate-card__read-more {
+  width: fit-content;
   color: var(--party-color);
   font-weight: 800;
   text-decoration: none;
@@ -651,24 +678,132 @@
 
 @media (max-width: 980px) {
   .party-hero {
-    grid-template-columns: minmax(110px, 150px) 1fr;
+    grid-template-columns: minmax(128px, 172px) 1fr;
   }
 
   .party-hero .seats-trend {
     grid-column: 1 / -1;
+    grid-template-columns: minmax(120px, 0.55fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: center;
   }
 }
 
 @media (max-width: 760px) {
-  .party-hero,
-  .seats-trend,
-  .stats-bar__grid,
-  .candidate-map__layout {
-    grid-template-columns: 1fr;
+  .stats-bar .party-detail-card__title,
+  .candidate-list .party-detail-card__title,
+  .candidate-map .party-detail-card__title,
+  .elections-overview-map .party-detail-card__title {
+    display: none;
+  }
+
+  .party-hero {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 12px 14px;
+    align-items: start;
+    padding: 18px;
   }
 
   .party-hero__logo-wrap {
-    max-width: 148px;
+    width: 72px;
+    max-width: 72px;
+  }
+
+  .party-hero__content {
+    display: contents;
+  }
+
+  .party-hero__heading {
+    grid-column: 2;
+  }
+
+  .party-hero--name-centered .party-hero__logo-wrap,
+  .party-hero--name-centered .party-hero__heading {
+    align-self: center;
+  }
+
+  .party-hero__title {
+    font-size: clamp(1.85rem, 8vw, 2.5rem);
+  }
+
+  .party-hero__subtitle {
+    margin-block-start: 6px;
+  }
+
+  .party-hero__description {
+    grid-column: 1 / -1;
+    margin-block-start: 4px;
+  }
+
+  .party-hero .seats-trend {
+    grid-column: 1 / -1;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'value caption'
+      'chart chart'
+      'link link';
+    gap: 8px 14px;
+    align-items: center;
+  }
+
+  .party-hero .seats-trend__copy {
+    display: contents;
+  }
+
+  .party-hero .seats-trend__value {
+    grid-area: value;
+    font-size: clamp(2.2rem, 10vw, 3rem);
+  }
+
+  .party-hero .seats-trend__caption {
+    grid-area: caption;
+    margin: 0;
+    text-align: start;
+  }
+
+  .party-hero .seats-trend__link {
+    grid-area: link;
+    margin-top: 2px;
+    justify-self: center;
+    text-align: center;
+  }
+
+  .party-hero .seats-trend__chart-wrap {
+    grid-area: chart;
+    width: 100%;
+  }
+
+  .party-hero .seats-trend__chart {
+    width: 100%;
+    min-height: 72px;
+  }
+
+  .stats-bar__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stats-bar__item {
+    padding: 12px 6px;
+  }
+
+  .stats-bar__value {
+    font-size: clamp(1.35rem, 6vw, 2rem);
+  }
+
+  .stats-bar__label {
+    margin-block-start: 6px;
+    font-size: 0.82rem;
+    line-height: 1.2;
+  }
+
+  .stats-bar__coverage {
+    font-size: 0.72rem;
+    line-height: 1.25;
+  }
+
+  .candidate-map__layout {
+    grid-template-columns: 1fr;
   }
 
   .candidate-map__logo-badge {
@@ -682,18 +817,130 @@
     max-width: 72px;
     max-height: 72px;
   }
-}
 
-@media (max-width: 520px) {
+  .candidate-list__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
   .candidate-card {
-    grid-template-columns: 68px 1fr;
-    min-height: 104px;
-    padding-block: 0;
-    padding-inline-start: 0;
-    padding-inline-end: 12px;
+    display: block;
+    aspect-ratio: 3 / 4;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    background: color-mix(in srgb, var(--party-color, #4890fd) 22%, #1a1a1a);
+  }
+
+  .candidate-card__position {
+    top: 8px;
+    left: 8px;
+    right: auto;
+    inset-block-start: 8px;
+    inset-inline-start: auto;
+    inset-inline-end: auto;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 4px;
+    border-radius: 0;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 1rem;
+  }
+
+  .candidate-card__media {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--party-color, #4890fd) 22%, #1a1a1a);
+  }
+
+  .candidate-card__photo {
+    position: absolute;
+    inset: 0;
+  }
+
+  .candidate-card__photo--initials {
+    color: #fff;
+    font-size: 2rem;
+    opacity: 0.85;
+    background: transparent;
+  }
+
+  .candidate-card__gradient {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.9) 0%,
+      rgba(0, 0, 0, 0.58) 30%,
+      rgba(0, 0, 0, 0.14) 58%,
+      transparent 78%
+    );
+    pointer-events: none;
   }
 
   .candidate-card__body {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 1;
+    gap: 3px;
+    justify-content: flex-end;
+    padding: 12px 10px 14px;
+    color: #fff;
+  }
+
+  .candidate-card__identity {
+    gap: 0;
+  }
+
+  .candidate-card__name {
+    font-size: 0.95rem;
+    line-height: 1.2;
+    color: #fff;
+  }
+
+  .candidate-card__age {
+    display: inline;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .candidate-card__age::before {
+    content: ' · ';
+    opacity: 0.7;
+  }
+
+  .candidate-card__city,
+  .candidate-card__description,
+  .candidate-card__tag {
+    display: none;
+  }
+
+  .candidate-card__tenure {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 0.72rem;
+  }
+
+  .candidate-card__read-more {
+    margin-block-start: 2px;
+    color: #fff;
+    font-size: 0.78rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .candidate-card--skeleton .candidate-card__body {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .candidate-card--skeleton .candidate-card__body {
     padding-block: 12px;
   }
 }

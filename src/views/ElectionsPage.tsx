@@ -112,16 +112,21 @@ export function ElectionsPage() {
               <h1 id="elections-title" className="elections-page__title">
                 {title}
               </h1>
-              <p className="elections-page__subtitle">
-                כל המפלגות שרצות לכנסת ה-26 במקום אחד. לחצו על מפלגה כדי לראות את
-                הרשימה, הנתונים והמפה הגיאוגרפית של המועמדים.
-              </p>
               {dateLabel ? (
                 <p className="elections-page__date">מועד הבחירות: {dateLabel}</p>
               ) : null}
-              <p className="elections-page__polls-link">
-                <Link href="/elections/polls">לצפייה בסקרי המנדטים לקראת הבחירות</Link>
-              </p>
+              <nav className="elections-page__links" aria-label="קישורים לבחירות">
+                <p className="elections-page__link">
+                  <Link href="/elections/polls">
+                    לצפייה בסקרי המנדטים לקראת הבחירות
+                  </Link>
+                </p>
+                <p className="elections-page__link">
+                  <Link href="/elections/lists">
+                    בדקו את איזו מפלגה הכי מתאימה לכם
+                  </Link>
+                </p>
+              </nav>
             </header>
           </div>
         </section>

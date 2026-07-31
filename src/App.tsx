@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from './components/SiteLayout'
+import { ListsGamePromo } from './components/elections/ListsGamePromo'
 import { useSiteUpdates } from './hooks/useSiteUpdates'
 
 const HERO_BUTTONS = [
   { label: 'בחירות 2026', to: '/elections' },
-  { label: 'הממשלה', to: '/government' },
   { label: 'סקרי מנדטים', to: '/elections/polls' },
+  { label: 'הממשלה', to: '/government' },
   { label: 'הכנסת', to: '/knesset' },
 ] as const
 
@@ -137,36 +138,7 @@ function App() {
           </div>
         </aside>
 
-        <section
-          id="lists-game"
-          className="project-section"
-          aria-labelledby="lists-game-title"
-        >
-          <Link href="/elections/lists" className="project-section__link">
-            <div className="container">
-              <div className="project-section__inner">
-                <div className="project-section__content">
-                  <h2 id="lists-game-title" className="project-section__title">
-                    משחק הרשימות: שחקו וגלו איזו רשימה הכי מתאימה לכם
-                  </h2>
-                  <span className="project-section__tag">בחירות 2026</span>
-                </div>
-
-                <div className="project-section__media" aria-hidden="true">
-                  <img
-                    src="/election-game-homepage.png"
-                    alt=""
-                    className="project-section__image"
-                    width={906}
-                    height={513}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-              </div>
-            </div>
-          </Link>
-        </section>
+        <ListsGamePromo />
 
         <section
           id="mandate-polls"

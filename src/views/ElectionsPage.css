@@ -85,66 +85,67 @@
 .elections-overview-map__party-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.elections-overview-map__party-option {
-  --party-color: var(--color-blue);
-
+.elections-overview-map__party-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 8px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: var(--color-white);
+  justify-content: center;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: #fff;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background-color 0.16s ease;
+    opacity 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
-.elections-overview-map__party-option--selected {
-  border-color: color-mix(in srgb, var(--party-color) 55%, rgba(0, 0, 0, 0.12));
-  background:
-    radial-gradient(
-      circle at 100% 0,
-      color-mix(in srgb, var(--party-color) 14%, transparent),
-      transparent 70%
-    ),
-    var(--color-white);
+.elections-overview-map__party-btn:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.04);
 }
 
-.elections-overview-map__party-checkbox {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
+.elections-overview-map__party-btn:focus-visible {
+  outline: 2px solid var(--color-blue, #4890fd);
+  outline-offset: 2px;
+}
+
+.elections-overview-map__party-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.elections-overview-map__party-btn--hidden {
+  opacity: 0.4;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+.elections-overview-map__party-btn--hidden .elections-overview-map__party-swatch {
+  background-color: #bbb !important;
+}
+
+.elections-overview-map__party-btn--hidden .elections-overview-map__party-logo {
+  filter: grayscale(1);
+  opacity: 0.45;
 }
 
 .elections-overview-map__party-swatch {
-  width: 12px;
-  height: 12px;
   flex-shrink: 0;
-  background: var(--party-color);
+  width: 32px;
+  height: 32px;
 }
 
-.elections-overview-map__party-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.elections-overview-map__party-name {
-  font-size: 0.92rem;
-  font-weight: 800;
-  line-height: 1.15;
-}
-
-.elections-overview-map__party-count {
-  color: var(--color-text-muted);
-  font-size: 0.78rem;
-  line-height: 1.2;
+.elections-overview-map__party-logo {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .elections-overview-map__layout {
@@ -174,13 +175,6 @@
   color: var(--color-text);
 }
 
-.elections-page__subtitle {
-  max-width: 620px;
-  margin-block: 16px 0;
-  color: var(--color-text-muted);
-  font-size: clamp(1rem, 2vw, 1.2rem);
-}
-
 .elections-page__date {
   display: inline-block;
   margin-block-start: 20px;
@@ -188,17 +182,24 @@
   font-weight: 700;
 }
 
-.elections-page__polls-link {
+.elections-page__links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-block-start: 12px;
 }
 
-.elections-page__polls-link a {
+.elections-page__link {
+  margin: 0;
+}
+
+.elections-page__link a {
   color: var(--color-blue-dark);
   font-weight: 700;
   text-decoration: none;
 }
 
-.elections-page__polls-link a:hover {
+.elections-page__link a:hover {
   text-decoration: underline;
 }
 

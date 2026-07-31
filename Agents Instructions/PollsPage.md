@@ -13,7 +13,7 @@ Frontend and pipeline module for Knesset-26 opinion poll seat projections source
 
 Register `/elections/polls/edit` as a static App Router segment under `src/app/elections/polls/edit/` (alongside `/elections/polls`); views live in `src/views/…`.
 
-The elections index at `/elections` links to polls from the hero.
+The elections index at `/elections` links to polls and the lists game from the hero.
 
 ## Pipeline
 

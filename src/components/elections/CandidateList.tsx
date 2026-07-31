@@ -1,11 +1,37 @@
 'use client'
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import type { ElectionCandidate } from '../../hooks/useElectionCandidates'
+import {
+  calculateAge,
+  type ElectionCandidate,
+} from '../../hooks/useElectionCandidates'
 import { getInitials, tintColor } from '../../lib/hemicycle'
 import { formatTenureYears } from '../../lib/knessetTenure'
 
-const PAGE_SIZE = 9
+const PAGE_SIZE_DESKTOP = 9
+const PAGE_SIZE_MOBILE = 4
+const MOBILE_MEDIA_QUERY = '(max-width: 760px)'
+
+function useCandidatePageSize() {
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_DESKTOP)
+
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_MEDIA_QUERY)
+
+    const syncPageSize = () => {
+      setPageSize(media.matches ? PAGE_SIZE_MOBILE : PAGE_SIZE_DESKTOP)
+    }
+
+    syncPageSize()
+    media.addEventListener('change', syncPageSize)
+
+    return () => {
+      media.removeEventListener('change', syncPageSize)
+    }
+  }, [])
+
+  return pageSize
+}
 
 type CandidateListProps = {
   candidates: ElectionCandidate[]
@@ -19,7 +45,9 @@ function CandidateListSkeleton() {
       {Array.from({ length: 6 }, (_, index) => (
         <div key={index} className="candidate-card candidate-card--skeleton">
           <span className="candidate-card__position" />
-          <span className="candidate-card__photo" />
+          <span className="candidate-card__media">
+            <span className="candidate-card__photo" />
+          </span>
           <span className="candidate-card__body">
             <span className="candidate-card__line candidate-card__line--title" />
             <span className="candidate-card__line" />
@@ -32,7 +60,8 @@ function CandidateListSkeleton() {
 }
 
 export function CandidateList({ candidates, partyColor, loading }: CandidateListProps) {
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const pageSize = useCandidatePageSize()
+  const [visibleCount, setVisibleCount] = useState(pageSize)
   const partyId = candidates[0]?.partyId ?? null
   const accentColor = partyColor ?? '#4890fd'
   const style = {
@@ -41,15 +70,15 @@ export function CandidateList({ candidates, partyColor, loading }: CandidateList
   } as CSSProperties
 
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE)
-  }, [partyId])
+    setVisibleCount(pageSize)
+  }, [partyId, pageSize])
 
   const visibleCandidates = useMemo(
     () => candidates.slice(0, visibleCount),
     [candidates, visibleCount],
   )
   const hiddenCount = Math.max(candidates.length - visibleCount, 0)
-  const nextBatchSize = Math.min(PAGE_SIZE, hiddenCount)
+  const nextBatchSize = Math.min(pageSize, hiddenCount)
 
   return (
     <section
@@ -75,59 +104,68 @@ export function CandidateList({ candidates, partyColor, loading }: CandidateList
       {!loading && candidates.length > 0 ? (
         <>
           <ol className="candidate-list__grid">
-            {visibleCandidates.map((candidate) => (
-              <li key={candidate.id} className="candidate-card">
-                <span className="candidate-card__position">
-                  {candidate.listPosition}
-                </span>
+            {visibleCandidates.map((candidate) => {
+              const age = calculateAge(candidate.birthDate)
 
-                {candidate.imageUrl ? (
-                  <img
-                    className="candidate-card__photo"
-                    src={candidate.imageUrl}
-                    alt={candidate.fullName}
-                    loading="lazy"
-                  />
-                ) : (
-                  <span className="candidate-card__photo candidate-card__photo--initials">
-                    {getInitials(candidate.fullName)}
+              return (
+                <li key={candidate.id} className="candidate-card">
+                  <span className="candidate-card__position">
+                    {candidate.listPosition}
                   </span>
-                )}
 
-                <span className="candidate-card__body">
-                  <span className="candidate-card__name">{candidate.fullName}</span>
-                  <span className="candidate-card__city">
-                    {candidate.city ?? 'לא ידוע מקום מגורים'}
+                  <span className="candidate-card__media">
+                    {candidate.imageUrl ? (
+                      <img
+                        className="candidate-card__photo"
+                        src={candidate.imageUrl}
+                        alt={candidate.fullName}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="candidate-card__photo candidate-card__photo--initials">
+                        {getInitials(candidate.fullName)}
+                      </span>
+                    )}
+                    <span className="candidate-card__gradient" aria-hidden="true" />
                   </span>
-                  {candidate.totalYearsInKnesset > 0 ? (
-                    <span className="candidate-card__tenure">
-                      {formatTenureYears(candidate.totalYearsInKnesset)} בכנסת
-                    </span>
-                  ) : null}
-                  {candidate.isNewMk ? (
-                    <span className="candidate-card__tag">חדש/ה לכנסת</span>
-                  ) : null}
-                  {candidate.description ? (
-                    <span className="candidate-card__description">
-                      {candidate.description}
-                      {candidate.wikipediaUrl ? (
-                        <>
-                          {' '}
-                          <a
-                            className="candidate-card__read-more"
-                            href={candidate.wikipediaUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            קרא עוד
-                          </a>
-                        </>
+
+                  <span className="candidate-card__body">
+                    <span className="candidate-card__identity">
+                      <span className="candidate-card__name">{candidate.fullName}</span>
+                      {age !== null ? (
+                        <span className="candidate-card__age">{age}</span>
                       ) : null}
                     </span>
-                  ) : null}
-                </span>
-              </li>
-            ))}
+                    <span className="candidate-card__city">
+                      {candidate.city ?? 'לא ידוע מקום מגורים'}
+                    </span>
+                    {candidate.totalYearsInKnesset > 0 ? (
+                      <span className="candidate-card__tenure">
+                        {formatTenureYears(candidate.totalYearsInKnesset)} בכנסת
+                      </span>
+                    ) : null}
+                    {candidate.isNewMk ? (
+                      <span className="candidate-card__tag">חדש/ה לכנסת</span>
+                    ) : null}
+                    {candidate.description ? (
+                      <span className="candidate-card__description">
+                        {candidate.description}
+                      </span>
+                    ) : null}
+                    {candidate.wikipediaUrl ? (
+                      <a
+                        className="candidate-card__read-more"
+                        href={candidate.wikipediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        קרא עוד
+                      </a>
+                    ) : null}
+                  </span>
+                </li>
+              )
+            })}
           </ol>
 
           {hiddenCount > 0 ? (
@@ -136,7 +174,7 @@ export function CandidateList({ candidates, partyColor, loading }: CandidateList
               className="candidate-list__toggle"
               onClick={() =>
                 setVisibleCount((current) =>
-                  Math.min(current + PAGE_SIZE, candidates.length),
+                  Math.min(current + pageSize, candidates.length),
                 )
               }
             >

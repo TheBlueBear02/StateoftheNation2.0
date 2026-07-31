@@ -102,8 +102,8 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 | Label | Destination |
 |-------|--------|
 | בחירות 2026 | `/elections` (route) |
-| הממשלה | `/government` (route) |
 | סקרי מנדטים | `/elections/polls` (route) |
+| הממשלה | `/government` (route) |
 | הכנסת | `/knesset` (route) |
 
 **בחירות 2026** links to the live Elections page, **סקרי מנדטים** links to weighted poll averages, **הממשלה** links to the live Government page, and **הכנסת** links to the live Knesset hemicycle page.
@@ -121,6 +121,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 ### 4. Lists game project (`#lists-game`)
 
+- Rendered by shared `src/components/elections/ListsGamePromo.tsx` (also used at the bottom of `/elections/[partyId]`).
 - White section placed **above** the polls teaser, with a bottom border divider.
 - News-block layout: title **משחק הרשימות: שחקו וגלו איזו רשימה הכי מתאימה לכם** + category tag **בחירות 2026** below it (no description / meta line).
 - Whole section is a link (`.project-section__link`) to `/elections/lists`.

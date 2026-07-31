@@ -99,13 +99,6 @@ export function SeatsTrend({ partyId, color }: SeatsTrendProps) {
   return (
     <section className="party-detail-card seats-trend" style={style} aria-labelledby="seats-title">
       <div className="seats-trend__copy">
-        <p className="seats-trend__label">
-          {loading
-            ? 'טוען סקרים…'
-            : hasTrend
-              ? `ממוצע ${pollCount} הסקרים האחרונים`
-              : 'נתוני סקרים'}
-        </p>
         <h2 id="seats-title" className="seats-trend__value">
           {loading ? '…' : displaySeats !== null ? displaySeats : '—'}
         </h2>
@@ -113,7 +106,7 @@ export function SeatsTrend({ partyId, color }: SeatsTrendProps) {
           {error
             ? 'לא ניתן לטעון סקרים'
             : hasTrend
-              ? 'מנדטים בממוצע נוכחי'
+              ? `מנדטים בממוצע ב${pollCount} הסקרים האחרונים`
               : loading
                 ? 'מנדטים'
                 : 'אין סקרים זמינים'}
