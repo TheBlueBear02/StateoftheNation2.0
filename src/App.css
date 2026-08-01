@@ -464,50 +464,6 @@
   background: #fafafa;
 }
 
-/* ── Polls preview placeholder ── */
-
-.polls-preview {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 10px;
-  aspect-ratio: 16 / 10;
-  width: 100%;
-  max-width: 520px;
-  margin-inline: auto;
-  padding: 28px 24px 20px;
-}
-
-.polls-preview__bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: clamp(6px, 1.2vw, 12px);
-  height: 100%;
-}
-
-.polls-preview__bar {
-  flex: 1;
-  min-width: 0;
-  border-radius: 4px 4px 0 0;
-  background: var(--color-blue);
-}
-
-.polls-preview__bar--1 { height: 88%; background: #1f4e9e; }
-.polls-preview__bar--2 { height: 72%; background: #4890fd; }
-.polls-preview__bar--3 { height: 54%; background: #6aa6fd; }
-.polls-preview__bar--4 { height: 44%; background: #c45c5c; }
-.polls-preview__bar--5 { height: 36%; background: #8a8a8a; }
-.polls-preview__bar--6 { height: 28%; background: #5a9e6e; }
-.polls-preview__bar--7 { height: 22%; background: #d4a017; }
-.polls-preview__bar--8 { height: 16%; background: #7b6bb0; }
-
-.polls-preview__baseline {
-  height: 2px;
-  width: 100%;
-  background: rgba(0, 0, 0, 0.12);
-}
-
 /* ── Dashboard preview placeholder ── */
 
 .dashboard-preview {

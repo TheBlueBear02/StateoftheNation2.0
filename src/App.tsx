@@ -20,6 +20,9 @@ const DASHBOARD_ICONS = [
   'agriculture', 'energy', 'science', 'culture',
 ] as const
 
+/** Temporarily hidden on the homepage; set true to restore the teaser. */
+const SHOW_GOVERNMENT_DASHBOARD = false
+
 const HERO_VIDEO_SRC =
   'https://tawfpzpikbxvgsqrtvpm.supabase.co/storage/v1/object/public/site-assets/bear-hero-video2.mp4'
 
@@ -150,72 +153,70 @@ function App() {
               <div className="project-section__inner">
                 <div className="project-section__content">
                   <h2 id="mandate-polls-title" className="project-section__title">
-                    סקרי מנדטים
+                    ניתוח כל סקרי המנדטים במקום אחד
                   </h2>
                   <span className="project-section__tag">בחירות 2026</span>
                 </div>
 
                 <div className="project-section__media" aria-hidden="true">
-                  <div className="polls-preview">
-                    <div className="polls-preview__bars">
-                      <span className="polls-preview__bar polls-preview__bar--1" />
-                      <span className="polls-preview__bar polls-preview__bar--2" />
-                      <span className="polls-preview__bar polls-preview__bar--3" />
-                      <span className="polls-preview__bar polls-preview__bar--4" />
-                      <span className="polls-preview__bar polls-preview__bar--5" />
-                      <span className="polls-preview__bar polls-preview__bar--6" />
-                      <span className="polls-preview__bar polls-preview__bar--7" />
-                      <span className="polls-preview__bar polls-preview__bar--8" />
-                    </div>
-                    <div className="polls-preview__baseline" />
-                  </div>
+                  <img
+                    src="/polls-page-homepage.png"
+                    alt=""
+                    className="project-section__image"
+                    width={810}
+                    height={375}
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
               </div>
             </div>
           </Link>
         </section>
 
-        <section
-          id="government-dashboard"
-          className="project-section"
-          aria-labelledby="dashboard-title"
-        >
-          <Link href="/government" className="project-section__link">
-            <div className="container">
-              <div className="project-section__inner">
-                <div className="project-section__content">
-                  <h2 id="dashboard-title" className="project-section__title">
-                    דשבורד ממשלה
-                  </h2>
-                  <span className="project-section__tag">הממשלה</span>
-                </div>
+        {SHOW_GOVERNMENT_DASHBOARD ? (
+          <section
+            id="government-dashboard"
+            className="project-section"
+            aria-labelledby="dashboard-title"
+          >
+            <Link href="/government" className="project-section__link">
+              <div className="container">
+                <div className="project-section__inner">
+                  <div className="project-section__content">
+                    <h2 id="dashboard-title" className="project-section__title">
+                      דשבורד ממשלה
+                    </h2>
+                    <span className="project-section__tag">הממשלה</span>
+                  </div>
 
-                <div className="project-section__media" aria-hidden="true">
-                  <div className="dashboard-preview">
-                    <div className="dashboard-preview__grid">
-                      {DASHBOARD_ICONS.map((icon, index) => (
-                        <div
-                          key={icon}
-                          className={`dashboard-preview__cell dashboard-preview__cell--${icon}${
-                            index % 7 === 3 ? ' dashboard-preview__cell--alert' : ''
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <div className="dashboard-preview__axis dashboard-preview__axis--vertical" />
-                    <div className="dashboard-preview__axis dashboard-preview__axis--horizontal" />
-                    <div className="dashboard-preview__center">
-                      <span className="dashboard-preview__portrait" />
-                      <span className="dashboard-preview__portrait" />
-                      <span className="dashboard-preview__portrait" />
-                      <span className="dashboard-preview__portrait" />
+                  <div className="project-section__media" aria-hidden="true">
+                    <div className="dashboard-preview">
+                      <div className="dashboard-preview__grid">
+                        {DASHBOARD_ICONS.map((icon, index) => (
+                          <div
+                            key={icon}
+                            className={`dashboard-preview__cell dashboard-preview__cell--${icon}${
+                              index % 7 === 3 ? ' dashboard-preview__cell--alert' : ''
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <div className="dashboard-preview__axis dashboard-preview__axis--vertical" />
+                      <div className="dashboard-preview__axis dashboard-preview__axis--horizontal" />
+                      <div className="dashboard-preview__center">
+                        <span className="dashboard-preview__portrait" />
+                        <span className="dashboard-preview__portrait" />
+                        <span className="dashboard-preview__portrait" />
+                        <span className="dashboard-preview__portrait" />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </Link>
-        </section>
+            </Link>
+          </section>
+        ) : null}
       </main>
     </SiteLayout>
   )

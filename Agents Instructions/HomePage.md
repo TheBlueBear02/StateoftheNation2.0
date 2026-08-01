@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and shared conventions.
 
-Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with six visible sections.
+Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with five visible sections (government dashboard teaser temporarily hidden).
 
 ## Page Structure
 
@@ -20,9 +20,6 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 │    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
 │  Project: סקרי מנדטים (#fafafa, full-bleed)            │
-│    └─ .container — tag + title | media                  │
-├─────────────────────────────────────────────────────────┤
-│  Project: דשבורד ממשלה (white, full-bleed)             │
 │    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
 │  Footer (blue, full-bleed) — logo + social + legal links + copyright│
@@ -129,18 +126,19 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 ### 5. Mandate polls project (`#mandate-polls`)
 
-- Uses `.project-section--alt` (`#fafafa`) so it sits visually between the lists game and government dashboard teasers.
-- Same news-block layout: title **סקרי מנדטים** + category tag **בחירות 2026** below it (no description / meta line).
+- Uses `.project-section--alt` (`#fafafa`) so it sits below the white lists-game teaser.
+- Same news-block layout: title **ניתוח כל סקרי המנדטים במקום אחד** + category tag **בחירות 2026** below it (no description / meta line).
 - Whole section is a link (`.project-section__link`) to `/elections/polls`.
-- Media (`.project-section__media`): CSS bar-chart placeholder (`.polls-preview`) — eight descending bars in varied party-like colors above a baseline.
+- Media (`.project-section__media`): screenshot from `public/polls-page-homepage.png`.
 
-### 6. Government Dashboard project (`#government-dashboard`)
+### 6. Government Dashboard project (`#government-dashboard`) — hidden
 
-- White section below the polls teaser (alternating backgrounds: white → alt → white).
+- Markup kept in `App.tsx` behind `SHOW_GOVERNMENT_DASHBOARD = false`; flip to `true` to restore.
 - Same news-block layout: title **דשבורד ממשלה** + category tag **הממשלה** below it (no description / meta line).
 - `.project-section__inner.container`: ~`0.95fr / 1.2fr` grid (media larger). DOM order is content first, media second — text right, preview left in RTL.
 - Hover on `.project-section__inner`: light grey background on the whole content box. Hover on title or media: title underline. Whole section remains clickable; focus-visible outline on the link.
 - Tag (`.project-section__tag`): square corners, `--color-blue` fill / white text.
+- Media is still a CSS dashboard placeholder (`.dashboard-preview`).
 
 ### 7. Footer (`site-footer`)
 
@@ -186,8 +184,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 ## Future Work
 
 - Wire remaining placeholder hero buttons to real routes.
-- Replace dashboard CSS placeholder with final dashboard screenshot/asset.
-- Replace polls CSS bar-chart placeholder with a final polls page screenshot/asset.
+- Restore the government dashboard homepage teaser (`SHOW_GOVERNMENT_DASHBOARD`) and replace its CSS placeholder with a final screenshot/asset.
 
 ## Verification
 
