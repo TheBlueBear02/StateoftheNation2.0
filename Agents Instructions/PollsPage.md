@@ -60,7 +60,10 @@ Requires `npm run dev` (or `ENABLE_PIPELINE_API`), `SUPABASE_SERVICE_KEY`, and `
 
 | File | Role |
 |------|------|
-| `src/hooks/usePolls.ts` | Recent polls with joined results (includes party `bloc`, logo/color with confirmed-party + faction branding fallback) |
+| `src/app/elections/polls/page.tsx` | Server fetch of a small poll window for last-5 average `ItemList` JSON-LD; charts still client-fetch via `usePolls(120)` |
+| `src/lib/fetchPolls.ts` | Shared `fetchPolls(client, limit)` used by the Server Component and `usePolls` |
+| `src/lib/supabaseServer.ts` | Anon server Supabase client for the App Router page |
+| `src/hooks/usePolls.ts` | Thin hook over `fetchPolls`; accepts optional `initialPolls` and skips client refetch when set |
 | `src/hooks/usePollAggregates.ts` | Weighted/last3 aggregates + daily trend series from `poll_aggregates` |
 | `src/lib/pollChartData.ts` | Last-N average, per-party last-N trend, multi-party trend lines, bloc totals, per-poll snapshots for charts |
 | `src/lib/runPollsPipeline.ts` | Dev API client for status / sync / stage / save site-update |
@@ -101,7 +104,7 @@ Raw-poll historical charts use individual poll results. The aggregate-history ch
 4. **Joint List group headers** on Wikipedia span Hadash–Ta'al / Balad sub-columns — parser uses sub-column names, not the group title (`הרשימה המשותפת`)
 5. Stage 2 inserts only rows whose `(natural_key, content_hash)` is new — does not reset already-processed staging rows to `pending`. Rows with no parseable party seat cells (Wikipedia event annotations) are skipped.
 6. Aggregates recomputed for trailing 30 Jerusalem days
-7. Frontend reads `polls`, `poll_results`, `poll_aggregates`, `party_lineage` via anon key
+7. `/elections/polls` Server Component reads `polls` + `poll_results` (+ publishers/pollsters/parties) via anon key and hydrates the client view; aggregate-history chart still reads `poll_aggregates` / `party_lineage` client-side via `usePollAggregates`
 8. Stage 6 validates recent regular polls (last 45 days) by default; `--backfill` validates full history
 
 ## Party Status Filter

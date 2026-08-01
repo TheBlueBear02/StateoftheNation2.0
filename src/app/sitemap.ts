@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
-import { createClient } from '@supabase/supabase-js'
-import { getSiteUrl, getSupabaseAnonKey, getSupabaseUrl } from '@/lib/runtimeEnv'
+import { getSiteUrl } from '@/lib/runtimeEnv'
+import { createServerSupabaseClient } from '@/lib/supabaseServer'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl()
@@ -52,10 +52,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ]
 
-  const url = getSupabaseUrl()
-  const key = getSupabaseAnonKey()
-  if (url && key) {
-    const client = createClient(url, key)
+  const client = createServerSupabaseClient()
+  if (client) {
     const { data } = await client
       .from('election_parties')
       .select('id')

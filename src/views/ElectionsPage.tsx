@@ -10,6 +10,7 @@ import {
   formatElectionDate,
   useElectionParties,
 } from '../hooks/useElectionParties'
+import type { ElectionOption, ElectionParty } from '../lib/supabase'
 import './ElectionPartyPage.css'
 import './ElectionsPage.css'
 
@@ -89,8 +90,20 @@ function useCurrentTime() {
   return now
 }
 
-export function ElectionsPage() {
-  const { election, parties, loading, error } = useElectionParties()
+type ElectionsPageProps = {
+  initialElection?: ElectionOption | null
+  initialParties?: ElectionParty[]
+}
+
+export function ElectionsPage({
+  initialElection,
+  initialParties,
+}: ElectionsPageProps = {}) {
+  const { election, parties, loading, error } = useElectionParties(
+    initialParties !== undefined
+      ? { election: initialElection ?? null, parties: initialParties }
+      : undefined,
+  )
   const {
     pins: mapPins,
     loading: mapLoading,

@@ -1,6 +1,5 @@
 'use client'
 
-import { useParams } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
@@ -10,28 +9,28 @@ import { ListsGamePromo } from '../components/elections/ListsGamePromo'
 import { SeatsTrend } from '../components/elections/SeatsTrend'
 import { StatsBar } from '../components/elections/StatsBar'
 import { useElectionCandidates } from '../hooks/useElectionCandidates'
-import { useElectionParties } from '../hooks/useElectionParties'
+import type { ElectionCandidate } from '../lib/fetchElectionCandidates'
+import type { ElectionParty } from '../lib/supabase'
 import './ElectionPartyPage.css'
 
-export function ElectionPartyPage() {
-  const { partyId } = useParams()
-  const partyIdNumber = Number(partyId)
-  const {
-    parties,
-    loading: partiesLoading,
-    error: partiesError,
-  } = useElectionParties()
-  const party =
-    Number.isFinite(partyIdNumber) && partyId
-      ? parties.find((item) => item.id === partyIdNumber) ?? null
-      : null
+type ElectionPartyPageProps = {
+  party: ElectionParty | null
+  initialCandidates?: ElectionCandidate[]
+  loadError?: string | null
+}
+
+export function ElectionPartyPage({
+  party,
+  initialCandidates,
+  loadError = null,
+}: ElectionPartyPageProps) {
   const {
     candidates,
     mapPins,
     stats,
     loading: candidatesLoading,
     error: candidatesError,
-  } = useElectionCandidates(party?.id ?? null)
+  } = useElectionCandidates(party?.id ?? null, initialCandidates)
 
   const partyName = party?.shortName ?? party?.name ?? 'מפלגה'
   const showFullNameSubtitle = Boolean(
@@ -39,9 +38,9 @@ export function ElectionPartyPage() {
   )
   const accentColor = party?.color ?? '#4890fd'
   const style = { '--party-color': accentColor } as CSSProperties
-  const loading = partiesLoading || (Boolean(party) && candidatesLoading)
-  const error = partiesError ?? candidatesError
-  const notFound = !partiesLoading && !party
+  const loading = Boolean(party) && candidatesLoading
+  const error = loadError ?? candidatesError
+  const notFound = !party && !loadError
 
   return (
     <SiteLayout className="election-party-page">

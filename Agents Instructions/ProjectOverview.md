@@ -35,7 +35,7 @@ Live pages fetch data from **Supabase**. Static homepage content (news ticker, h
 | Data | Supabase (`@supabase/supabase-js`) |
 | Lint | `next lint` (eslint-config-next); Oxlint available |
 | Language / layout | Hebrew, `dir="rtl"`, Heebo via `next/font` |
-| SEO | `metadata` / `generateMetadata`, `sitemap.ts`, `robots.ts`, JSON-LD |
+| SEO | `metadata` / `generateMetadata`, `sitemap.ts`, `robots.ts`, JSON-LD; elections/polls/party routes SSR-fetch Supabase into client views |
 
 ## Repository Layout
 

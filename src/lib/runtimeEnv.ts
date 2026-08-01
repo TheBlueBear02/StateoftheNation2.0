@@ -76,6 +76,16 @@ export function getSiteUrl(): string {
   return 'http://localhost:3000'
 }
 
+/** Public Facebook App ID for `fb:app_id` / Sharing Debugger (not a secret). */
+export function getFacebookAppId(): string | undefined {
+  const id =
+    process.env.NEXT_PUBLIC_FACEBOOK_APP_ID ||
+    process.env.FACEBOOK_APP_ID ||
+    undefined
+  const trimmed = id?.trim()
+  return trimmed || undefined
+}
+
 /** Pipeline spawn APIs: local dev or explicit opt-in. */
 export function pipelineApisEnabled(): boolean {
   return (

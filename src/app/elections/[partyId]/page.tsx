@@ -1,34 +1,18 @@
 import type { Metadata } from 'next'
-import { createClient } from '@supabase/supabase-js'
 import { ElectionPartyPage } from '@/views/ElectionPartyPage'
 import { JsonLd } from '@/components/seo/JsonLd'
-import { getSiteUrl, getSupabaseAnonKey, getSupabaseUrl } from '@/lib/runtimeEnv'
+import { loadElectionPartyPage } from '@/lib/loadElectionPartyPage'
+import { getSiteUrl } from '@/lib/runtimeEnv'
 
 type Props = {
   params: Promise<{ partyId: string }>
 }
 
-async function loadParty(partyId: string) {
-  const url = getSupabaseUrl()
-  const key = getSupabaseAnonKey()
-  if (!url || !key) return null
-
-  const id = Number(partyId)
-  if (!Number.isInteger(id) || id < 1) return null
-
-  const client = createClient(url, key)
-  const { data } = await client
-    .from('election_parties')
-    .select('id, name, short_name, description, color')
-    .eq('id', id)
-    .maybeSingle()
-
-  return data
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { partyId } = await params
-  const party = await loadParty(partyId)
+  const id = Number(partyId)
+  const { party } = await loadElectionPartyPage(id)
+
   const name = party?.name ?? 'מפלגה'
   const description =
     party?.description?.trim() ||
@@ -47,8 +31,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { partyId } = await params
-  const party = await loadParty(partyId)
   const siteUrl = getSiteUrl()
+  const id = Number(partyId)
+  const { party, candidates, error: loadError } = await loadElectionPartyPage(id)
 
   return (
     <>
@@ -65,7 +50,7 @@ export default async function Page({ params }: Props) {
             about: {
               '@type': 'PoliticalParty',
               name: party.name,
-              alternateName: party.short_name ?? undefined,
+              alternateName: party.shortName ?? undefined,
             },
             breadcrumb: {
               '@type': 'BreadcrumbList',
@@ -90,10 +75,30 @@ export default async function Page({ params }: Props) {
                 },
               ],
             },
+            mainEntity:
+              candidates.length > 0
+                ? {
+                    '@type': 'ItemList',
+                    name: `רשימת המועמדים של ${party.name}`,
+                    numberOfItems: candidates.length,
+                    itemListElement: candidates.map((candidate, index) => ({
+                      '@type': 'ListItem',
+                      position: index + 1,
+                      name: candidate.fullName,
+                      description: candidate.city
+                        ? `מקום ${candidate.listPosition}, ${candidate.city}`
+                        : `מקום ${candidate.listPosition}`,
+                    })),
+                  }
+                : undefined,
           }}
         />
       ) : null}
-      <ElectionPartyPage />
+      <ElectionPartyPage
+        party={party}
+        initialCandidates={candidates}
+        loadError={loadError}
+      />
     </>
   )
 }

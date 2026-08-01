@@ -14,7 +14,7 @@ Frontend module for the 2026 elections. It has a party index at `/elections`, a 
 | `/elections/edit` | `src/views/ElectionCandidatesEditPage.tsx` | Password-gated editor for existing candidate + person fields |
 | `/elections/[partyId]` | `src/views/ElectionPartyPage.tsx` | Detail page for one party, keyed by `election_parties.id` |
 
-App Router uses static segments (`edit`, `lists`, `polls`) under `src/app/elections/`; the dynamic party detail is `src/app/elections/[partyId]/page.tsx`. Thin `page.tsx` wrappers own metadata and render the views in `src/views/…`.
+App Router uses static segments (`edit`, `lists`, `polls`) under `src/app/elections/`; the dynamic party detail is `src/app/elections/[partyId]/page.tsx`. Public `page.tsx` wrappers own metadata, server-fetch Supabase data for SEO HTML, attach JSON-LD, and pass `initial*` props into the views in `src/views/…`.
 
 The homepage hero button **בחירות 2026** links to `/elections`. The homepage project section **משחק הרשימות** links to `/elections/lists`.
 
@@ -40,7 +40,11 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/lib/runElectionPartyPipeline.ts` | Dev-only client for party-level pipeline (`/api/elections/pipeline/*`) |
 | `src/lib/geocodeElectionMap.ts` | Dev-only client for party-scoped map geocode (`/api/elections/geocode-map`) |
 | `src/app/api/elections/[...path]/route.ts` | Next.js App Router handlers: `update-candidate`, `enrich-candidate`, party pipeline, and geocode-map (gated by `assertPipelineEnabled`) |
-| `src/app/elections/**/page.tsx` | App Router wrappers + per-route metadata for index, polls, lists, edit, and `[partyId]` |
+| `src/app/elections/**/page.tsx` | App Router wrappers + metadata; public index/polls/`[partyId]` also SSR-fetch data + JSON-LD |
+| `src/lib/supabaseServer.ts` | Shared anon server Supabase client |
+| `src/lib/fetchElectionParties.ts` | Shared parties fetch |
+| `src/lib/loadElectionPartyPage.ts` | Cached server loader for metadata + party page body |
+| `src/lib/fetchElectionCandidates.ts` | Shared candidates fetch + stats / map-pin builders |
 | `src/server/apiCommon.ts` | Shared pipeline API helpers (auth, Python spawn, JSON responses) |
 | `src/components/elections/PartyCard.tsx` | Clickable portrait card (same UI as the lists-game party picker): full-bleed leader photo/initials, bottom gradient overlay with name + leader line, party logo pinned top-start |
 | `src/components/elections/SeatsTrend.tsx` | Party-hero last-5-polls average + sparkline from `polls` / `poll_results` |
@@ -50,15 +54,17 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/components/elections/ElectionsOverviewMap.tsx` | All-parties map on `/elections` with per-party color pins and checkbox filter (default: all parties) |
 | `src/components/elections/CandidateMapTooltip.tsx` | Fixed-position map tooltip matching the Knesset page style, showing city instead of faction |
 | `src/lib/candidateMapProjection.ts` | Shared Israel map projection and pin offset logic for `CandidateMap` and `ElectionsOverviewMap` |
-| `src/hooks/useElectionParties.ts` | Fetches the 2026 election row and its parties |
-| `src/hooks/useElectionCandidates.ts` | Fetches party candidates, flags new MKs, computes stats, normalizes map pins, and exposes `refetch` |
-| `src/hooks/useAllElectionMapPins.ts` | Fetches geocoded candidates across all parties for the `/elections` overview map |
+| `src/hooks/useElectionParties.ts` | Thin hook over `fetchElectionParties`; accepts optional `{ election, parties }` initial data |
+| `src/hooks/useElectionCandidates.ts` | Thin hook over `fetchElectionCandidates`; accepts optional `initialCandidates` |
+| `src/hooks/useAllElectionMapPins.ts` | Fetches geocoded candidates across all parties for the `/elections` overview map (still client-only) |
 
 ## Data Flow
 
-`useElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר (promoted from polled_only); נועם stays `polled_only` (on the ballot in theory but not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero has no subtitle; under the election date it links to `/elections/polls` (weighted poll averages) and `/elections/lists` (list rating game).
+`/elections` and `/elections/[partyId]` Server Components call `fetchElectionParties` / `loadElectionPartyPage` (anon key) and pass results into the client views so party cards, descriptions, and candidate lists appear in the first HTML. Hooks skip the browser refetch when initial data is provided. `useAllElectionMapPins` on the index remains client-fetched after parties hydrate.
 
-`useElectionCandidates(partyId)` loads ordered `election_candidates` joined to `people`. It then queries `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merges overlapping terms with `computeMemberTenureStats`, and attaches `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
+`fetchElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר (promoted from polled_only); נועם stays `polled_only` (on the ballot in theory but not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero has no subtitle; under the election date it links to `/elections/polls` (weighted poll averages) and `/elections/lists` (list rating game).
+
+`fetchElectionCandidates(client, partyId)` / `useElectionCandidates(partyId)` load ordered `election_candidates` joined to `people`. They then query `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merge overlapping terms with `computeMemberTenureStats`, and attach `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
 
 `useAllElectionMapPins(parties)` loads all geocoded candidates for the supplied party ids in one query (`city`, `latitude`, and `longitude` all non-null), joins MK tenure the same way, and attaches `partyId`, `partyName`, and `partyColor` for multi-party map rendering on `/elections`.
 
