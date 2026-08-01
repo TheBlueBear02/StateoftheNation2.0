@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 
 from supabase import Client
 
-from db import get_election_id, get_supabase, resolve_publisher_id
+from db import get_election_id, get_supabase, resolve_publisher_id, resolve_pollster_id
 
 log = logging.getLogger(__name__)
 
@@ -257,18 +257,6 @@ def dedupe_polls(sb: Client, election_id: int) -> int:
     return deleted
 
 
-POLLSTER_HE = {
-    "Midgam": "מידגם",
-    "Lazar": "מנחם לזר",
-    "Filber": "שלמה פילבר",
-    "Panels Politics": "פאנלס פוליטיקס",
-    "Kantar": "קנטר",
-    "Smith": "סמית",
-    "Direct Polls": "דירקט פולס",
-    "Maagar Mohot": "מagar מוחות",
-}
-
-
 def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
     """Normalize pending raw rows. Returns counts: processed, inserted, updated."""
     election_id = get_election_id(sb)
@@ -316,14 +304,22 @@ def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
         is_scenario = bool(payload.get("is_scenario", False))
         scenario_desc = payload.get("scenario_desc")
 
+        if dry_run:
+            pollster_id, pollster_he = None, None
+            publisher_id = None
+        else:
+            pollster_id, pollster_he = resolve_pollster_id(sb, pollster)
+            publisher_id = resolve_publisher_id(sb, publisher)
+
         poll_row = {
             "election_id": election_id,
             "natural_key": natural_key,
             "raw_poll_row_id": row["id"],
             "pollster": pollster,
-            "pollster_he": POLLSTER_HE.get(pollster),
+            "pollster_he": pollster_he,
+            "pollster_id": pollster_id,
             "publisher": publisher,
-            "publisher_id": None if dry_run else resolve_publisher_id(sb, publisher),
+            "publisher_id": publisher_id,
             "fieldwork_start": fw_start.isoformat(),
             "fieldwork_end": fw_end.isoformat(),
             "sample_size": sample_size,

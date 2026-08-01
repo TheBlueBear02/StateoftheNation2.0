@@ -14,7 +14,7 @@ The schema is split into four logical groups:
 | **Government** | `governments` · `offices` · `minister_appointments` | Seeded — powers the Government page |
 | **KPI data** | `indexes` · `index_data` | Seeded — dashboard page planned |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | Live — `/elections`, party detail, lists game, edit |
-| **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` | Live — `/elections/polls`, `/piplines` |
+| **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` · `pollsters` | Live — `/elections/polls`, `/piplines` |
 | **Site** | `site_updates` | Live — homepage news strip |
 
 All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE.
@@ -63,13 +63,15 @@ The central person record. Every MK, minister, and election candidate across all
 | `email` | text | From Knesset OData |
 | `twitter_handle` | text | Manual / Wikidata enrichment |
 | `wikipedia_url` | text | `fetch_candidate_wiki_urls.py` (Stage 6) / manual |
+| `wikidata_id` | text | Wikidata Q-id (e.g. `Q12345`) — UNIQUE when set. Filled by `enrich_wikidata.py` (Stage 2) when null; never overwritten. |
 | `is_current` | boolean | Whether the person is a current MK — from `KNS_Person.IsCurrent` (OData mirror). Public pages do **not** rely on this; they use membership/appointment date ranges. |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_Person`. Enriched by `enrich_wikidata.py` for election candidates. Upserted on `knesset_person_id`.
+**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_Person`. Enriched by `enrich_wikidata.py` for election candidates (including `wikidata_id`). Upserted on `knesset_person_id`.
 
 **Notes:**
 - `knesset_person_id` is null for persons created by the election pipeline (new candidates never in a Knesset). These rows are created by `resolve_candidates.py` with only `full_name` set.
+- `wikidata_id` is the stable external person key when no Knesset ID exists; format CHECK `^Q[0-9]+$`.
 - `gender` uses Hebrew labels directly — never mapped from a numeric ID. The Knesset API's `GenderID` values (250, 251, 252) are not meaningful; use `GenderDesc`.
 
 ---
@@ -253,9 +255,11 @@ Time-series data points for each index.
 | `id` | bigint | Primary key |
 | `index_id` | bigint | FK → `indexes.id` |
 | `label` | text | Display label for this data point (e.g. `"ינואר 2025"`) |
-| `value` | bigint | The metric value |
+| `value` | numeric | The metric value (supports rates/decimals; was bigint historically) |
 | `recorded_at` | date | When this value was recorded |
 | `created_at` | timestamptz | Row creation timestamp |
+
+**Constraints:** `UNIQUE (index_id, recorded_at)` when data is clean.
 
 **Data source:** Manually curated or automated per index source. No central sync script yet.
 
@@ -488,6 +492,21 @@ Media channels that publish polls (Kan 11, Channel 13, etc.). Logos maintained m
 
 ---
 
+### `pollsters`
+
+Polling firms (Midgam, Lazar, etc.). Parallel to `poll_publishers`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | text | Canonical English name — must match `polls.pollster`. UNIQUE. |
+| `name_he` | text | Hebrew display name |
+
+**Data source:** Created/updated by `normalize_polls.py` via `resolve_pollster_id` (and one-shot `schema_modeling_point5.sql` seed). Known Hebrew map lives in `Polls/db.py` (`POLLSTER_HE`).
+
+**Used by:** `polls.pollster_id` FK. Frontend falls back to `pollsters.name_he` when `polls.pollster_he` is blank.
+
+---
+
 ### `polls`
 
 Normalized poll header — one row per distinct poll.
@@ -496,8 +515,9 @@ Normalized poll header — one row per distinct poll.
 |--------|------|-------------|
 | `election_id` | bigint | FK → `elections.id` |
 | `natural_key` | text | Unique poll identity |
-| `pollster` | text | Normalized English pollster name |
-| `pollster_he` | text | Hebrew pollster name |
+| `pollster` | text | Normalized English pollster name — pipeline identity (matches `pollsters.name`) |
+| `pollster_he` | text | Hebrew pollster name (denormalized from `pollsters`) |
+| `pollster_id` | bigint | FK → `pollsters.id` — resolved at normalize time |
 | `publisher` | text | Media outlet English name — pipeline identity string (matches `poll_publishers.name`) |
 | `publisher_id` | bigint | FK → `poll_publishers.id` — resolved at normalize time for logos; keep in sync with `publisher` |
 | `fieldwork_start` / `fieldwork_end` | date | Fieldwork date range |
@@ -508,7 +528,7 @@ Normalized poll header — one row per distinct poll.
 | `source_url` | text | Original publication URL |
 | `source_revid` | bigint | Wikipedia revision |
 
-**Ownership:** `publisher` text is the natural identity from Wikipedia. `publisher_id` is denormalized FK set by `normalize_polls.py` via `resolve_publisher_id` (creates a stub `poll_publishers` row when missing). Logos live only on `poll_publishers`.
+**Ownership:** `pollster` / `publisher` text are natural identities from Wikipedia. `pollster_id` / `publisher_id` are denormalized FKs set by `normalize_polls.py`. Logos live only on `poll_publishers`.
 
 ---
 
@@ -642,5 +662,24 @@ Unique constraints also provide leading-column indexes for several keys (e.g. `e
 | Active knesset / government | `is_active` (+ partial unique index) | Keep in sync when terms change |
 | Office display name | `offices.name` (curated) vs `knesset_category_name` (OData) | Sync never overwrites existing `name` |
 | Poll publisher | `polls.publisher` text identity; `publisher_id` FK for logos | Normalize resolves/creates `poll_publishers` rows |
+| Poll pollster | `polls.pollster` text identity; `pollster_id` FK | Normalize resolves/creates `pollsters` rows; Hebrew on `pollsters.name_he` |
 | Party color / logo | Ballot: `election_parties`; chamber: `knesset_factions` | Intentional dual branding — do not auto-overwrite either from the other |
 | Election → Knesset | `elections.knesset_number` FK → `knessets.knesset_number` | Applied |
+| Cross-election party identity | Deferred — use `election_parties` + `party_lineage` | A stable `parties` master table is not needed until multi-election trends are productized |
+| Pollsters / Wikidata / KPI numeric | Applied on Supabase | `pollsters`, `people.wikidata_id`, `index_data.value` numeric |
+
+---
+
+## Ops hygiene (`updated_at` + delete rules)
+
+Live on Supabase (applied; one-shot migration script removed from the repo).
+
+**`updated_at`:** column + `BEFORE UPDATE` trigger (`set_updated_at`) on `people`, `election_parties`, `election_candidates`, `knesset_factions`, `offices`, `polls`, `poll_publishers`, `pollsters`, `governments`, `knessets`, `indexes`. Staging tables like `raw_poll_rows` intentionally keep insert-only timestamps.
+
+**ON DELETE:**
+
+| Behavior | Relationships |
+|----------|----------------|
+| `CASCADE` | `poll_results` ← polls; aggregates/aliases/house effects/lineage ← `election_parties`; `index_data` ← indexes; `raw_candidate_lists` ← party |
+| `SET NULL` | `polls.raw_poll_row_id`, `polls.publisher_id`, `polls.pollster_id`, `election_parties.knesset_faction_id` |
+| Restrict (default) | `people` / party / knesset roots — refuse delete while memberships, candidates, or appointments still reference them |

@@ -70,7 +70,7 @@ def load_candidate(sb: Client, candidate_id: int) -> dict | None:
     ec = ec_rows[0]
     person_rows = (
         sb.table("people")
-        .select("id, full_name, birth_date, gender, image_url, wikipedia_url")
+        .select("id, full_name, birth_date, gender, image_url, wikipedia_url, wikidata_id")
         .eq("id", ec["person_id"])
         .execute()
         .data
@@ -100,6 +100,7 @@ def load_candidate(sb: Client, candidate_id: int) -> dict | None:
         "gender":        person["gender"],
         "image_url":     person["image_url"],
         "wikipedia_url": person["wikipedia_url"],
+        "wikidata_id":   person.get("wikidata_id"),
         # enrich_wikidata candidate shape
         "ec_city":       ec["city"],
     }

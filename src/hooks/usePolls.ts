@@ -10,6 +10,7 @@ import {
   supabaseConfigError,
   type PartyBloc,
   type PollPublisherRow,
+  type PollsterRow,
   type PollResultRow,
   type PollRow,
 } from '../lib/supabase'
@@ -193,6 +194,17 @@ export function usePolls(limit = 30): UsePollsResult {
       publisherHeByName.set(row.name, row.name_he)
     }
 
+    const pollsterHeById = new Map<number, string | null>()
+    const pollsterHeByName = new Map<string, string | null>()
+    const { data: pollsterRows } = await supabase
+      .from('pollsters')
+      .select('id, name, name_he')
+
+    for (const row of (pollsterRows ?? []) as PollsterRow[]) {
+      pollsterHeById.set(row.id, row.name_he)
+      pollsterHeByName.set(row.name, row.name_he)
+    }
+
     const partyIds = [
       ...new Set((resultRows ?? []).map((r) => (r as PollResultRow).party_id)),
     ]
@@ -266,7 +278,13 @@ export function usePolls(limit = 30): UsePollsResult {
       typedPolls.map((poll) => ({
         id: poll.id,
         pollster: poll.pollster,
-        pollsterHe: poll.pollster_he,
+        pollsterHe:
+          poll.pollster_he?.trim() ||
+          (poll.pollster_id !== null
+            ? pollsterHeById.get(poll.pollster_id)
+            : undefined) ||
+          pollsterHeByName.get(poll.pollster) ||
+          null,
         publisher: poll.publisher,
         publisherHe:
           poll.publisher_he?.trim() ||

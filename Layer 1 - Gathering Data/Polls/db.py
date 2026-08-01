@@ -127,3 +127,56 @@ def resolve_publisher_id(sb: Client, publisher: str) -> int | None:
     if not inserted:
         return None
     return inserted[0]["id"]
+
+
+# Canonical English pollster → Hebrew display (also seeded into pollsters.name_he).
+POLLSTER_HE = {
+    "Midgam": "מידגם",
+    "Lazar": "מנחם לזר",
+    "Filber": "שלמה פילבר",
+    "Panels Politics": "פאנלס פוליטיקס",
+    "Kantar": "קנטר",
+    "Smith": "סמית",
+    "Direct Polls": "דירקט פולס",
+    "Maagar Mohot": "מאגר מוחות",
+}
+
+
+def resolve_pollster_id(sb: Client, pollster: str) -> tuple[int | None, str | None]:
+    """
+    Resolve polls.pollster text → (pollsters.id, name_he).
+
+    Creates a stub pollsters row when missing. Returns Hebrew label from the
+    table, falling back to POLLSTER_HE for known firms.
+    """
+    name = (pollster or "").strip()
+    if not name:
+        return None, None
+
+    known_he = POLLSTER_HE.get(name)
+    existing = (
+        sb.table("pollsters")
+        .select("id, name_he")
+        .eq("name", name)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if existing:
+        row = existing[0]
+        name_he = row.get("name_he") or known_he
+        if known_he and not row.get("name_he"):
+            sb.table("pollsters").update({"name_he": known_he}).eq("id", row["id"]).execute()
+            name_he = known_he
+        return row["id"], name_he
+
+    inserted = (
+        sb.table("pollsters")
+        .insert({"name": name, "name_he": known_he})
+        .execute()
+        .data
+    )
+    if not inserted:
+        return None, known_he
+    return inserted[0]["id"], known_he or inserted[0].get("name_he")
+

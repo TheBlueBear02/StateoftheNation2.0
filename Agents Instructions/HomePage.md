@@ -110,7 +110,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Black background, white text, blue dot separators.
 - Full-bleed edge-to-edge (no `.container`) — intentional marquee effect.
 - Headlines from `site_updates` via `useSiteUpdates` (written by pipeline finish hooks in `emit_site_updates.py`). Each item is a `Link` to its `href` (e.g. `/elections/polls`, `/knesset`).
-- DB items show a Jerusalem local stamp before the headline: `HH:mm | …` for updates from today, otherwise `D.M HH:mm | …` (e.g. `15:00 | כותרת` / `30.7 15:00 | כותרת`). Static defaults have no timestamp.
+- DB items show a Jerusalem local stamp before the headline: `HH:mm | …` for updates from today, otherwise `D.M | …` with no time (e.g. `15:00 | כותרת` / `30.7 | כותרת`). Static defaults have no timestamp.
 - Feed composition: up to **10** latest DB rows (`occurred_at` desc), then pad with the static default headlines until 10 total (or until defaults run out). Defaults are skipped when their headline already appears in the DB set. On query failure (or missing Supabase config), the strip shows defaults only.
 - The track renders `newsItems` twice for a seamless CSS marquee loop — that is intentional duplication for animation, not a second fetch.
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.

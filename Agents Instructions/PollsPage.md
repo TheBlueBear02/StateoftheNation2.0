@@ -34,7 +34,7 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 | `seed_party_aliases.py` | one-off | English labels + lineage |
 | `seed_poll_publishers.sql` | one-off | Distinct `polls.publisher` → `poll_publishers` + `publisher_id` backfill |
 
-Schema: `schema_polls.sql` (apply manually in Supabase).
+Schema: `schema_polls.sql` (base polls DDL). `pollsters` / `people.wikidata_id` / numeric KPI values are live on Supabase.
 
 Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel). Needs `OPENAI_API_KEY` secret for homepage ticker emission (missing key skips emit). Review-queue alerts create a GitHub issue without a required label (`continue-on-error`). Validation: seat sum ±1 and ops alerts (staleness/volume) log warnings but exit 0 so scheduled runs stay green; harder data errors still fail and roll back that run’s aggregates.
 

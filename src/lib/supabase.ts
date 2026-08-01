@@ -113,12 +113,19 @@ export type PollPublisherRow = {
   logo_url: string | null
 }
 
+export type PollsterRow = {
+  id: number
+  name: string
+  name_he: string | null
+}
+
 export type PollRow = {
   id: number
   election_id: number
   natural_key: string
   pollster: string
   pollster_he: string | null
+  pollster_id: number | null
   publisher: string
   publisher_he: string | null
   publisher_id: number | null

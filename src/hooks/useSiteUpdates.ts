@@ -26,11 +26,11 @@ export type NewsStripItem = {
   key: string
   headline: string
   href: string
-  /** Jerusalem local stamp like `31.7 15:00`, or null for static defaults */
+  /** Jerusalem local stamp like `15:00` (today) or `31.7` (other days), or null for static defaults */
   whenLabel: string | null
 }
 
-/** Format `occurred_at` in Asia/Jerusalem: `HH:mm` today, else `D.M HH:mm`. */
+/** Format `occurred_at` in Asia/Jerusalem: `HH:mm` today, else `D.M` (no time). */
 export function formatSiteUpdateWhen(occurredAt: string): string | null {
   const date = new Date(occurredAt)
   if (Number.isNaN(date.getTime())) {
@@ -68,17 +68,16 @@ export function formatSiteUpdateWhen(occurredAt: string): string | null {
     return null
   }
 
-  const time = `${hour}:${minute}`
   const isToday =
     day === get(nowParts, 'day') &&
     month === get(nowParts, 'month') &&
     year === get(nowParts, 'year')
 
   if (isToday) {
-    return time
+    return `${hour}:${minute}`
   }
 
-  return `${Number(day)}.${Number(month)} ${time}`
+  return `${Number(day)}.${Number(month)}`
 }
 
 function fallbackItems(): NewsStripItem[] {

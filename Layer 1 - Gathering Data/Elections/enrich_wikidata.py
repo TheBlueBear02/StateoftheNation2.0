@@ -6,7 +6,7 @@ Enriches people rows for current election candidates using Wikidata SPARQL.
 Only fills NULL fields — never overwrites existing data.
 
 Enriches people table:
-  birth_date · gender · image_url
+  birth_date · gender · image_url · wikidata_id
 
 Enriches election_candidates table:
   city  (Wikidata residence — starting point for geocoding)
@@ -85,7 +85,7 @@ def load_candidates(sb: Client, election_id: int) -> list[dict]:
         batch = person_ids[i:i + 200]
         rows = (
             sb.table("people")
-            .select("id, full_name, birth_date, gender, image_url")
+            .select("id, full_name, birth_date, gender, image_url, wikidata_id")
             .in_("id", batch)
             .execute()
             .data
@@ -106,6 +106,7 @@ def load_candidates(sb: Client, election_id: int) -> list[dict]:
                 "birth_date": person["birth_date"],
                 "gender":     person["gender"],
                 "image_url":  person["image_url"],
+                "wikidata_id": person.get("wikidata_id"),
                 "ec_city":    ec["city"],
             })
     return result
@@ -114,7 +115,7 @@ def load_candidates(sb: Client, election_id: int) -> list[dict]:
 # ── SPARQL query ──────────────────────────────────────────────────────────────
 
 SPARQL_TEMPLATE = """
-SELECT DISTINCT ?nameHe ?birthDate ?genderLabel ?image ?cityLabel WHERE {{
+SELECT DISTINCT ?person ?nameHe ?birthDate ?genderLabel ?image ?cityLabel WHERE {{
   VALUES ?nameHe {{ {values} }}
   ?person rdfs:label ?nameHe ;
           wdt:P31 wd:Q5 ;
@@ -148,12 +149,19 @@ def sparql_query(names: list[str]) -> list[dict]:
         bindings = resp.json().get("results", {}).get("bindings", [])
         results  = []
         for b in bindings:
+            person_uri = b.get("person", {}).get("value", "")
+            wikidata_id = None
+            if "/entity/" in person_uri:
+                qid = person_uri.rsplit("/", 1)[-1]
+                if qid.startswith("Q"):
+                    wikidata_id = qid
             results.append({
-                "name":       b.get("nameHe",    {}).get("value"),
-                "birth_date": b.get("birthDate", {}).get("value", "")[:10] or None,
-                "gender":     b.get("genderLabel", {}).get("value"),
-                "image_url":  b.get("image",     {}).get("value"),
-                "city":       b.get("cityLabel", {}).get("value"),
+                "name":        b.get("nameHe",    {}).get("value"),
+                "wikidata_id": wikidata_id,
+                "birth_date":  b.get("birthDate", {}).get("value", "")[:10] or None,
+                "gender":      b.get("genderLabel", {}).get("value"),
+                "image_url":   b.get("image",     {}).get("value"),
+                "city":        b.get("cityLabel", {}).get("value"),
             })
         return results
     except Exception as exc:
@@ -181,6 +189,9 @@ def collect_enrichment_updates(candidate: dict, wikidata: dict) -> tuple[dict, d
     """
     person_updates = {}
     ec_updates     = {}
+
+    if not candidate.get("wikidata_id") and wikidata.get("wikidata_id"):
+        person_updates["wikidata_id"] = wikidata["wikidata_id"]
 
     if not candidate["birth_date"] and wikidata.get("birth_date"):
         person_updates["birth_date"] = wikidata["birth_date"]

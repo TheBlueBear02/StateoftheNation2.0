@@ -125,7 +125,7 @@ Each collapsed card with missing fields shows a **השלם מידע** button (su
 
 | Stage | Script | Fills (when null) |
 |-------|--------|-------------------|
-| 2 | `enrich_wikidata.py` | `birth_date`, `gender`, `image_url`, `city` |
+| 2 | `enrich_wikidata.py` | `birth_date`, `gender`, `image_url`, `city`, `people.wikidata_id` |
 | 3 | `generate_descriptions.py` | `description` |
 | 5 | `fetch_candidate_birthdates.py` | `birth_date` (retry) |
 | 6 | `fetch_candidate_wiki_urls.py` | `wikipedia_url` |
@@ -159,7 +159,7 @@ Stages run one at a time from the frontend with live progress: the current step 
 | Stage | Script | Action |
 |-------|--------|--------|
 | 1 | `resolve_candidates.py` | Match names → `election_candidates` |
-| 2 | `enrich_wikidata.py` | Fill missing `birth_date`, `gender`, `image_url`, `city` |
+| 2 | `enrich_wikidata.py` | Fill missing `birth_date`, `gender`, `image_url`, `city`, `wikidata_id` |
 | 3 | `generate_descriptions.py` | Generate Hebrew descriptions |
 | 4 | `geocode_cities.py` | City → lat/long |
 | 5 | `fetch_candidate_birthdates.py` | Retry missing birth dates |
