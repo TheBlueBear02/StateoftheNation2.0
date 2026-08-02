@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { ElectionPartyPage } from '@/views/ElectionPartyPage'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { loadElectionPartyPage } from '@/lib/loadElectionPartyPage'
-import { getSiteUrl } from '@/lib/runtimeEnv'
+import { getDefaultOgImageUrl, getSiteUrl } from '@/lib/runtimeEnv'
 
 type Props = {
   params: Promise<{ partyId: string }>
@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description =
     party?.description?.trim() ||
     `רשימת המועמדים, סטטיסטיקות ומפת מגורים של ${name} בבחירות 2026.`
+  const ogImageUrl = getDefaultOgImageUrl()
 
   return {
     title: name,
@@ -25,6 +26,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${name} | מצב האומה`,
       description,
+      images: [
+        {
+          url: ogImageUrl,
+          secureUrl: ogImageUrl,
+          width: 1200,
+          height: 630,
+          type: 'image/png',
+          alt: 'מצב האומה | State of the Nation IL',
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      images: [ogImageUrl],
     },
   }
 }

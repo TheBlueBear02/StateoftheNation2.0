@@ -67,13 +67,28 @@ function normalizeSiteUrl(raw: string): string {
   return `https://${trimmed}`
 }
 
+/** Apex permanently redirects to www — Facebook fails og:image on 308. */
+function preferWwwCanonical(url: string): string {
+  if (url === 'https://stateofthenation.co.il') {
+    return 'https://www.stateofthenation.co.il'
+  }
+  return url
+}
+
 export function getSiteUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL
-  if (explicit?.trim()) return normalizeSiteUrl(explicit)
+  if (explicit?.trim()) {
+    return preferWwwCanonical(normalizeSiteUrl(explicit))
+  }
   if (process.env.VERCEL_URL) {
-    return normalizeSiteUrl(process.env.VERCEL_URL)
+    return preferWwwCanonical(normalizeSiteUrl(process.env.VERCEL_URL))
   }
   return 'http://localhost:3000'
+}
+
+/** Absolute default share image URL for Open Graph / Twitter. */
+export function getDefaultOgImageUrl(): string {
+  return `${getSiteUrl()}/website-preview-thumbnail.png`
 }
 
 /** Public Facebook App ID for `fb:app_id` / Sharing Debugger (not a secret). */

@@ -9,7 +9,7 @@ Professional SEO and web standards for the Next.js App Router site.
 1. Every **public** URL has a unique Hebrew `title` + `description` (via `metadata` or `generateMetadata`).
 2. Crawlers get real HTML from the App Router shell (not an empty SPA root). High-traffic elections routes **server-fetch** Supabase data and pass it as `initial*` props so Client Components SSR with party names, seat averages, and candidate lists in the first HTML.
 3. Edit / pipeline tools are **noindex** and excluded from the sitemap.
-4. Absolute URLs use `NEXT_PUBLIC_SITE_URL` (`getSiteUrl()` in `src/lib/runtimeEnv.ts`). Prefer `https://stateofthenation.co.il`; a bare host is normalized with `https://`. On Vercel, unset falls back to `https://${VERCEL_URL}`.
+4. Absolute URLs use `NEXT_PUBLIC_SITE_URL` (`getSiteUrl()` in `src/lib/runtimeEnv.ts`). Prefer `https://www.stateofthenation.co.il` (apex redirects to www; Facebook often fails `og:image` on 308). Bare hosts get `https://`. On Vercel, unset falls back to `https://${VERCEL_URL}`. Apex `stateofthenation.co.il` is normalized to www.
 5. Optional Facebook App ID: set `NEXT_PUBLIC_FACEBOOK_APP_ID` so root metadata emits `facebook.appId` / `fb:app_id` (Sharing Debugger). Create an app at developers.facebook.com → App settings → App ID.
 
 ## Files
@@ -59,7 +59,7 @@ When adding a content page, prefer matching `BreadcrumbList` JSON-LD to the visi
 
 - **Heebo** via `next/font/google` in root layout (`display: swap`). Do not re-add Google Fonts `@import` in CSS.
 - Prefer `next/image` for new image work; remote hosts must be listed in `next.config.ts` `images.remotePatterns`.
-- Default social preview: `public/website-preview-thumbnail.png` wired in root `openGraph.images` / `twitter.images`. Child routes inherit it unless they set their own.
+- Default social preview: absolute `getDefaultOgImageUrl()` → `/website-preview-thumbnail.png` on `openGraph.images` / `twitter.images` (incl. `secureUrl` + `type`). Child routes that set `openGraph` must re-declare `images` or Facebook may drop them.
 
 ## Checklist for new public pages
 

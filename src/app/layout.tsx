@@ -1,7 +1,11 @@
 import { Heebo } from 'next/font/google'
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
-import { getFacebookAppId, getSiteUrl } from '@/lib/runtimeEnv'
+import {
+  getDefaultOgImageUrl,
+  getFacebookAppId,
+  getSiteUrl,
+} from '@/lib/runtimeEnv'
 import '@/index.css'
 import '@/App.css'
 
@@ -14,6 +18,16 @@ const heebo = Heebo({
 
 const siteUrl = getSiteUrl()
 const facebookAppId = getFacebookAppId()
+const ogImageUrl = getDefaultOgImageUrl()
+
+const defaultOgImage = {
+  url: ogImageUrl,
+  secureUrl: ogImageUrl,
+  width: 1200,
+  height: 630,
+  type: 'image/png' as const,
+  alt: 'מצב האומה | State of the Nation IL',
+}
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -35,21 +49,14 @@ export const metadata: Metadata = {
     description:
       'הבית של המידע הפוליטי בישראל — כנסת, ממשלה, בחירות 2026 וסקרי מנדטים.',
     url: siteUrl,
-    images: [
-      {
-        url: '/website-preview-thumbnail.png',
-        width: 1200,
-        height: 630,
-        alt: 'מצב האומה | State of the Nation IL',
-      },
-    ],
+    images: [defaultOgImage],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'מצב האומה | State of the Nation IL',
     description:
       'הבית של המידע הפוליטי בישראל. כל המידע הפוליטי של ישראל במקום אחד',
-    images: ['/website-preview-thumbnail.png'],
+    images: [ogImageUrl],
   },
   ...(facebookAppId ? { facebook: { appId: facebookAppId } } : {}),
   alternates: {
