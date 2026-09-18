@@ -58,6 +58,41 @@ type ElectionPartyEditInput = {
 
 type UpdateResult = { ok: true } | { ok: false; error: string }
 
+type DeleteCandidateInput = {
+  candidateId: number
+  partyId: number
+}
+
+async function deleteCandidateWithClient(
+  client: SupabaseClient,
+  input: DeleteCandidateInput,
+): Promise<UpdateResult> {
+  if (!Number.isInteger(input.candidateId) || input.candidateId < 1) {
+    return { ok: false, error: 'מזהה מועמד לא תקין' }
+  }
+
+  if (!Number.isInteger(input.partyId) || input.partyId < 1) {
+    return { ok: false, error: 'מזהה מפלגה לא תקין' }
+  }
+
+  const { data, error } = await client
+    .from('election_candidates')
+    .delete()
+    .eq('id', input.candidateId)
+    .eq('party_id', input.partyId)
+    .select('id')
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  if (!data?.length) {
+    return { ok: false, error: 'המועמד לא נמצא ברשימת המפלגה' }
+  }
+
+  return { ok: true }
+}
+
 async function updateWithClient(
   client: SupabaseClient,
   input: ElectionCandidateEditInput,
@@ -235,7 +270,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 /** Data edits use service role + edit secret in all environments.
  *  Python pipeline routes stay behind assertPipelineEnabled (dev / opt-in). */
-const DATA_EDIT_ROUTES = new Set(['update-candidate', 'update-party'])
+const DATA_EDIT_ROUTES = new Set([
+  'update-candidate',
+  'update-party',
+  'delete-candidate',
+])
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const { path: segments } = await context.params
@@ -396,6 +435,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return jsonOk(result, result.ok ? 200 : 400)
     }
 
+    if (route === 'delete-candidate') {
+      const admin = getAdminClient()
+      if (!admin) {
+        return jsonError('חסר SUPABASE_SERVICE_KEY או SUPABASE_URL', 503)
+      }
+
+      const body = (await request.json()) as DeleteCandidateInput
+      const result = await deleteCandidateWithClient(admin, body)
+      return jsonOk(result, result.ok ? 200 : 400)
+    }
+
     if (route === 'enrich-candidate') {
       const body = (await request.json()) as { candidateId?: number }
       const candidateId = Number(body?.candidateId)
@@ -453,6 +503,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     if (route === 'update-candidate' || route === 'update-party') {
       return jsonError('שגיאת שרת בעת השמירה', 500)
+    }
+    if (route === 'delete-candidate') {
+      return jsonError('שגיאת שרת בעת המחיקה', 500)
     }
     if (route === 'enrich-candidate') {
       return jsonError('שגיאת שרת בעת הרצת pipeline', 500)

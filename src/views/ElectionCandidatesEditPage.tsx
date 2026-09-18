@@ -19,6 +19,7 @@ import {
 import { useElectionParties } from '../hooks/useElectionParties'
 import { getInitials, tintColor } from '../lib/hemicycle'
 import { updateElectionCandidate } from '../lib/updateElectionCandidate'
+import { deleteElectionCandidate } from '../lib/deleteElectionCandidate'
 import {
   enrichElectionCandidate,
   type CandidateEnrichmentUpdates,
@@ -43,6 +44,11 @@ type CandidateDraft = {
 
 type SaveState = {
   status: 'idle' | 'saving' | 'success' | 'error'
+  message: string | null
+}
+
+type DeleteState = {
+  status: 'idle' | 'confirm' | 'deleting' | 'error'
   message: string | null
 }
 
@@ -227,6 +233,10 @@ function EditableCandidateCard({
     status: 'idle',
     message: null,
   })
+  const [deleteState, setDeleteState] = useState<DeleteState>({
+    status: 'idle',
+    message: null,
+  })
   const [pipelineState, setPipelineState] = useState<PipelineState>({
     status: 'idle',
     message: null,
@@ -236,6 +246,7 @@ function EditableCandidateCard({
   useEffect(() => {
     setDraft(baseline)
     setSaveState({ status: 'idle', message: null })
+    setDeleteState({ status: 'idle', message: null })
     setPipelineState({ status: 'idle', message: null })
     setPipelineElapsedSeconds(0)
   }, [baseline])
@@ -261,10 +272,39 @@ function EditableCandidateCard({
     '--party-soft': tintColor(accentColor, 0.18),
   } as CSSProperties
 
+  async function handleDelete() {
+    if (
+      deleteState.status === 'deleting' ||
+      saveState.status === 'saving' ||
+      pipelineState.status === 'running'
+    ) {
+      return
+    }
+
+    if (deleteState.status === 'idle') {
+      setDeleteState({ status: 'confirm', message: null })
+      return
+    }
+
+    setDeleteState({ status: 'deleting', message: null })
+
+    const result = await deleteElectionCandidate({
+      candidateId: candidate.id,
+      partyId: candidate.partyId,
+    })
+
+    if (!result.ok) {
+      setDeleteState({ status: 'error', message: result.error })
+      return
+    }
+
+    await onSaved()
+  }
+
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (saveState.status === 'saving') {
+    if (saveState.status === 'saving' || deleteState.status === 'deleting') {
       return
     }
 
@@ -573,7 +613,10 @@ function EditableCandidateCard({
             <button
               type="submit"
               className="candidate-edit-card__save"
-              disabled={saveState.status === 'saving'}
+              disabled={
+                saveState.status === 'saving' ||
+                deleteState.status === 'deleting'
+              }
             >
               {saveState.status === 'saving' ? 'שומר…' : 'שמור'}
             </button>
@@ -581,9 +624,51 @@ function EditableCandidateCard({
               type="button"
               className="candidate-edit-card__collapse"
               onClick={() => setExpanded(false)}
+              disabled={deleteState.status === 'deleting'}
             >
               סגור
             </button>
+            {deleteState.status === 'confirm' ||
+            deleteState.status === 'deleting' ||
+            deleteState.status === 'error' ? (
+              <div className="candidate-edit-card__delete-confirm">
+                <p className="candidate-edit-card__delete-prompt" role="alert">
+                  למחוק את {displayName} מרשימת המפלגה?
+                </p>
+                <button
+                  type="button"
+                  className="candidate-edit-card__delete candidate-edit-card__delete--confirm"
+                  onClick={handleDelete}
+                  disabled={deleteState.status === 'deleting'}
+                >
+                  {deleteState.status === 'deleting'
+                    ? 'מוחק…'
+                    : 'אישור מחיקה'}
+                </button>
+                <button
+                  type="button"
+                  className="candidate-edit-card__collapse"
+                  onClick={() =>
+                    setDeleteState({ status: 'idle', message: null })
+                  }
+                  disabled={deleteState.status === 'deleting'}
+                >
+                  ביטול
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="candidate-edit-card__delete"
+                onClick={handleDelete}
+                disabled={
+                  saveState.status === 'saving' ||
+                  pipelineState.status === 'running'
+                }
+              >
+                מחק מהרשימה
+              </button>
+            )}
             {saveState.message ? (
               <p
                 className={
@@ -594,6 +679,14 @@ function EditableCandidateCard({
                 role={saveState.status === 'error' ? 'alert' : undefined}
               >
                 {saveState.message}
+              </p>
+            ) : null}
+            {deleteState.message ? (
+              <p
+                className="candidate-edit-card__status candidate-edit-card__status--error"
+                role="alert"
+              >
+                {deleteState.message}
               </p>
             ) : null}
           </div>
@@ -670,7 +763,7 @@ export function ElectionCandidatesEditPage() {
     isDev &&
     selectedParty !== null &&
     !candidatesLoading &&
-    candidates.length <= 2
+    candidates.length <= 3
 
   const candidatesNeedingGeocode = useMemo(
     () =>

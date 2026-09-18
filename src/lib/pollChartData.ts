@@ -18,10 +18,16 @@ export const BLOC_LABELS: Record<PartyBloc, string> = {
   unaligned: 'לא מזוהים',
 }
 
-export type DisplayBlocKey = 'coalition' | 'raam' | 'jointList' | 'opposition'
+export type DisplayBlocKey =
+  | 'coalition'
+  | 'amchaYisrael'
+  | 'raam'
+  | 'jointList'
+  | 'opposition'
 
 export const DISPLAY_BLOC_ORDER: DisplayBlocKey[] = [
   'coalition',
+  'amchaYisrael',
   'jointList',
   'raam',
   'opposition',
@@ -29,6 +35,7 @@ export const DISPLAY_BLOC_ORDER: DisplayBlocKey[] = [
 
 export const DISPLAY_BLOC_COLORS: Record<DisplayBlocKey, string> = {
   coalition: '#4890fd',
+  amchaYisrael: '#7B2CBF',
   raam: '#228B22',
   jointList: '#DC143C',
   opposition: '#e74c3c',
@@ -36,6 +43,7 @@ export const DISPLAY_BLOC_COLORS: Record<DisplayBlocKey, string> = {
 
 export const DISPLAY_BLOC_LABELS: Record<DisplayBlocKey, string> = {
   coalition: 'קואליציה',
+  amchaYisrael: 'עמך ישראל',
   raam: 'רע״ם',
   jointList: 'הרשימה המשותפת',
   opposition: 'אופוזיציה',
@@ -46,6 +54,7 @@ export const DISPLAY_BLOC_LEGEND_ORDER: DisplayBlocKey[] = [
   'opposition',
   'raam',
   'jointList',
+  'amchaYisrael',
   'coalition',
 ]
 
@@ -122,6 +131,11 @@ const JOINT_LIST_SHORT_NAMES = new Set([
   'חד"ש-תע"ל',
 ])
 const RAAM_SHORT_NAMES = new Set(['רע״ם', 'רע"ם'])
+const AMCHA_YISRAEL_SHORT_NAMES = new Set([
+  'עמך ישראל',
+  'עמיחא ישראל',
+  'עמיחאי ישראל',
+])
 
 export type DisplayBlocTotals = Record<DisplayBlocKey, number>
 
@@ -131,8 +145,16 @@ function classifyDisplayBloc(party: {
   bloc: PartyBloc | null
 }): DisplayBlocKey {
   const short = party.partyShortName?.trim()
+  if (short && AMCHA_YISRAEL_SHORT_NAMES.has(short)) return 'amchaYisrael'
   if (short && RAAM_SHORT_NAMES.has(short)) return 'raam'
   if (short && JOINT_LIST_SHORT_NAMES.has(short)) return 'jointList'
+  if (
+    party.partyName.includes('עמך') ||
+    party.partyName.includes('עמיחא') ||
+    party.partyName.includes('עמיחאי')
+  ) {
+    return 'amchaYisrael'
+  }
   if (party.partyName.includes('רע') && party.partyName.includes('ם')) return 'raam'
   if (party.partyName.includes('הרשימה המשותפת')) return 'jointList'
   if (party.partyName.includes('חד') && party.partyName.includes('תע')) {
@@ -164,9 +186,20 @@ export function displayBlocBarGradientForParty(party: {
   return displayBlocBarGradient(displayBlocColorForParty(party))
 }
 
+function emptyDisplayBlocTotals(): DisplayBlocTotals {
+  return {
+    coalition: 0,
+    amchaYisrael: 0,
+    raam: 0,
+    jointList: 0,
+    opposition: 0,
+  }
+}
+
 function buildDisplayBlocShares(totals: DisplayBlocTotals): DisplayBlocTotals {
   return {
     coalition: (totals.coalition / KNESSET_SEATS) * 100,
+    amchaYisrael: (totals.amchaYisrael / KNESSET_SEATS) * 100,
     raam: (totals.raam / KNESSET_SEATS) * 100,
     jointList: (totals.jointList / KNESSET_SEATS) * 100,
     opposition: (totals.opposition / KNESSET_SEATS) * 100,
@@ -179,12 +212,7 @@ export function sumDisplayBlocTotals(
     'partyName' | 'partyShortName' | 'bloc' | 'seatsAvg'
   >[],
 ): DisplayBlocTotals {
-  const totals: DisplayBlocTotals = {
-    coalition: 0,
-    raam: 0,
-    jointList: 0,
-    opposition: 0,
-  }
+  const totals = emptyDisplayBlocTotals()
   for (const party of parties) {
     totals[classifyDisplayBloc(party)] += party.seatsAvg
   }
@@ -194,12 +222,7 @@ export function sumDisplayBlocTotals(
 function sumDisplayBlocTotalsFromParties(
   parties: Pick<PartySnapshot, 'partyName' | 'partyShortName' | 'bloc' | 'seats'>[],
 ): DisplayBlocTotals {
-  const totals: DisplayBlocTotals = {
-    coalition: 0,
-    raam: 0,
-    jointList: 0,
-    opposition: 0,
-  }
+  const totals = emptyDisplayBlocTotals()
   for (const party of parties) {
     totals[classifyDisplayBloc(party)] += party.seats
   }

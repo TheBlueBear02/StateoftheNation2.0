@@ -501,6 +501,57 @@
   outline: none;
 }
 
+.candidate-edit-card__delete {
+  margin-inline-start: auto;
+  padding: 10px 18px;
+  border: 1px solid var(--color-alert);
+  border-radius: 0;
+  background: var(--color-white);
+  color: var(--color-alert);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.candidate-edit-card__delete:hover,
+.candidate-edit-card__delete:focus-visible {
+  background: var(--color-alert);
+  color: var(--color-white);
+  outline: none;
+}
+
+.candidate-edit-card__delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.candidate-edit-card__delete--confirm {
+  margin-inline-start: 0;
+  background: var(--color-alert);
+  color: var(--color-white);
+}
+
+.candidate-edit-card__delete--confirm:hover,
+.candidate-edit-card__delete--confirm:focus-visible {
+  background: #c0392b;
+}
+
+.candidate-edit-card__delete-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.candidate-edit-card__delete-prompt {
+  margin: 0;
+  width: 100%;
+  color: var(--color-alert);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
 .candidate-edit-card__status {
   margin: 0;
   color: var(--color-text-muted);
