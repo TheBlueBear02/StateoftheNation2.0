@@ -85,3 +85,34 @@ export function buildProjectedPins<T extends CandidateMapPin>(
     }
   })
 }
+
+/** Visible pins grouped by trimmed city name, each group sorted by Hebrew name. */
+export function groupPinsByCity<T extends { city: string; fullName: string }>(
+  pins: T[],
+): Map<string, T[]> {
+  const groups = new Map<string, T[]>()
+  for (const pin of pins) {
+    const key = pin.city.trim()
+    if (!key) continue
+    const list = groups.get(key)
+    if (list) {
+      list.push(pin)
+    } else {
+      groups.set(key, [pin])
+    }
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => a.fullName.localeCompare(b.fullName, 'he'))
+  }
+  return groups
+}
+
+/** Visible pins that share a city (trimmed), stable order by name. */
+export function pinsInSameCity<T extends { city: string; fullName: string }>(
+  pins: T[],
+  city: string,
+): T[] {
+  const target = city.trim()
+  if (!target) return []
+  return groupPinsByCity(pins).get(target) ?? []
+}

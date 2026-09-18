@@ -47,7 +47,8 @@ function App() {
   }, [])
 
   const revealHeroVideo = () => setHeroVideoReady(true)
-  const tickerItems = [...newsItems, ...newsItems]
+  const tickerItems =
+    newsItems.length > 0 ? [...newsItems, ...newsItems] : []
 
   return (
     <SiteLayout>
@@ -119,27 +120,29 @@ function App() {
           </div>
         </section>
 
-        <aside className="news-strip" aria-label="עדכונים">
-          <div className="news-strip__track">
-            {tickerItems.map((item, index) => (
-              <Link
-                key={`${item.key}-${index}`}
-                href={item.href}
-                className="news-strip__item"
-              >
-                {item.whenLabel ? (
-                  <>
-                    <span className="news-strip__when">{item.whenLabel}</span>
-                    <span className="news-strip__sep" aria-hidden="true">
-                      |
-                    </span>
-                  </>
-                ) : null}
-                <span className="news-strip__headline">{item.headline}</span>
-              </Link>
-            ))}
-          </div>
-        </aside>
+        {tickerItems.length > 0 ? (
+          <aside className="news-strip" aria-label="עדכונים">
+            <div className="news-strip__track">
+              {tickerItems.map((item, index) => (
+                <Link
+                  key={`${item.key}-${index}`}
+                  href={item.href}
+                  className="news-strip__item"
+                >
+                  {item.whenLabel ? (
+                    <>
+                      <span className="news-strip__when">{item.whenLabel}</span>
+                      <span className="news-strip__sep" aria-hidden="true">
+                        |
+                      </span>
+                    </>
+                  ) : null}
+                  <span className="news-strip__headline">{item.headline}</span>
+                </Link>
+              ))}
+            </div>
+          </aside>
+        ) : null}
 
         <ListsGamePromo />
 

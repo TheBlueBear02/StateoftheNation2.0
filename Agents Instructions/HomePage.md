@@ -34,7 +34,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/app/page.tsx` | Homepage route + metadata |
 | `src/app/layout.tsx` | RTL (`lang="he"` `dir="rtl"`), Heebo via `next/font`, root metadata, Vercel Analytics |
 | `src/App.tsx` | Homepage body — section markup and static content arrays |
-| `src/hooks/useSiteUpdates.ts` | Loads `site_updates` for the news strip (static fallback if empty) |
+| `src/hooks/useSiteUpdates.ts` | Loads generated `site_updates` rows for the news strip (no static defaults) |
 | `src/components/SiteHeader.tsx` | Shared header; hidden on homepage mobile (≤900px) |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue); legal links to `/about` and `/terms` only |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
@@ -109,9 +109,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 - Black background, white text, blue dot separators.
 - Full-bleed edge-to-edge (no `.container`) — intentional marquee effect.
-- Headlines from `site_updates` via `useSiteUpdates` (written by pipeline finish hooks in `emit_site_updates.py`). Each item is a `Link` to its `href` (e.g. `/elections/polls`, `/knesset`).
-- DB items show a Jerusalem local stamp before the headline: `HH:mm | …` for updates from today, otherwise `D.M | …` with no time (e.g. `15:00 | כותרת` / `30.7 | כותרת`). Static defaults have no timestamp.
-- Feed composition: up to **10** latest DB rows (`occurred_at` desc), then pad with the static default headlines until 10 total (or until defaults run out). Defaults are skipped when their headline already appears in the DB set. On query failure (or missing Supabase config), the strip shows defaults only.
+- Headlines from `site_updates` via `useSiteUpdates` only (written by pipeline finish hooks in `emit_site_updates.py`). No static default / filler headlines. Each item is a `Link` to its `href` (e.g. `/elections/polls`, `/knesset`).
+- Each item shows a Jerusalem local stamp before the headline: `HH:mm | …` for updates from today, otherwise `D.M | …` with no time (e.g. `15:00 | כותרת` / `30.7 | כותרת`).
+- Feed: up to **10** latest DB rows (`occurred_at` desc). On query failure, missing Supabase config, or an empty table, the strip is **hidden** (not padded with placeholders).
 - The track renders `newsItems` twice for a seamless CSS marquee loop — that is intentional duplication for animation, not a second fetch.
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
 - CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
@@ -159,7 +159,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 ## State Management
 
 - Homepage project teasers remain static in `App.tsx`.
-- News strip loads live rows from `site_updates` (`src/hooks/useSiteUpdates.ts`); see [PiplinesPage.md](./PiplinesPage.md) for the mandatory pipeline finish-hook.
+- News strip loads generated rows from `site_updates` only (`src/hooks/useSiteUpdates.ts`); empty/error → strip hidden. See [PiplinesPage.md](./PiplinesPage.md) for the mandatory pipeline finish-hook.
 - The **בחירות 2026** hero CTA routes to the `/elections` module documented in `Agents Instructions/ElectionsPage.md`.
 - Knesset page uses `useKnessetMembers` hook with Supabase (see `Agents Instructions/KnessetPage.md`).
 

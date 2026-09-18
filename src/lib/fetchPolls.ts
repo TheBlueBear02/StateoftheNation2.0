@@ -104,6 +104,37 @@ export function formatFieldwork(start: string, end: string): string {
   return `${fmt(start)} – ${fmt(end)}`
 }
 
+/**
+ * PostgREST/Supabase caps a single response at ~1000 rows by default.
+ * 120 polls × ~15 parties exceeds that, so the newest poll_ids were truncated
+ * and the last-N average chart rendered empty while older trend charts still worked.
+ * Keep each chunk well under the cap (~40 × 15 ≈ 600 rows).
+ */
+const POLL_RESULTS_ID_CHUNK = 40
+
+async function fetchPollResultsForIds(
+  client: SupabaseClient,
+  pollIds: number[],
+): Promise<{ rows: PollResultRow[]; error: string | null }> {
+  const rows: PollResultRow[] = []
+
+  for (let i = 0; i < pollIds.length; i += POLL_RESULTS_ID_CHUNK) {
+    const chunk = pollIds.slice(i, i + POLL_RESULTS_ID_CHUNK)
+    const { data, error } = await client
+      .from('poll_results')
+      .select('poll_id, party_id, seats, vote_share, below_threshold')
+      .in('poll_id', chunk)
+
+    if (error) {
+      return { rows: [], error: error.message }
+    }
+
+    rows.push(...((data ?? []) as PollResultRow[]))
+  }
+
+  return { rows, error: null }
+}
+
 export async function fetchPolls(
   client: SupabaseClient,
   limit = 30,
@@ -140,13 +171,13 @@ export async function fetchPolls(
     return { polls: [], error: null }
   }
 
-  const { data: resultRows, error: resultError } = await client
-    .from('poll_results')
-    .select('poll_id, party_id, seats, vote_share, below_threshold')
-    .in('poll_id', pollIds)
+  const { rows: resultRows, error: resultError } = await fetchPollResultsForIds(
+    client,
+    pollIds,
+  )
 
   if (resultError) {
-    return { polls: [], error: resultError.message }
+    return { polls: [], error: resultError }
   }
 
   const publisherLogoById = new Map<number, string | null>()
@@ -175,9 +206,7 @@ export async function fetchPolls(
     pollsterHeByName.set(row.name, row.name_he)
   }
 
-  const partyIds = [
-    ...new Set((resultRows ?? []).map((r) => (r as PollResultRow).party_id)),
-  ]
+  const partyIds = [...new Set(resultRows.map((r) => r.party_id))]
 
   const partyMap = new Map<
     number,
@@ -227,7 +256,7 @@ export async function fetchPolls(
   }
 
   const resultsByPoll = new Map<number, PollPartyResult[]>()
-  for (const row of (resultRows ?? []) as PollResultRow[]) {
+  for (const row of resultRows) {
     const party = partyMap.get(row.party_id)
     const list = resultsByPoll.get(row.poll_id) ?? []
     list.push({

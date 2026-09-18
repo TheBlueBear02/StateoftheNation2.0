@@ -14,6 +14,7 @@ import {
   MAP_IMAGE_SRC,
   MAP_VIEWBOX,
   buildProjectedPins,
+  groupPinsByCity,
   type ProjectedPin,
 } from '../../lib/candidateMapProjection'
 import { CandidateMapTooltip } from './CandidateMapTooltip'
@@ -44,7 +45,7 @@ export function ElectionsOverviewMap({
   const [brokenLogoIds, setBrokenLogoIds] = useState<Set<number>>(
     () => new Set(),
   )
-  const [hoveredPin, setHoveredPin] = useState<OverviewProjectedPin | null>(null)
+  const [hoveredCity, setHoveredCity] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
 
   const partiesWithPins = useMemo(
@@ -59,7 +60,7 @@ export function ElectionsOverviewMap({
 
   useEffect(() => {
     if (loading) {
-      setHoveredPin(null)
+      setHoveredCity(null)
     }
   }, [loading])
 
@@ -67,7 +68,17 @@ export function ElectionsOverviewMap({
     () => pins.filter((pin) => selectedPartyIds.has(pin.partyId)),
     [pins, selectedPartyIds],
   )
-  const projectedPins = buildProjectedPins(filteredPins)
+  const projectedPins = useMemo(
+    () => buildProjectedPins(filteredPins),
+    [filteredPins],
+  )
+  const pinsByCity = useMemo(
+    () => groupPinsByCity(projectedPins),
+    [projectedPins],
+  )
+  const hoveredPeople = hoveredCity
+    ? (pinsByCity.get(hoveredCity.trim()) ?? [])
+    : []
   const allSelected =
     partiesWithPins.length > 0 &&
     partiesWithPins.every((party) => selectedPartyIds.has(party.id))
@@ -108,8 +119,11 @@ export function ElectionsOverviewMap({
     setTooltipPosition({ x: event.clientX, y: event.clientY })
   }
 
-  function handleFocus(event: FocusEvent<SVGGElement>, pin: OverviewProjectedPin) {
-    setHoveredPin(pin)
+  function handleFocus(
+    event: FocusEvent<SVGGElement>,
+    pin: OverviewProjectedPin,
+  ) {
+    setHoveredCity(pin.city.trim())
     const rect = event.currentTarget.getBoundingClientRect()
     setTooltipPosition({
       x: rect.left + rect.width / 2,
@@ -226,20 +240,29 @@ export function ElectionsOverviewMap({
             <g className="candidate-map__pins" role="list">
               {projectedPins.map((pin) => {
                 const accentColor = pin.partyColor ?? '#4890fd'
+                const cityKey = pin.city.trim()
+                const cityMates = pinsByCity.get(cityKey) ?? [pin]
+                const isCityHovered = hoveredCity?.trim() === cityKey
+                const ariaExtra =
+                  cityMates.length > 1
+                    ? `, ועוד ${cityMates.length - 1} מ${pin.city}`
+                    : ''
 
                 return (
                   <g
                     key={pin.id}
-                    className="candidate-map__pin-group"
+                    className={`candidate-map__pin-group${
+                      isCityHovered ? ' candidate-map__pin-group--active' : ''
+                    }`}
                     style={{ '--party-color': accentColor } as CSSProperties}
                     role="listitem"
                     tabIndex={0}
-                    aria-label={`${pin.fullName}, ${pin.partyName}, ${pin.city}`}
-                    onMouseEnter={() => setHoveredPin(pin)}
-                    onMouseLeave={() => setHoveredPin(null)}
+                    aria-label={`${pin.fullName}, ${pin.partyName}, ${pin.city}${ariaExtra}`}
+                    onMouseEnter={() => setHoveredCity(cityKey)}
+                    onMouseLeave={() => setHoveredCity(null)}
                     onMouseMove={handleMove}
                     onFocus={(event) => handleFocus(event, pin)}
-                    onBlur={() => setHoveredPin(null)}
+                    onBlur={() => setHoveredCity(null)}
                   >
                     <circle
                       className="candidate-map__pin-hit-area"
@@ -259,14 +282,17 @@ export function ElectionsOverviewMap({
             </g>
           </svg>
 
-          {hoveredPin ? (
+          {hoveredPeople.length > 0 && hoveredCity ? (
             <CandidateMapTooltip
-              fullName={hoveredPin.fullName}
-              city={hoveredPin.city}
-              partyName={hoveredPin.partyName}
-              imageUrl={hoveredPin.imageUrl}
-              accentColor={hoveredPin.partyColor ?? '#4890fd'}
-              totalYearsInKnesset={hoveredPin.totalYearsInKnesset}
+              city={hoveredCity}
+              people={hoveredPeople.map((pin) => ({
+                id: pin.id,
+                fullName: pin.fullName,
+                partyName: pin.partyName,
+                imageUrl: pin.imageUrl,
+                accentColor: pin.partyColor ?? '#4890fd',
+                totalYearsInKnesset: pin.totalYearsInKnesset,
+              }))}
               x={tooltipPosition.x}
               y={tooltipPosition.y}
             />

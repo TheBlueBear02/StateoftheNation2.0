@@ -292,12 +292,15 @@ def _walk_sections(
 ) -> list[tuple[str, Tag]]:
     """Return (section_path, table) pairs for in-scope wikitables.
 
-    latest_only=True keeps only the first Seat projections table (newest polls)
-    and skips scenario / archived continuation tables.
+    latest_only=True keeps every Seat projections table under the newest year
+    subsection (e.g. all tables under ``Seat projections > 2026``). Wikipedia
+    now splits that year across multiple wikitables; taking only the first
+    table drops mid-year polls. Scenario / archived year sections are skipped.
     """
     results: list[tuple[str, Tag]] = []
     section_stack: list[str] = []
     heading_tags = {"h2", "h3", "h4", "h5"}
+    latest_path: str | None = None
 
     for element in soup.find_all(["h2", "h3", "h4", "h5", "table"]):
         if element.name in heading_tags:
@@ -317,7 +320,13 @@ def _walk_sections(
             if latest_only:
                 if "seat projection" not in path.lower() or _section_is_scenario(path):
                     continue
-                results.append((path, element))
+                # Lock onto the first in-scope year path, then take *all* of its tables.
+                if latest_path is None:
+                    latest_path = path
+                if path == latest_path:
+                    results.append((path, element))
+                    continue
+                # Next year / sibling subsection (e.g. 2025) — stop.
                 break
             if "seat projection" not in path.lower() and not _section_is_scenario(path):
                 continue

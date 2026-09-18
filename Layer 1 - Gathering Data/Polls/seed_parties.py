@@ -51,6 +51,10 @@ PARTIES = [
     {"short_name": "הרשימה המשותפת", "name": "הרשימה המשותפת", "party_status": "polled_only", "bloc": "opposition", "color": "#DC143C"},
     {"short_name": "מילואימניקים", "name": "מילואימניקים", "party_status": "polled_only", "bloc": "opposition", "color": "#708090"},
     {"short_name": "בית ציוני", "name": "בית ציוני", "party_status": "polled_only", "bloc": "opposition", "color": "#5B7C99"},
+    {"short_name": "עמיחא ישראל", "name": "עמיחא ישראל", "party_status": "polled_only", "bloc": "opposition", "color": "#C45C26"},
+    {"short_name": "הציבור החרדי", "name": "הציבור החרדי", "party_status": "polled_only", "bloc": "coalition", "color": "#2F2F2F"},
+    {"short_name": "זהות", "name": "זהות", "party_status": "polled_only", "bloc": "coalition", "color": "#FF8C00"},
+    {"short_name": "וינטר", "name": "מפלגת וינטר", "party_status": "polled_only", "bloc": "opposition", "color": "#6A5ACD"},
     # ── historical (merged / dissolved) ────────────────────────────────────
     {"short_name": "עבודה", "name": "עבודה", "party_status": "historical", "bloc": "opposition", "color": "#E30613"},
     {"short_name": "מרצ", "name": "מרצ", "party_status": "historical", "bloc": "opposition", "color": "#008080"},

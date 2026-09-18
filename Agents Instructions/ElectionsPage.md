@@ -52,7 +52,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/components/elections/ListsGamePromo.tsx` | Homepage-style lists-game teaser linking to `/elections/lists`; reused on `/elections/[partyId]` |
 | `src/components/elections/CandidateMap.tsx` | Public Israel map SVG with one projected dot per geocoded candidate |
 | `src/components/elections/ElectionsOverviewMap.tsx` | All-parties map on `/elections` with per-party color pins and checkbox filter (default: all parties) |
-| `src/components/elections/CandidateMapTooltip.tsx` | Fixed-position map tooltip matching the Knesset page style, showing city instead of faction |
+| `src/components/elections/CandidateMapTooltip.tsx` | Fixed-position map tooltip matching the Knesset page style; lists all candidates in the hovered city (party name on overview map) |
 | `src/lib/candidateMapProjection.ts` | Shared Israel map projection and pin offset logic for `CandidateMap` and `ElectionsOverviewMap` |
 | `src/hooks/useElectionParties.ts` | Thin hook over `fetchElectionParties`; accepts optional `{ election, parties }` initial data |
 | `src/hooks/useElectionCandidates.ts` | Thin hook over `fetchElectionCandidates`; accepts optional `initialCandidates` |
@@ -214,11 +214,11 @@ Rendered as a compact block in the party detail hero (visual left column on desk
 - clamping so outlier geocodes do not escape the map viewBox,
 - a small deterministic spread for candidates with identical city coordinates so each candidate still gets a visible dot.
 
-Pins use the party color, render larger than the original static dots, and expose a Knesset-style fixed tooltip on hover/focus: borderless circular photo or initials, candidate name, city (instead of faction name), and MK tenure when available. When `election_parties.logo_url` is present, a small party logo badge is pinned to the top-left corner of the map section (same placement pattern as the party index cards). The map coverage label beside the SVG reads **מציג X מועמדים מרשימת {party}**, where X is the number of geocoded candidates shown as pins and `{party}` is the party `shortName` (fallback: full `name`).
+Pins use the party color, render larger than the original static dots, and expose a Knesset-style fixed tooltip on hover/focus: city as the tooltip title, then every geocoded candidate in that city (borderless circular photo or initials, name, MK tenure when available). Co-located pins all highlight together while the city is hovered. When `election_parties.logo_url` is present, a small party logo badge is pinned to the top-left corner of the map section (same placement pattern as the party index cards). The map coverage label beside the SVG reads **מציג X מועמדים מרשימת {party}**, where X is the number of geocoded candidates shown as pins and `{party}` is the party `shortName` (fallback: full `name`).
 
 ## All-Parties Overview Map (`/elections`)
 
-Below the party grid, `ElectionsOverviewMap` shows geocoded candidates from every party on the same Israel SVG. Each pin uses its party color. A logo filter (same pattern as the polls party-trend legend) lists only parties that have at least one geocoded candidate; **all such parties are selected by default**. Each control is a party logo button (color swatch fallback if `logo_url` is missing or fails to load); deselected logos render greyed out. Users can toggle individual parties or use **בחר הכל** / **נקה**. The coverage label reads **מציג X מועמדים מ-Y מפלגות** when at least one party is selected. Tooltips show candidate name, party name, city, and MK tenure when available.
+Below the party grid, `ElectionsOverviewMap` shows geocoded candidates from every party on the same Israel SVG. Each pin uses its party color. A logo filter (same pattern as the polls party-trend legend) lists only parties that have at least one geocoded candidate; **all such parties are selected by default**. Each control is a party logo button (color swatch fallback if `logo_url` is missing or fails to load); deselected logos render greyed out. Users can toggle individual parties or use **בחר הכל** / **נקה**. The coverage label reads **מציג X מועמדים מ-Y מפלגות** when at least one party is selected. Hovering any pin shows one tooltip for that city listing all currently visible candidates there (name, party, MK tenure when available).
 
 ## Styling
 

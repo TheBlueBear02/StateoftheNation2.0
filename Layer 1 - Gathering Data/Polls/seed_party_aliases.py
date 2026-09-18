@@ -95,7 +95,10 @@ ALIASES = [
     {"raw_label": "YB", "short_name": "ישראל ביתנו"},
     {"raw_label": "B&W", "short_name": "כחול לבן", "valid_to": "2022-12-31"},
     {"raw_label": "NU", "short_name": "המחנה הממלכתי", "valid_to": "2024-03-31"},
-    # Joint List is a Wikipedia group header only — sub-columns Hadash–Ta'al / Balad are parsed separately.
+    # Joint List: often a group header (Hadash–Ta'al / Balad sub-columns), but since
+    # mid-2026 some seat tables expose a single combined "Joint List" column.
+    {"raw_label": "Joint List", "short_name": "הרשימה המשותפת"},
+    {"raw_label": "The Joint List", "short_name": "הרשימה המשותפת"},
     {"raw_label": "Labor–Meretz", "short_name": "הדמוקרטים", "valid_from": "2024-07-01"},
     {"raw_label": "Labor-Meretz", "short_name": "הדמוקרטים", "valid_from": "2024-07-01"},
     # polled_only
@@ -103,6 +106,24 @@ ALIASES = [
     {"raw_label": "Yashar", "short_name": "ישר"},
     {"raw_label": "Reservists", "short_name": "מילואימניקים"},
     {"raw_label": "Reservists on Duty", "short_name": "מילואימניקים"},
+    {"raw_label": "Reserv. - NEP", "short_name": "מילואימניקים"},
+    {"raw_label": "Reserv.–NEP", "short_name": "מילואימניקים"},
+    {"raw_label": "Reserv. – NEP", "short_name": "מילואימניקים"},
+    # 2026 wiki columns that blocked ingest after Aug 2026 table redesign
+    {"raw_label": "Amcha Yisrael", "short_name": "עמיחא ישראל"},
+    {"raw_label": "Amcha Israel", "short_name": "עמיחא ישראל"},
+    {"raw_label": "Haredi Public", "short_name": "הציבור החרדי"},
+    {"raw_label": "Unity", "short_name": "המחנה הממלכתי"},
+    {"raw_label": "Zehut", "short_name": "זהות"},
+    {"raw_label": "RZP - Zehut", "short_name": "הציונות הדתית"},
+    {"raw_label": "RZP–Zehut", "short_name": "הציונות הדתית"},
+    {"raw_label": "RZP – Zehut", "short_name": "הציונות הדתית"},
+    {"raw_label": "Winter party", "short_name": "וינטר"},
+    {"raw_label": "Winter", "short_name": "וינטר"},
+    {"raw_label": "Ofer Winter", "short_name": "וינטר"},
+    # One-off mid-2026 column (leadership alternative framed as a party column)
+    {"raw_label": "Erdan / Edelstein", "short_name": "הליכוד"},
+    {"raw_label": "Erdan/Edelstein", "short_name": "הליכוד"},
 ]
 
 LINEAGE = [

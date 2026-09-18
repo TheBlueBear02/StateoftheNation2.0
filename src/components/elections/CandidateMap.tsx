@@ -1,11 +1,19 @@
 'use client'
 
-import { useEffect, useState, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type MouseEvent,
+} from 'react'
 import type { CandidateMapPin } from '../../hooks/useElectionCandidates'
 import {
   MAP_IMAGE_SRC,
   MAP_VIEWBOX,
   buildProjectedPins,
+  groupPinsByCity,
   type ProjectedPin,
 } from '../../lib/candidateMapProjection'
 import { CandidateMapTooltip } from './CandidateMapTooltip'
@@ -29,13 +37,21 @@ export function CandidateMap({
 }: CandidateMapProps) {
   const accentColor = partyColor ?? '#4890fd'
   const style = { '--party-color': accentColor } as CSSProperties
-  const projectedPins = buildProjectedPins(pins)
-  const [hoveredPin, setHoveredPin] = useState<PartyProjectedPin | null>(null)
+  const projectedPins = useMemo(() => buildProjectedPins(pins), [pins])
+  const pinsByCity = useMemo(
+    () => groupPinsByCity(projectedPins),
+    [projectedPins],
+  )
+  const [hoveredCity, setHoveredCity] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+
+  const hoveredPeople = hoveredCity
+    ? (pinsByCity.get(hoveredCity.trim()) ?? [])
+    : []
 
   useEffect(() => {
     if (loading) {
-      setHoveredPin(null)
+      setHoveredCity(null)
     }
   }, [loading])
 
@@ -44,7 +60,7 @@ export function CandidateMap({
   }
 
   function handleFocus(event: FocusEvent<SVGGElement>, pin: PartyProjectedPin) {
-    setHoveredPin(pin)
+    setHoveredCity(pin.city.trim())
     const rect = event.currentTarget.getBoundingClientRect()
     setTooltipPosition({
       x: rect.left + rect.width / 2,
@@ -88,43 +104,58 @@ export function CandidateMap({
             />
 
             <g className="candidate-map__pins" role="list">
-              {projectedPins.map((pin) => (
-                <g
-                  key={pin.id}
-                  className="candidate-map__pin-group"
-                  role="listitem"
-                  tabIndex={0}
-                  aria-label={`${pin.fullName}, ${pin.city}`}
-                  onMouseEnter={() => setHoveredPin(pin)}
-                  onMouseLeave={() => setHoveredPin(null)}
-                  onMouseMove={handleMove}
-                  onFocus={(event) => handleFocus(event, pin)}
-                  onBlur={() => setHoveredPin(null)}
-                >
-                  <circle
-                    className="candidate-map__pin-hit-area"
-                    cx={pin.x}
-                    cy={pin.y}
-                    r={15}
-                  />
-                  <circle
-                    className="candidate-map__pin"
-                    cx={pin.x}
-                    cy={pin.y}
-                    r={pin.offsetIndex === 0 ? 7 : 5.8}
-                  />
-                </g>
-              ))}
+              {projectedPins.map((pin) => {
+                const cityKey = pin.city.trim()
+                const cityMates = pinsByCity.get(cityKey) ?? [pin]
+                const isCityHovered = hoveredCity?.trim() === cityKey
+                const ariaExtra =
+                  cityMates.length > 1
+                    ? `, ועוד ${cityMates.length - 1} מ${pin.city}`
+                    : ''
+
+                return (
+                  <g
+                    key={pin.id}
+                    className={`candidate-map__pin-group${
+                      isCityHovered ? ' candidate-map__pin-group--active' : ''
+                    }`}
+                    role="listitem"
+                    tabIndex={0}
+                    aria-label={`${pin.fullName}, ${pin.city}${ariaExtra}`}
+                    onMouseEnter={() => setHoveredCity(cityKey)}
+                    onMouseLeave={() => setHoveredCity(null)}
+                    onMouseMove={handleMove}
+                    onFocus={(event) => handleFocus(event, pin)}
+                    onBlur={() => setHoveredCity(null)}
+                  >
+                    <circle
+                      className="candidate-map__pin-hit-area"
+                      cx={pin.x}
+                      cy={pin.y}
+                      r={15}
+                    />
+                    <circle
+                      className="candidate-map__pin"
+                      cx={pin.x}
+                      cy={pin.y}
+                      r={pin.offsetIndex === 0 ? 7 : 5.8}
+                    />
+                  </g>
+                )
+              })}
             </g>
           </svg>
 
-          {hoveredPin ? (
+          {hoveredPeople.length > 0 && hoveredCity ? (
             <CandidateMapTooltip
-              fullName={hoveredPin.fullName}
-              city={hoveredPin.city}
-              imageUrl={hoveredPin.imageUrl}
-              accentColor={accentColor}
-              totalYearsInKnesset={hoveredPin.totalYearsInKnesset}
+              city={hoveredCity}
+              people={hoveredPeople.map((pin) => ({
+                id: pin.id,
+                fullName: pin.fullName,
+                imageUrl: pin.imageUrl,
+                accentColor,
+                totalYearsInKnesset: pin.totalYearsInKnesset,
+              }))}
               x={tooltipPosition.x}
               y={tooltipPosition.y}
             />

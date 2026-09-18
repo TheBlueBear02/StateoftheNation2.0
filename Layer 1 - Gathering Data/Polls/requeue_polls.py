@@ -14,8 +14,18 @@ log = logging.getLogger(__name__)
 REVIEW_FILE = Path(__file__).parent / "review_queue.json"
 
 
-def run(*, full: bool = False) -> None:
+def run(*, full: bool = False, rejected_only: bool = False) -> None:
     sb = get_supabase()
+
+    if rejected_only:
+        sb.table("raw_poll_rows").update({
+            "status": "pending",
+            "error": None,
+        }).eq("status", "rejected").execute()
+        log.info("Re-queued rejected raw_poll_rows (polls table left intact)")
+        REVIEW_FILE.write_text("[]\n", encoding="utf-8")
+        log.info("Cleared review_queue.json")
+        return
 
     sb.table("poll_aggregates").delete().neq("id", 0).execute()
     sb.table("polls").delete().neq("id", 0).execute()
@@ -39,8 +49,13 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-8s  %(message)s")
     parser = argparse.ArgumentParser(description="Reset polls staging for re-processing")
     parser.add_argument("--full", action="store_true", help="Also delete raw_poll_rows")
+    parser.add_argument(
+        "--rejected-only",
+        action="store_true",
+        help="Only flip rejected → pending; do not delete polls",
+    )
     args = parser.parse_args()
-    run(full=args.full)
+    run(full=args.full, rejected_only=args.rejected_only)
 
 
 if __name__ == "__main__":
