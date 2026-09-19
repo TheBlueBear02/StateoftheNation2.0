@@ -78,6 +78,7 @@ Parent section / Section page / Current item
 | `/elections/lists` | `בחירות 2026` → `/elections` / `משחק הרשימות` → `/elections/lists` |
 | `/elections/lists` (party selected) | … / משחק הרשימות / {party} |
 | `/elections/:partyId` | `בחירות 2026` → `/elections` / {party} |
+| `/government/dashboard` | `הממשלה` → `/government` / דשבורד מדדים |
 | `/piplines` | `צינורות נתונים` |
 | `/piplines/docs/{id}` | `צינורות נתונים` → `/piplines` / תיעוד |
 | `/about` | `אודות` |

@@ -12,7 +12,7 @@ The schema is split into four logical groups:
 |-------|--------|--------|
 | **Knesset** | `people` · `knessets` · `knesset_factions` · `knesset_memberships` | Live — powers the Knesset page |
 | **Government** | `governments` · `offices` · `minister_appointments` | Seeded — powers the Government page |
-| **KPI data** | `indexes` · `index_data` | Seeded — dashboard page planned |
+| **KPI data** | `indexes` · `index_data` | Live — `/government/dashboard` |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | Live — `/elections`, party detail, lists game, edit |
 | **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` · `pollsters` | Live — `/elections/polls`, `/piplines` |
 | **Site** | `site_updates` | Live — homepage news strip |
@@ -234,15 +234,17 @@ KPI definitions attached to a government office. Each index defines one trackabl
 | `office_id` | bigint | FK → `offices.id` |
 | `name` | text | Metric name in Hebrew |
 | `info` | text | Explanation of the metric |
-| `icon` | text | Icon identifier for the UI |
+| `icon` | text | Icon URL/path for the UI (optional; dashboard uses CSS bubble fallbacks) |
 | `is_kpi` | boolean | Whether to show as a headline KPI |
 | `alert` | boolean | Whether to highlight this metric |
-| `chart_type` | text | Default: `"line"`. Drives frontend chart selection. |
-| `source` | text | Data source attribution |
+| `chart_type` | text | `'line'` \| `'bar'` \| `'pie'`. Default `"line"`. |
+| `source` | text | Data source attribution URL |
 | `is_shown` | boolean | Whether to show on the dashboard |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** Manually curated. No automated sync.
+**Data source:** Curated. Seeded from the old Flask `sn.db` by `Layer 1 - Gathering Data/knesset/seed_office_dashboard.py` (idempotent upsert by `office_id` + `name`). No automated sync.
+
+**Used by:** `/government/dashboard` via `fetchOfficeDashboard.ts`.
 
 ---
 
@@ -254,14 +256,16 @@ Time-series data points for each index.
 |--------|------|-------------|
 | `id` | bigint | Primary key |
 | `index_id` | bigint | FK → `indexes.id` |
-| `label` | text | Display label for this data point (e.g. `"ינואר 2025"`) |
-| `value` | numeric | The metric value (supports rates/decimals; was bigint historically) |
-| `recorded_at` | date | When this value was recorded |
+| `label` | text | Display label for this data point (often original `DD.MM.YYYY` / `YYYY`) |
+| `value` | numeric | The metric value (supports rates/decimals) |
+| `recorded_at` | date | Sortable date — seed parses old labels (`DD.MM.YYYY` → that day; `YYYY` → `YYYY-01-01`) |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Constraints:** `UNIQUE (index_id, recorded_at)` when data is clean.
+**Constraints:** `UNIQUE (index_id, recorded_at)` — required for seed upserts (`schema_office_dashboard.sql`).
 
-**Data source:** Manually curated or automated per index source. No central sync script yet.
+**Data source:** Same seed script. Upserts on `(index_id, recorded_at)`.
+
+**RLS:** anon SELECT — see `Layer 1 - Gathering Data/schema_office_dashboard.sql`.
 
 ---
 
@@ -609,6 +613,7 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 | Script | Tables updated | Trigger |
 |--------|---------------|---------|
 | `sync_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Weekly (GitHub Actions) |
+| `seed_office_dashboard.py` | `offices.is_shown` / `info` · `indexes` · `index_data` | Manual — migrate curated KPI data from old sn.db |
 | `insert_raw_list.py` | `raw_candidate_lists` | Manual — when a party publishes their list |
 | `run_pipeline.py` | `election_candidates` · `people` (enrichment) | Manual — after each `insert_raw_list.py` run |
 | `run_polls_pipeline.py` | `polls` · `poll_results` · `poll_aggregates` · `raw_poll_rows` | Daily midnight Israel (GitHub Actions) |

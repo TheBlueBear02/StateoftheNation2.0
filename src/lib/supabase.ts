@@ -235,6 +235,38 @@ export type OfficeRow = {
   knesset_category_name: string | null
 }
 
+export type OfficeDashboardOfficeRow = {
+  id: number
+  name: string | null
+  knesset_category_name: string | null
+  info: string | null
+  logo_url: string | null
+  is_shown: boolean | null
+}
+
+export type IndexChartType = 'line' | 'bar' | 'pie'
+
+export type IndexRow = {
+  id: number
+  office_id: number
+  name: string
+  info: string | null
+  icon: string | null
+  is_kpi: boolean
+  alert: boolean
+  chart_type: IndexChartType | string | null
+  source: string | null
+  is_shown: boolean | null
+}
+
+export type IndexDataRow = {
+  id: number
+  index_id: number
+  label: string
+  value: number | string
+  recorded_at: string
+}
+
 export type MinisterAppointmentRow = {
   person_id: number
   duty_desc: string | null

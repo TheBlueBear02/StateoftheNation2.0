@@ -14,7 +14,8 @@ Central reference for agents working on this repository. Use this file to unders
 | הכנסת — Knesset hemicycle | `/knesset` | Live |
 | צינורות נתונים — Pipelines dashboard | `/piplines` | Live (password-gated, noindex) |
 | תיעוד צינורות | `/piplines/docs` | Live (noindex) |
-| דשבורד ממשלה — Government dashboard | `/government` | Live |
+| דשבורד ממשלה — Government structure | `/government` | Live |
+| דשבורד מדדים — Office KPI dashboard | `/government/dashboard` | Live |
 | בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls`, `/elections/lists` | Live |
 | סקרי מנדטים — Poll averages | `/elections/polls` | Live |
 | משחק הרשימות — List rating game | `/elections/lists` | Live |
@@ -78,6 +79,7 @@ StateoftheNation2.0/
 | `/elections/lists` | `src/app/elections/lists/page.tsx` |
 | `/elections/[partyId]` | `src/app/elections/[partyId]/page.tsx` |
 | `/government` | `src/app/government/page.tsx` |
+| `/government/dashboard` | `src/app/government/dashboard/page.tsx` |
 | `/knesset` | `src/app/knesset/page.tsx` |
 | `/knesset/edit` | `src/app/knesset/edit/page.tsx` |
 | `/piplines` | `src/app/piplines/page.tsx` |
@@ -95,7 +97,7 @@ Page UI lives in `src/views/*` (and `src/App.tsx` for home). App Router `page.ts
 
 | Folder | Purpose |
 |--------|---------|
-| `knesset/` | OData sync (`load_all_knesset_data.py`), faction fixes, images |
+| `knesset/` | OData sync (`load_all_knesset_data.py`), office KPI seed (`seed_office_dashboard.py`), faction fixes, images |
 | `Elections/` | Candidate list pipeline + `run_party_pipeline_api.py` |
 | `Polls/` | Wikipedia scrape → normalize → aggregates; GitHub Actions cron |
 | (shared) | `record_pipeline_run.py` (ops log) · `emit_site_updates.py` (homepage ticker) |
@@ -114,6 +116,7 @@ These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Loc
 │         ├─ /about      → views/AboutPage.tsx                │
 │         ├─ /terms      → views/TermsPage.tsx                │
 │         ├─ /government → views/GovernmentPage.tsx           │
+│         ├─ /government/dashboard → OfficeDashboardPage.tsx  │
 │         ├─ /knesset    → views/KnessetPage.tsx              │
 │         ├─ /elections… → views/Elections*.tsx               │
 │         ├─ /piplines     → PipelinesDashboardPage.tsx       │
@@ -171,6 +174,7 @@ npm run lint
 | [DesignLanguage.md](./DesignLanguage.md) | UI rules |
 | [SeoAndWebStandards.md](./SeoAndWebStandards.md) | Metadata, sitemap, robots, JSON-LD |
 | [GovernmentPage.md](./GovernmentPage.md) | `/government` |
+| [GovernmentDashboardPage.md](./GovernmentDashboardPage.md) | `/government/dashboard` |
 | [HomePage.md](./HomePage.md) | `/` |
 | [LegalPages.md](./LegalPages.md) | `/about`, `/terms` (footer only) |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` + `/knesset/edit` |

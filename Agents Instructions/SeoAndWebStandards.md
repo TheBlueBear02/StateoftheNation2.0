@@ -53,7 +53,7 @@ When adding a content page, prefer matching `BreadcrumbList` JSON-LD to the visi
 
 ## SSR data (elections)
 
-`/elections` and `/elections/[partyId]` load anon Supabase data in their Server Component `page.tsx` and pass `initialParties` / `party` + `initialCandidates` into the client views so the first HTML includes names and lists. `/elections/polls` server-fetches a small poll window (15) only to build seat-average JSON-LD; the interactive charts still load via `usePolls(120)` on the client (passing the full poll payload through RSC froze the Next server). Hooks skip the browser refetch when initial data is provided. `/government` and `/knesset` are still client-fetched.
+`/elections` and `/elections/[partyId]` load anon Supabase data in their Server Component `page.tsx` and pass `initialParties` / `party` + `initialCandidates` into the client views so the first HTML includes names and lists. `/elections/polls` server-fetches a small poll window (15) only to build seat-average JSON-LD; the interactive charts still load via `usePolls(120)` on the client (passing the full poll payload through RSC froze the Next server). Hooks skip the browser refetch when initial data is provided. `/government`, `/government/dashboard`, and `/knesset` are still client-fetched.
 
 ## Fonts and images
 
@@ -68,3 +68,5 @@ When adding a content page, prefer matching `BreadcrumbList` JSON-LD to the visi
 2. Add the path to `src/app/sitemap.ts` (or dynamic query if DB-backed).
 3. Do **not** list password-gated tools in the sitemap.
 4. Update the matching Agents Instructions doc and [ProjectOverview.md](./ProjectOverview.md) route table.
+
+Public routes currently include `/government/dashboard` (office KPI dashboard).

@@ -1,0 +1,84 @@
+.index-trend-chart {
+  position: relative;
+  width: 100%;
+}
+
+.index-trend-chart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+}
+
+.index-trend-chart__grid {
+  stroke: rgba(0, 0, 0, 0.08);
+  stroke-width: 1;
+}
+
+.index-trend-chart__axis {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.index-trend-chart__line {
+  stroke: var(--color-blue);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.index-trend-chart__dot {
+  fill: var(--color-blue);
+  stroke: #fff;
+  stroke-width: 1.5;
+  cursor: pointer;
+}
+
+.index-trend-chart__bar {
+  fill: var(--color-blue);
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.index-trend-chart__bar--active {
+  opacity: 1;
+  fill: var(--color-blue-dark);
+}
+
+.index-trend-chart__pie-slice {
+  stroke: #fff;
+  stroke-width: 1;
+  cursor: pointer;
+}
+
+.index-trend-chart__tooltip {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  background: var(--color-white);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.index-trend-chart__tooltip strong {
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.index-trend-chart__tooltip span {
+  color: var(--color-text-muted);
+}
+
+.index-trend-chart__empty {
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+}

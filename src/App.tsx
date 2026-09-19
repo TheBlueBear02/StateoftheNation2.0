@@ -21,8 +21,8 @@ const DASHBOARD_ICONS = [
   'agriculture', 'energy', 'science', 'culture',
 ] as const
 
-/** Temporarily hidden on the homepage; set true to restore the teaser. */
-const SHOW_GOVERNMENT_DASHBOARD = false
+/** Homepage teaser for the office KPI dashboard. */
+const SHOW_GOVERNMENT_DASHBOARD = true
 
 const HERO_VIDEO_SRC =
   'https://tawfpzpikbxvgsqrtvpm.supabase.co/storage/v1/object/public/site-assets/bear-hero-video2.mp4'
@@ -186,7 +186,7 @@ function App() {
             className="project-section"
             aria-labelledby="dashboard-title"
           >
-            <Link href="/government" className="project-section__link">
+            <Link href="/government/dashboard" className="project-section__link">
               <div className="container">
                 <div className="project-section__inner">
                   <div className="project-section__content">
