@@ -106,11 +106,15 @@
 .dream-gov-report {
   --dream-report-bg: #040a14;
   --dream-report-art-opacity: 1;
+  /* Match share poster proportions (scaled for the live card) */
+  --dream-slot-max: 186px;
+  --dream-face-ratio: 278 / 270;
+  --dream-photo-position: center 18%;
   display: flex;
   flex-direction: column;
   gap: 20px;
   width: 100%;
-  max-width: 720px;
+  max-width: 760px;
   margin-inline: auto;
 }
 
@@ -118,8 +122,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 56px 24px 32px;
+  gap: 14px;
+  padding: 48px 18px 28px;
   border-radius: 12px;
   background: var(--dream-report-bg);
   color: var(--color-white);
@@ -240,9 +244,9 @@
 
 .dream-gov-report__heading-title {
   margin: 0;
-  font-size: clamp(1.35rem, 3.5vw, 1.75rem);
+  font-size: clamp(1.4rem, 3.8vw, 1.85rem);
   font-weight: 900;
-  line-height: 1.2;
+  line-height: 1.15;
   color: var(--color-white);
 }
 
@@ -252,20 +256,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  gap: 12px;
   width: 100%;
 }
 
 .dream-gov-board__pm {
   width: 100%;
-  max-width: 110px;
+  max-width: var(--dream-slot-max);
 }
 
 .dream-gov-board__ministers {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px 12px;
+  gap: 10px 12px;
   justify-items: center;
   align-items: start;
 }
@@ -276,13 +280,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
-  max-width: 110px;
+  max-width: var(--dream-slot-max);
 }
 
 .dream-office--pm {
-  max-width: 110px;
+  max-width: var(--dream-slot-max);
 }
 
 .dream-office__square {
@@ -290,11 +294,11 @@
   display: grid;
   place-items: center;
   width: 100%;
-  aspect-ratio: 3 / 4.2;
+  aspect-ratio: var(--dream-face-ratio);
   height: auto;
   padding: 0;
-  border: 3px solid rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
   background: #2a2a2a;
   overflow: hidden;
   cursor: pointer;
@@ -331,6 +335,8 @@
 }
 
 .dream-office__plus {
+  position: relative;
+  z-index: 1;
   font-size: clamp(1.6rem, 5vw, 2.2rem);
   font-weight: 300;
   line-height: 1;
@@ -338,10 +344,12 @@
 }
 
 .dream-office__photo {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: top center;
+  object-position: var(--dream-photo-position, center 18%);
   display: block;
 }
 
@@ -373,6 +381,8 @@
 }
 
 .dream-office__initials {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
   width: 100%;
@@ -394,14 +404,14 @@
 
 .dream-office__title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.88);
-  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.15;
   text-align: center;
   width: 100%;
   /* Reserve 2 lines so portraits in a row stay level when a label wraps */
-  min-height: calc(1.3em * 2);
+  min-height: calc(1.15em * 2);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -409,18 +419,18 @@
 
 .dream-office__name {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: var(--color-white);
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 .dream-office__party {
   margin: 0;
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.55);
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .dream-office__hint {
@@ -761,17 +771,21 @@
   /* Instagram / feed post 4∶5 — standard social share size */
   --dream-report-bg: #040a14;
   --dream-report-art-opacity: 1;
+  /* Wide enough to cut side empty space; tall enough to keep portrait crop */
+  --dream-share-slot: 278px;
+  --dream-share-face-h: 270px;
+  --dream-photo-position: center 18%;
   width: 1080px;
   height: 1350px;
   box-sizing: border-box;
-  padding: 36px 44px 28px;
+  padding: 24px 28px 40px;
   background: var(--dream-report-bg);
   color: #ffffff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 10px;
   overflow: hidden;
   font-family: var(--font-heebo), Heebo, sans-serif;
 }
@@ -801,8 +815,8 @@
 .dream-share-card__site-logo {
   position: absolute;
   z-index: 1;
-  top: 22px;
-  right: 26px;
+  top: 18px;
+  right: 22px;
   width: 168px;
   height: auto;
 }
@@ -814,18 +828,18 @@
   gap: 4px;
   text-align: center;
   flex-shrink: 0;
-  padding-top: 8px;
+  padding-top: 2px;
 }
 
 .dream-share-card__title {
   margin: 0;
-  font-size: 50px;
+  font-size: 48px;
   font-weight: 900;
   line-height: 1.1;
 }
 
 .dream-share-card__pm {
-  width: 210px;
+  width: var(--dream-share-slot);
   flex-shrink: 0;
 }
 
@@ -834,8 +848,8 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, 210px);
-  gap: 8px 16px;
+  grid-template-columns: repeat(3, var(--dream-share-slot));
+  gap: 8px 14px;
   justify-content: center;
   width: max-content;
   max-width: 100%;
@@ -847,28 +861,31 @@
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  width: 210px;
+  width: var(--dream-share-slot);
   text-align: center;
   box-sizing: border-box;
 }
 
 .dream-share-slot__face {
   position: relative;
-  width: 210px;
-  height: 264px;
+  width: var(--dream-share-slot);
+  height: var(--dream-share-face-h);
   flex-shrink: 0;
   overflow: hidden;
   background: #2a2a2a;
-  border: 4px solid rgba(255, 255, 255, 0.18);
+  border: 3px solid rgba(255, 255, 255, 0.18);
   border-radius: 12px;
   box-sizing: border-box;
 }
 
 .dream-share-slot__photo {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: top center;
+  /* Same focal point as the on-page board */
+  object-position: var(--dream-photo-position, center 18%);
   display: block;
 }
 
@@ -879,7 +896,7 @@
   width: 100%;
   height: 100%;
   font-weight: 800;
-  font-size: 52px;
+  font-size: 58px;
   color: #ffffff;
   background: color-mix(in srgb, #4890fd 35%, #1a1a1a);
   box-sizing: border-box;
@@ -909,73 +926,81 @@
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
   flex-shrink: 0;
 }
 
 .dream-share-slot__party {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
-  line-height: 1.2;
+  line-height: 1.15;
   color: rgba(255, 255, 255, 0.55);
   flex-shrink: 0;
 }
 
 .dream-share-card__cta {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   padding: 0 16px;
   text-align: center;
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.3;
   color: rgba(255, 255, 255, 0.9);
   flex-shrink: 0;
-  max-width: 960px;
+  max-width: 980px;
 }
 
 .dream-share-card__cta-url {
   display: block;
-  margin-top: 4px;
-  font-size: 24px;
+  margin-top: 6px;
+  font-size: 22px;
   font-weight: 800;
   color: #ffffff;
   letter-spacing: 0.01em;
 }
 
 @media (max-width: 900px) {
+  .dream-gov-report {
+    --dream-slot-max: 150px;
+  }
+
   .dream-gov-board__ministers {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px 8px;
+    gap: 12px 8px;
   }
 
   .dream-office {
-    max-width: 96px;
+    max-width: var(--dream-slot-max);
   }
 
   .dream-gov-board__pm {
     width: 100%;
-    max-width: 96px;
+    max-width: var(--dream-slot-max);
   }
 }
 
 @media (max-width: 520px) {
+  .dream-gov-report {
+    --dream-slot-max: 148px;
+  }
+
   .dream-gov-report__card {
-    padding: 52px 14px 24px;
+    padding: 48px 12px 24px;
   }
 
   .dream-gov-board__ministers {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px 10px;
+    gap: 14px 10px;
   }
 
   .dream-office {
-    max-width: 140px;
+    max-width: var(--dream-slot-max);
   }
 
   .dream-gov-board__pm {
     width: 100%;
-    max-width: 140px;
+    max-width: var(--dream-slot-max);
   }
 
   .dream-modal__dialog {
