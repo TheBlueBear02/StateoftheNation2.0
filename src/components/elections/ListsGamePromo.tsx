@@ -2,13 +2,18 @@ import Link from 'next/link'
 
 type ListsGamePromoProps = {
   titleId?: string
+  /** Light grey section background (`project-section--alt`). */
+  alt?: boolean
 }
 
-export function ListsGamePromo({ titleId = 'lists-game-title' }: ListsGamePromoProps) {
+export function ListsGamePromo({
+  titleId = 'lists-game-title',
+  alt = false,
+}: ListsGamePromoProps) {
   return (
     <section
       id="lists-game"
-      className="project-section"
+      className={alt ? 'project-section project-section--alt' : 'project-section'}
       aria-labelledby={titleId}
     >
       <Link href="/elections/lists" className="project-section__link">

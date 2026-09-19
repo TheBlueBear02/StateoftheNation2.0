@@ -460,6 +460,10 @@
   height: auto;
 }
 
+.project-section--dream .project-section__inner {
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.45fr);
+}
+
 .project-section--alt {
   background: #fafafa;
 }
@@ -591,6 +595,10 @@
     gap: 16px;
     align-items: center;
     padding: 12px;
+  }
+
+  .project-section--dream .project-section__inner {
+    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.4fr);
   }
 
   .project-section__content {

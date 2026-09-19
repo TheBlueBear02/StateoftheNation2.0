@@ -3,6 +3,8 @@ import { getInitials } from '../../../lib/hemicycle'
 import {
   DREAM_MINISTER_OFFICES,
   DREAM_PM_OFFICE,
+  getDreamOfficeLabel,
+  type DreamOffice,
   type DreamOfficeId,
 } from '../../../lib/dreamGovernmentOffices'
 import type { DreamOfficeSelection } from './DreamOfficeSquare'
@@ -20,6 +22,15 @@ export const ShareableGovernment = forwardRef<
   return (
     <div ref={ref} className="dream-share-card" dir="rtl">
       <img
+        className="dream-share-card__bg-art"
+        src="/dream-government-bg.png?v=3"
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        width={1080}
+        height={1350}
+      />
+      <img
         className="dream-share-card__site-logo"
         src="/while-logo-nobg.svg"
         alt="מצב האומה"
@@ -32,31 +43,38 @@ export const ShareableGovernment = forwardRef<
       </header>
 
       <div className="dream-share-card__pm">
-        <ShareSlot officeLabel={DREAM_PM_OFFICE.label} selection={pmSelection} />
+        <ShareSlot office={DREAM_PM_OFFICE} selection={pmSelection} />
       </div>
 
       <ul className="dream-share-card__grid">
         {DREAM_MINISTER_OFFICES.map((office) => (
           <li key={office.id}>
             <ShareSlot
-              officeLabel={office.label}
+              office={office}
               selection={selections[office.id] ?? null}
             />
           </li>
         ))}
       </ul>
+
+      <p className="dream-share-card__cta">
+        הרכיבו ושתפו את ממשלת החלומות שלכם באתר מצב האומה
+        <span className="dream-share-card__cta-url">
+          www.stateofthenation.co.il
+        </span>
+      </p>
     </div>
   )
 })
 
 function ShareSlot({
-  officeLabel,
+  office,
   selection,
 }: {
-  officeLabel: string
+  office: DreamOffice
   selection: DreamOfficeSelection | null
 }) {
-  const partyLogoUrl = selection?.party.logoUrl ?? null
+  const officeLabel = getDreamOfficeLabel(office, selection?.candidate.gender)
 
   return (
     <div className="dream-share-slot">
@@ -76,18 +94,14 @@ function ShareSlot({
         ) : (
           <span className="dream-share-slot__empty">+</span>
         )}
-        {partyLogoUrl ? (
-          <img
-            className="dream-share-slot__party-logo"
-            src={partyLogoUrl}
-            alt=""
-            width={40}
-            height={40}
-          />
-        ) : null}
       </div>
       {selection ? (
-        <p className="dream-share-slot__name">{selection.candidate.fullName}</p>
+        <>
+          <p className="dream-share-slot__name">{selection.candidate.fullName}</p>
+          <p className="dream-share-slot__party">
+            {selection.party.shortName ?? selection.party.name}
+          </p>
+        </>
       ) : null}
     </div>
   )

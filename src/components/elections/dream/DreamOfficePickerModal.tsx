@@ -96,7 +96,7 @@ export function DreamOfficePickerModal({
                 className="dream-modal__back"
                 onClick={handleBack}
               >
-                ← חזרה למפלגות
+                → חזרה למפלגות
               </button>
             ) : null}
             <h2 id={titleId} className="dream-modal__title">
@@ -247,7 +247,7 @@ function PersonStep({
 
   if (loading) {
     return (
-      <ul className="dream-modal__person-list" aria-hidden="true">
+      <ul className="dream-modal__person-grid" aria-hidden="true">
         {Array.from({ length: 6 }, (_, index) => (
           <li key={index} className="dream-modal-person dream-modal-person--skeleton" />
         ))}
@@ -262,30 +262,36 @@ function PersonStep({
   }
 
   return (
-    <ul className="dream-modal__person-list">
+    <ul className="dream-modal__person-grid">
       {candidates.map((candidate) => (
         <li key={candidate.id}>
           <button
             type="button"
             className="dream-modal-person"
             onClick={() => onSelect(candidate)}
+            aria-label={`בחר את ${candidate.fullName}`}
           >
-            <span className="dream-modal-person__position" aria-hidden="true">
-              {candidate.listPosition}
-            </span>
-            {candidate.imageUrl ? (
-              <img
-                className="dream-modal-person__photo"
-                src={candidate.imageUrl}
-                alt=""
-                loading="lazy"
-              />
-            ) : (
-              <span className="dream-modal-person__initials" aria-hidden="true">
-                {getInitials(candidate.fullName)}
+            <span className="dream-modal-person__media">
+              {candidate.imageUrl ? (
+                <img
+                  className="dream-modal-person__photo"
+                  src={candidate.imageUrl}
+                  alt=""
+                  loading="lazy"
+                />
+              ) : (
+                <span className="dream-modal-person__initials" aria-hidden="true">
+                  {getInitials(candidate.fullName)}
+                </span>
+              )}
+              <span className="dream-modal-person__gradient" aria-hidden="true" />
+              <span className="dream-modal-person__position" aria-hidden="true">
+                {candidate.listPosition}
               </span>
-            )}
-            <span className="dream-modal-person__name">{candidate.fullName}</span>
+              <span className="dream-modal-person__overlay">
+                <span className="dream-modal-person__name">{candidate.fullName}</span>
+              </span>
+            </span>
           </button>
         </li>
       ))}

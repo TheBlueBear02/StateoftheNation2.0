@@ -145,13 +145,13 @@ function App() {
           </aside>
         ) : null}
 
-        <ListsGamePromo />
-
         <DreamGovernmentPromo />
+
+        <ListsGamePromo alt />
 
         <section
           id="mandate-polls"
-          className="project-section project-section--alt"
+          className="project-section"
           aria-labelledby="mandate-polls-title"
         >
           <Link href="/elections/polls" className="project-section__link">

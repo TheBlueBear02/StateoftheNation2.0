@@ -10,7 +10,7 @@ export function DreamGovernmentPromo({
   return (
     <section
       id="dream-government"
-      className="project-section"
+      className="project-section project-section--dream"
       aria-labelledby={titleId}
     >
       <Link href="/elections/dream-government" className="project-section__link">
@@ -21,6 +21,18 @@ export function DreamGovernmentPromo({
                 ממשלת החלומות: בחרו שר לכל משרד מבין המועמדים לכנסת
               </h2>
               <span className="project-section__tag">בחירות 2026</span>
+            </div>
+
+            <div className="project-section__media" aria-hidden="true">
+              <img
+                src="/dream-government-homepage.png"
+                alt=""
+                className="project-section__image"
+                width={1969}
+                height={978}
+                loading="lazy"
+                decoding="async"
+              />
             </div>
           </div>
         </div>

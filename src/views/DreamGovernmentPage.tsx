@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { SiteLayout } from '../components/SiteLayout'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { DreamOfficePickerModal } from '../components/elections/dream/DreamOfficePickerModal'
@@ -55,13 +55,21 @@ export function DreamGovernmentPage() {
   >({})
   const [activeOffice, setActiveOffice] = useState<DreamOffice | null>(null)
   const [exporting, setExporting] = useState(false)
-  const [shareMessage, setShareMessage] = useState<string | null>(null)
+  const [copiedFlash, setCopiedFlash] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
 
   const filledCount = useMemo(
     () => Object.keys(selections).length,
     [selections],
   )
+
+  useEffect(() => {
+    if (!copiedFlash) return
+    const timer = window.setTimeout(() => {
+      setCopiedFlash(false)
+    }, 2500)
+    return () => window.clearTimeout(timer)
+  }, [copiedFlash])
 
   const handleSelect = (selection: DreamOfficeSelection) => {
     if (!activeOffice) return
@@ -74,10 +82,10 @@ export function DreamGovernmentPage() {
 
   const handleShare = async () => {
     const node = shareRef.current
-    if (!node || exporting || filledCount === 0) return
+    if (!node || exporting || filledCount === 0 || copiedFlash) return
 
     setExporting(true)
-    setShareMessage(null)
+    setCopiedFlash(false)
     setShareError(null)
 
     try {
@@ -85,7 +93,7 @@ export function DreamGovernmentPage() {
       // reset portrait <img src> back to remote URLs mid-export.
       const dataUrl = await exportNodeToPng(node, {
         pixelRatio: 2,
-        backgroundColor: '#0a1628',
+        backgroundColor: '#040a14',
         skipAutoScale: true,
       })
       const response = await fetch(dataUrl)
@@ -96,10 +104,10 @@ export function DreamGovernmentPage() {
       const copied = await copyImageToClipboard(blob)
 
       if (copied) {
-        setShareMessage('התמונה הועתקה — הדביקו אותה ברשת החברתית')
+        setCopiedFlash(true)
       } else {
         downloadDataUrl(dataUrl, 'dream-government.png')
-        setShareMessage('התמונה הורדה — העלו אותה לרשת החברתית')
+        setShareError('התמונה הורדה — העלו אותה לרשת החברתית')
       }
     } catch (error) {
       console.error('[dream-government] share export failed', error)
@@ -122,7 +130,7 @@ export function DreamGovernmentPage() {
             />
             <h1 className="dream-gov-page__title">ממשלת החלומות שלי</h1>
             <p className="dream-gov-page__subtitle">
-              בחר לכל אחד מהמשרדים את שר החלומות שלך מבין המועמדים לכנסת
+              בחרו את שרי החולומות שלכם מבין המועמדים לכנסת
             </p>
           </header>
 
@@ -138,38 +146,61 @@ export function DreamGovernmentPage() {
                 className="dream-gov-report__card"
                 aria-label="ממשלת החלומות"
               >
+                <img
+                  className="dream-gov-report__bg-art"
+                  src="/dream-government-bg.png?v=3"
+                  alt=""
+                  aria-hidden="true"
+                  draggable={false}
+                />
                 <button
                   type="button"
-                  className="dream-gov-report__share"
+                  className={
+                    copiedFlash
+                      ? 'dream-gov-report__share dream-gov-report__share--copied'
+                      : 'dream-gov-report__share'
+                  }
                   onClick={() => {
                     void handleShare()
                   }}
-                  disabled={exporting || filledCount === 0}
+                  disabled={exporting || filledCount === 0 || copiedFlash}
                   aria-label={
-                    exporting
-                      ? 'מייצא תמונה…'
-                      : 'שתף את ממשלת החלומות שלך'
+                    copiedFlash
+                      ? 'הועתק ללוח'
+                      : exporting
+                        ? 'מייצא תמונה…'
+                        : 'שתפו את ממשלת החלומות שלכם'
                   }
-                  title="שתף את ממשלת החלומות שלך"
+                  title={
+                    copiedFlash
+                      ? 'הועתק ללוח'
+                      : 'שתפו את ממשלת החלומות שלכם'
+                  }
                 >
-                  <svg
-                    className="dream-gov-report__share-icon"
-                    viewBox="0 0 24 24"
-                    width="22"
-                    height="22"
-                    aria-hidden="true"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="18" cy="5" r="3" />
-                    <circle cx="6" cy="12" r="3" />
-                    <circle cx="18" cy="19" r="3" />
-                    <path d="M8.59 13.51 15.42 17.49" />
-                    <path d="M15.41 6.51 8.59 10.49" />
-                  </svg>
+                  {copiedFlash ? (
+                    <span className="dream-gov-report__share-copied" role="status">
+                      הועתק ללוח
+                    </span>
+                  ) : (
+                    <svg
+                      className="dream-gov-report__share-icon"
+                      viewBox="0 0 24 24"
+                      width="22"
+                      height="22"
+                      aria-hidden="true"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="18" cy="5" r="3" />
+                      <circle cx="6" cy="12" r="3" />
+                      <circle cx="18" cy="19" r="3" />
+                      <path d="M8.59 13.51 15.42 17.49" />
+                      <path d="M15.41 6.51 8.59 10.49" />
+                    </svg>
+                  )}
                 </button>
 
                 <img
@@ -208,20 +239,31 @@ export function DreamGovernmentPage() {
                 </div>
               </article>
 
-              {(shareMessage || shareError) && (
-                <div className="dream-gov-report__footer">
-                  {shareMessage ? (
-                    <p className="dream-gov-page__share-ok" role="status">
-                      {shareMessage}
-                    </p>
-                  ) : null}
-                  {shareError ? (
-                    <p className="dream-gov-page__error" role="alert">
-                      {shareError}
-                    </p>
-                  ) : null}
-                </div>
-              )}
+              <div className="dream-gov-report__actions">
+                <button
+                  type="button"
+                  className={
+                    copiedFlash
+                      ? 'dream-gov-report__share-btn dream-gov-report__share-btn--copied'
+                      : 'dream-gov-report__share-btn'
+                  }
+                  onClick={() => {
+                    void handleShare()
+                  }}
+                  disabled={exporting || filledCount === 0 || copiedFlash}
+                >
+                  {copiedFlash
+                    ? 'הועתק ללוח'
+                    : exporting
+                      ? 'מייצא תמונה…'
+                      : 'שתפו את ממשלת החלומות שלכם'}
+                </button>
+                {shareError ? (
+                  <p className="dream-gov-page__error" role="alert">
+                    {shareError}
+                  </p>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </div>

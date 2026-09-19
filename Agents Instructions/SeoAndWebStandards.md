@@ -60,6 +60,7 @@ When adding a content page, prefer matching `BreadcrumbList` JSON-LD to the visi
 - **Heebo** via `next/font/google` in root layout (`display: swap`). Do not re-add Google Fonts `@import` in CSS.
 - Prefer `next/image` for new image work; remote hosts must be listed in `next.config.ts` `images.remotePatterns`.
 - Default social preview: absolute `getDefaultOgImageUrl()` → `/website-preview-thumbnail.png` on `openGraph.images` / `twitter.images` (incl. `secureUrl` + `type`). Child routes that set `openGraph` must re-declare `images` or Facebook may drop them.
+- `/elections/dream-government` overrides OG/Twitter with `public/dream-governemnt-og-image.jpeg` (1280×1600) in its `page.tsx` metadata.
 
 ## Checklist for new public pages
 

@@ -16,13 +16,13 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 ├─────────────────────────────────────────────────────────┤
 │  News strip (black, full-bleed) — edge-to-edge ticker   │
 ├─────────────────────────────────────────────────────────┤
-│  Project: משחק הרשימות (white, full-bleed)             │
+│  Project: ממשלת החלומות (white, full-bleed)            │
 │    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
-│  Project: ממשלת החלומות (white, full-bleed)            │
-│    └─ .container — tag + title                          │
+│  Project: משחק הרשימות (#fafafa, full-bleed)           │
+│    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
-│  Project: סקרי מנדטים (#fafafa, full-bleed)            │
+│  Project: סקרי מנדטים (white, full-bleed)              │
 │    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
 │  Footer (blue, full-bleed) — logo + social + legal links + copyright│
@@ -42,6 +42,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue); legal links to `/about` and `/terms` only |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
 | `src/components/elections/DreamGovernmentPromo.tsx` | Dream-government teaser linking to `/elections/dream-government` |
+| `public/dream-government-homepage.png` | Dream-government project section screenshot |
 | `src/App.css` | `.container` primitive and section-specific styles |
 | `src/index.css` | Global reset, CSS variables |
 | `public/header-logo 3.svg` | Header logo (desktop / non-home) |
@@ -120,24 +121,25 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
 - CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
 
-### 4. Lists game project (`#lists-game`)
+### 4. Dream government project (`#dream-government`)
+
+- Rendered by `src/components/elections/DreamGovernmentPromo.tsx` (also used on `/elections`).
+- First project teaser on the homepage (white); sits above lists-game and polls.
+- News-block layout: title **ממשלת החלומות: בחרו שר לכל משרד מבין המועמדים לכנסת** + category tag **בחירות 2026**.
+- Whole section is a link to `/elections/dream-government`.
+- Media (`.project-section__media`): landscape collage from `public/dream-government-homepage.png`; section uses `.project-section--dream` so the media column is a bit wider than the default project teasers.
+
+### 5. Lists game project (`#lists-game`)
 
 - Rendered by shared `src/components/elections/ListsGamePromo.tsx` (also used at the bottom of `/elections/[partyId]`).
-- White section placed **above** the dream-government and polls teasers, with a bottom border divider.
+- Second homepage project teaser; uses `.project-section--alt` (`#fafafa`) via the `alt` prop. Other teasers stay white.
 - News-block layout: title **משחק הרשימות: שחקו וגלו איזו רשימה הכי מתאימה לכם** + category tag **בחירות 2026** below it (no description / meta line).
 - Whole section is a link (`.project-section__link`) to `/elections/lists`.
 - Media (`.project-section__media`): screenshot from `public/election-game-homepage.png`.
 
-### 5. Dream government project (`#dream-government`)
-
-- Rendered by `src/components/elections/DreamGovernmentPromo.tsx` (also used on `/elections`).
-- White section between the lists-game and polls teasers.
-- News-block layout: title **ממשלת החלומות: בחרו שר לכל משרד מבין המועמדים לכנסת** + category tag **בחירות 2026**.
-- Whole section is a link to `/elections/dream-government`.
-
 ### 6. Mandate polls project (`#mandate-polls`)
 
-- Uses `.project-section--alt` (`#fafafa`) so it sits below the white lists-game / dream-government teasers.
+- White section below the grey lists-game teaser.
 - Same news-block layout: title **ניתוח כל סקרי המנדטים במקום אחד** + category tag **בחירות 2026** below it (no description / meta line).
 - Whole section is a link (`.project-section__link`) to `/elections/polls`.
 - Media (`.project-section__media`): screenshot from `public/polls-page-homepage.png`.

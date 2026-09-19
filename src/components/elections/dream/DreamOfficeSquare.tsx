@@ -1,5 +1,8 @@
 import { getInitials } from '../../../lib/hemicycle'
-import type { DreamOffice } from '../../../lib/dreamGovernmentOffices'
+import {
+  getDreamOfficeLabel,
+  type DreamOffice,
+} from '../../../lib/dreamGovernmentOffices'
 import type { ElectionCandidate } from '../../../hooks/useElectionCandidates'
 import type { ElectionParty } from '../../../lib/supabase'
 
@@ -20,9 +23,10 @@ export function DreamOfficeSquare({
   onClick,
 }: DreamOfficeSquareProps) {
   const isPm = Boolean(office.isPm)
-  const partyLogoUrl = selection?.party.logoUrl ?? null
-  const partyLabel =
-    selection?.party.shortName ?? selection?.party.name ?? 'מפלגה'
+  const officeLabel = getDreamOfficeLabel(
+    office,
+    selection?.candidate.gender,
+  )
 
   return (
     <div
@@ -32,7 +36,7 @@ export function DreamOfficeSquare({
           : 'dream-office'
       }
     >
-      <p className="dream-office__title">{office.label}</p>
+      <p className="dream-office__title">{officeLabel}</p>
 
       <button
         type="button"
@@ -44,8 +48,8 @@ export function DreamOfficeSquare({
         onClick={onClick}
         aria-label={
           selection
-            ? `שנה את ${office.label}: ${selection.candidate.fullName}`
-            : `בחר ${office.label}`
+            ? `שנה את ${officeLabel}: ${selection.candidate.fullName}`
+            : `בחר ${officeLabel}`
         }
       >
         {selection ? (
@@ -66,19 +70,34 @@ export function DreamOfficeSquare({
             +
           </span>
         )}
-        {partyLogoUrl ? (
-          <img
-            className="dream-office__party-logo"
-            src={partyLogoUrl}
-            alt={partyLabel}
-            loading="lazy"
-          />
+        {selection ? (
+          <span className="dream-office__edit" aria-hidden="true">
+            <svg
+              className="dream-office__edit-icon"
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </span>
         ) : null}
       </button>
 
       <div className="dream-office__meta">
         {selection ? (
-          <p className="dream-office__name">{selection.candidate.fullName}</p>
+          <>
+            <p className="dream-office__name">{selection.candidate.fullName}</p>
+            <p className="dream-office__party">
+              {selection.party.shortName ?? selection.party.name}
+            </p>
+          </>
         ) : (
           <p className="dream-office__hint">לחצו לבחירה</p>
         )}
