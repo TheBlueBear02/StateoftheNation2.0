@@ -127,7 +127,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - First project teaser on the homepage (white); sits above lists-game and polls.
 - News-block layout: title **ממשלת החלומות: בחרו שר לכל משרד מבין המועמדים לכנסת** + category tag **בחירות 2026**.
 - Whole section is a link to `/elections/dream-government`.
-- Media (`.project-section__media`): landscape collage from `public/dream-government-homepage.png`; section uses `.project-section--dream` so the media column is a bit wider than the default project teasers.
+- Media (`.project-section__media`): landscape collage from `public/dream-government-homepage.png` (same full-width media column as the other project teasers).
 
 ### 5. Lists game project (`#lists-game`)
 

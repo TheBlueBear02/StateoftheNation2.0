@@ -10,7 +10,7 @@ export function DreamGovernmentPromo({
   return (
     <section
       id="dream-government"
-      className="project-section project-section--dream"
+      className="project-section"
       aria-labelledby={titleId}
     >
       <Link href="/elections/dream-government" className="project-section__link">
