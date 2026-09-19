@@ -289,11 +289,85 @@
   max-width: var(--dream-slot-max);
 }
 
+.dream-office:has(.dream-office__pct) {
+  max-width: calc(var(--dream-slot-max) + 34px);
+}
+
+.dream-gov-board__pm:has(.dream-office__pct) {
+  max-width: calc(var(--dream-slot-max) + 34px);
+}
+
+.dream-office__portrait-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  /* Physical left = bar, then portrait (ignore page RTL). */
+  direction: ltr;
+}
+
+.dream-office__portrait-row--with-pct {
+  gap: 6px;
+}
+
+.dream-office__pct {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: 0 0 auto;
+  width: 28px;
+  align-self: stretch;
+  padding-block: 2px;
+}
+
+.dream-office__pct-label {
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.02em;
+}
+
+.dream-office__pct-total {
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
+  font-size: 0.58rem;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.dream-office__pct-track {
+  position: relative;
+  flex: 1 1 auto;
+  width: 10px;
+  min-height: 48px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.dream-office__pct-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: var(--color-blue, #4890fd);
+  transition: height 280ms ease;
+}
+
 .dream-office__square {
   position: relative;
   display: grid;
   place-items: center;
+  flex: 1 1 auto;
   width: 100%;
+  min-width: 0;
   aspect-ratio: var(--dream-face-ratio);
   height: auto;
   padding: 0;
