@@ -30,8 +30,8 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 | `compute_aggregates.py` | 5 | `last3` + `weighted` |
 | `validate_polls.py` | 6 | hard gates + ops alerts |
 | (API stage 7) | 7 | `emit_polls_run_update` → homepage `site_updates` headline (editable in UI) |
-| `seed_parties.py` | one-off | confirmed + historical + polled_only parties (ישר and הרשימה המשותפת are confirmed; יש עתיד, חד״ש־תע״ל, בל״ד, נועם, בית ציוני, עמיחא ישראל, הציבור החרדי, זהות, וינטר are polled_only). Matches by *normalized* `short_name` (quote/dash variants) so it never recreates ש״ס / ש"ס duplicates; merges any existing quote-variant dupes into the preferred row |
-| `seed_party_aliases.py` | one-off | English labels + lineage (includes Joint List / Amcha Yisrael / Haredi Public / Unity / Zehut / RZP–Zehut / Reserv.–NEP for 2026 wiki columns) |
+| `seed_parties.py` | one-off | confirmed + historical + polled_only parties (ישר, הרשימה המשותפת, עמך ישראל, and המילואימניקים are confirmed; יש עתיד, חד״ש־תע״ל, בל״ד, נועם, בית ציוני, הציבור החרדי, זהות, וינטר are polled_only). Matches by *normalized* `short_name` (quote/dash variants) so it never recreates ש״ס / ש"ס duplicates; merges any existing quote-variant dupes into the preferred row |
+| `seed_party_aliases.py` | one-off | English labels + lineage (includes Joint List / Amcha Yisrael → עמך ישראל / Haredi Public / Unity / Zehut / RZP–Zehut / Reserv.–NEP for 2026 wiki columns) |
 | `seed_poll_publishers.sql` | one-off | Distinct `polls.publisher` → `poll_publishers` + `publisher_id` backfill |
 
 Schema: `schema_polls.sql` (base polls DDL). `pollsters` / `people.wikidata_id` / numeric KPI values are live on Supabase.
