@@ -1,4 +1,6 @@
-import { getFontEmbedCSS, toPng, type Options as ToPngOptions } from 'html-to-image'
+import { getFontEmbedCSS, toPng } from 'html-to-image'
+
+type ToPngOptions = NonNullable<Parameters<typeof toPng>[1]>
 
 /**
  * Reliable html-to-image export for the dream-government share card.
