@@ -1,0 +1,813 @@
+.dream-gov-page {
+  background: var(--color-white);
+  overflow-x: hidden;
+}
+
+.dream-gov-page__main {
+  padding-block: 32px 80px;
+  overflow-x: hidden;
+}
+
+.dream-gov-page__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.dream-gov-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 42rem;
+}
+
+.dream-gov-page__title {
+  margin: 0;
+  font-size: clamp(1.85rem, 4vw, 2.5rem);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.dream-gov-page__subtitle {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: var(--color-text-muted);
+}
+
+.dream-gov-page__error {
+  margin: 0;
+  padding: 12px 16px;
+  border: 2px solid var(--color-alert);
+  background: rgba(231, 76, 60, 0.08);
+  color: var(--color-alert);
+  font-weight: 600;
+}
+
+.dream-gov-page__share-ok {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+}
+
+/* ── Report card (lists-game style) ── */
+
+.dream-gov-report {
+  --dream-report-bg: #0a1628;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+.dream-gov-report__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 56px 24px 32px;
+  border-radius: 12px;
+  background: var(--dream-report-bg);
+  color: var(--color-white);
+  overflow: hidden;
+}
+
+.dream-gov-report__site-logo {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1;
+  width: 110px;
+  height: auto;
+}
+
+.dream-gov-report__share {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-white);
+  cursor: pointer;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease,
+    background 0.12s ease;
+}
+
+.dream-gov-report__share:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.dream-gov-report__share:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dream-gov-report__share:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 2px;
+}
+
+.dream-gov-report__share-icon {
+  display: block;
+}
+
+.dream-gov-report__heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  text-align: center;
+  padding-inline: 48px;
+}
+
+.dream-gov-report__heading-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 3.5vw, 1.75rem);
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--color-white);
+}
+
+.dream-gov-report__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+/* ── Board layout ── */
+
+.dream-gov-board {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.dream-gov-board__pm {
+  width: 100%;
+  max-width: 110px;
+}
+
+.dream-gov-board__ministers {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 12px;
+  justify-items: center;
+  align-items: start;
+}
+
+/* ── Office square ── */
+
+.dream-office {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 110px;
+}
+
+.dream-office--pm {
+  max-width: 110px;
+}
+
+.dream-office__square {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 3 / 4.2;
+  height: auto;
+  padding: 0;
+  border: 3px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: #2a2a2a;
+  overflow: hidden;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.dream-office__square:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  transform: translateY(-2px);
+}
+
+.dream-office__square:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 2px;
+}
+
+.dream-office__square--empty {
+  background: rgba(255, 255, 255, 0.08);
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.dream-office__square--filled {
+  background: #2a2a2a;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.dream-office__plus {
+  font-size: clamp(1.6rem, 5vw, 2.2rem);
+  font-weight: 300;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.dream-office__photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+
+.dream-office__party-logo {
+  position: absolute;
+  z-index: 2;
+  bottom: 5px;
+  inset-inline-start: 5px;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  background: var(--color-white);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  padding: 2px;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.dream-office--pm .dream-office__party-logo {
+  width: 28px;
+  height: 28px;
+  bottom: 5px;
+  inset-inline-start: 5px;
+}
+
+.dream-office__initials {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: color-mix(in srgb, #4890fd 35%, #1a1a1a);
+}
+
+.dream-office__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  width: 100%;
+}
+
+.dream-office__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.3;
+  text-align: center;
+  width: 100%;
+  /* Reserve 2 lines so portraits in a row stay level when a label wraps */
+  min-height: calc(1.3em * 2);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.dream-office__name {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-white);
+  line-height: 1.3;
+}
+
+.dream-office__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ── Modal ── */
+
+.dream-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.dream-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(10, 22, 40, 0.55);
+  cursor: pointer;
+}
+
+.dream-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 100%);
+  max-height: min(860px, calc(100vh - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--color-white);
+  border: 2px solid var(--color-border);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+  outline: none;
+}
+
+.dream-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dream-modal__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dream-modal__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.dream-modal__back {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-blue-dark);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dream-modal__back:hover {
+  text-decoration: underline;
+}
+
+.dream-modal__close {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--color-border);
+  background: var(--color-white);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dream-modal__close:hover {
+  background: #f5f5f5;
+}
+
+.dream-modal__body {
+  padding: 16px 20px 24px;
+  overflow-y: auto;
+}
+
+.dream-modal__empty,
+.dream-modal__error {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.dream-modal__error {
+  color: var(--color-alert);
+}
+
+.dream-modal__party-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.dream-modal-party {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  border: none;
+  background: var(--color-white);
+  overflow: hidden;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.dream-modal-party--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dream-modal-party--skeleton {
+  background: linear-gradient(90deg, #f1f1f1, #e6e6e6, #f1f1f1);
+  background-size: 200% 100%;
+  animation: dream-skeleton 1500ms ease-in-out infinite;
+}
+
+.dream-modal-party__media {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: color-mix(in srgb, var(--party-color, #4890fd) 22%, #1a1a1a);
+}
+
+.dream-modal-party__photo,
+.dream-modal-party__initials {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+
+.dream-modal-party__initials {
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: #ffffff;
+}
+
+.dream-modal-party__gradient {
+  position: absolute;
+  inset: auto 0 0;
+  height: 55%;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.35) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.dream-modal-party__logo {
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 3px;
+  z-index: 1;
+}
+
+.dream-modal-party__overlay {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  color: #ffffff;
+}
+
+.dream-modal-party__name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.dream-modal__person-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dream-modal-person {
+  display: grid;
+  grid-template-columns: auto 52px 1fr;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--color-border);
+  background: var(--color-white);
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.dream-modal-person:hover {
+  border-color: var(--color-blue);
+  background: #f8fbff;
+}
+
+.dream-modal-person--skeleton {
+  height: 72px;
+  border: 2px solid #eee;
+  background: linear-gradient(90deg, #f1f1f1, #e6e6e6, #f1f1f1);
+  background-size: 200% 100%;
+  animation: dream-skeleton 1500ms ease-in-out infinite;
+}
+
+.dream-modal-person__position {
+  min-width: 1.6em;
+  font-weight: 800;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.dream-modal-person__photo,
+.dream-modal-person__initials {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  background: #ddd;
+}
+
+.dream-modal-person__initials {
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #ffffff;
+  background: color-mix(in srgb, #4890fd 35%, #1a1a1a);
+}
+
+.dream-modal-person__name {
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+@keyframes dream-skeleton {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* ── Share card (offscreen export) ── */
+
+.dream-share-card-host {
+  position: fixed;
+  inset-inline-start: -10000px;
+  top: 0;
+  pointer-events: none;
+}
+
+.dream-share-card {
+  position: relative;
+  /* Instagram / feed post 4∶5 — standard social share size */
+  width: 1080px;
+  height: 1350px;
+  box-sizing: border-box;
+  padding: 40px 44px 44px;
+  background: #0a1628;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  overflow: hidden;
+  font-family: var(--font-heebo), Heebo, sans-serif;
+}
+
+.dream-share-card__site-logo {
+  position: absolute;
+  top: 22px;
+  right: 26px;
+  width: 168px;
+  height: auto;
+}
+
+.dream-share-card__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+
+.dream-share-card__title {
+  margin: 0;
+  font-size: 50px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.dream-share-card__pm {
+  width: 216px;
+  flex-shrink: 0;
+}
+
+.dream-share-card__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 216px);
+  gap: 10px 18px;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+
+.dream-share-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 216px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.dream-share-slot__face {
+  position: relative;
+  width: 216px;
+  height: 302px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #2a2a2a;
+  border: 4px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.dream-share-slot__photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+
+.dream-share-slot__party-logo {
+  position: absolute;
+  z-index: 2;
+  bottom: 8px;
+  inset-inline-start: 8px;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  padding: 3px;
+  box-sizing: border-box;
+}
+
+.dream-share-slot__initials,
+.dream-share-slot__empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-weight: 800;
+  font-size: 52px;
+  color: #ffffff;
+  background: color-mix(in srgb, #4890fd 35%, #1a1a1a);
+  box-sizing: border-box;
+}
+
+.dream-share-slot__empty {
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dream-share-slot__office {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+  /* Reserve 2 lines so portraits in a row stay level when a label wraps */
+  min-height: calc(1.15em * 2);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.dream-share-slot__name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .dream-gov-board__ministers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 8px;
+  }
+
+  .dream-office {
+    max-width: 96px;
+  }
+
+  .dream-gov-board__pm {
+    width: 100%;
+    max-width: 96px;
+  }
+}
+
+@media (max-width: 520px) {
+  .dream-gov-report__card {
+    padding: 52px 14px 24px;
+  }
+
+  .dream-gov-board__ministers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 10px;
+  }
+
+  .dream-office {
+    max-width: 140px;
+  }
+
+  .dream-gov-board__pm {
+    width: 100%;
+    max-width: 140px;
+  }
+
+  .dream-modal__dialog {
+    max-height: calc(100vh - 16px);
+  }
+
+  .dream-modal__party-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dream-office__square,
+  .dream-gov-report__share,
+  .dream-modal-party--skeleton,
+  .dream-modal-person--skeleton {
+    transition: none;
+    animation: none;
+  }
+}

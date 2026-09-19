@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and shared conventions.
 
-Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with five visible sections (government dashboard teaser temporarily hidden).
+Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with six visible sections (government dashboard teaser temporarily hidden).
 
 ## Page Structure
 
@@ -18,6 +18,9 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 ├─────────────────────────────────────────────────────────┤
 │  Project: משחק הרשימות (white, full-bleed)             │
 │    └─ .container — tag + title | media                  │
+├─────────────────────────────────────────────────────────┤
+│  Project: ממשלת החלומות (white, full-bleed)            │
+│    └─ .container — tag + title                          │
 ├─────────────────────────────────────────────────────────┤
 │  Project: סקרי מנדטים (#fafafa, full-bleed)            │
 │    └─ .container — tag + title | media                  │
@@ -38,6 +41,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/components/SiteHeader.tsx` | Shared header; hidden on homepage mobile (≤900px) |
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue); legal links to `/about` and `/terms` only |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
+| `src/components/elections/DreamGovernmentPromo.tsx` | Dream-government teaser linking to `/elections/dream-government` |
 | `src/App.css` | `.container` primitive and section-specific styles |
 | `src/index.css` | Global reset, CSS variables |
 | `public/header-logo 3.svg` | Header logo (desktop / non-home) |
@@ -119,19 +123,26 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 ### 4. Lists game project (`#lists-game`)
 
 - Rendered by shared `src/components/elections/ListsGamePromo.tsx` (also used at the bottom of `/elections/[partyId]`).
-- White section placed **above** the polls teaser, with a bottom border divider.
+- White section placed **above** the dream-government and polls teasers, with a bottom border divider.
 - News-block layout: title **משחק הרשימות: שחקו וגלו איזו רשימה הכי מתאימה לכם** + category tag **בחירות 2026** below it (no description / meta line).
 - Whole section is a link (`.project-section__link`) to `/elections/lists`.
 - Media (`.project-section__media`): screenshot from `public/election-game-homepage.png`.
 
-### 5. Mandate polls project (`#mandate-polls`)
+### 5. Dream government project (`#dream-government`)
 
-- Uses `.project-section--alt` (`#fafafa`) so it sits below the white lists-game teaser.
+- Rendered by `src/components/elections/DreamGovernmentPromo.tsx` (also used on `/elections`).
+- White section between the lists-game and polls teasers.
+- News-block layout: title **ממשלת החלומות: בחרו שר לכל משרד מבין המועמדים לכנסת** + category tag **בחירות 2026**.
+- Whole section is a link to `/elections/dream-government`.
+
+### 6. Mandate polls project (`#mandate-polls`)
+
+- Uses `.project-section--alt` (`#fafafa`) so it sits below the white lists-game / dream-government teasers.
 - Same news-block layout: title **ניתוח כל סקרי המנדטים במקום אחד** + category tag **בחירות 2026** below it (no description / meta line).
 - Whole section is a link (`.project-section__link`) to `/elections/polls`.
 - Media (`.project-section__media`): screenshot from `public/polls-page-homepage.png`.
 
-### 6. Government Dashboard project (`#government-dashboard`) — hidden
+### 7. Government Dashboard project (`#government-dashboard`) — hidden
 
 - Markup kept in `App.tsx` behind `SHOW_GOVERNMENT_DASHBOARD = false`; flip to `true` to restore.
 - Same news-block layout: title **דשבורד ממשלה** + category tag **הממשלה** below it (no description / meta line).
@@ -140,7 +151,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Tag (`.project-section__tag`): square corners, `--color-blue` fill / white text.
 - Media is still a CSS dashboard placeholder (`.dashboard-preview`).
 
-### 7. Footer (`site-footer`)
+### 8. Footer (`site-footer`)
 
 - Blue background (`--color-blue: #4890FD`), white text.
 - Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: white logo brand (RTL start), centered social links, end column with legal links + copyright (RTL end).
@@ -171,6 +182,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - `/elections/[partyId]` → Elections 2026 party detail page
 - `/elections/polls` → Mandate poll averages
 - `/elections/lists` → Lists matching game
+- `/elections/dream-government` → Dream government builder
 - `/government` → Government page
 - `/knesset` → Knesset hemicycle page
 - `/about` → About (footer link only)

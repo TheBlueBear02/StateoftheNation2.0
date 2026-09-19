@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from '../components/SiteLayout'
+import { DreamGovernmentPromo } from '../components/elections/DreamGovernmentPromo'
 import { ElectionsOverviewMap } from '../components/elections/ElectionsOverviewMap'
 import { PartyCard, PartyCardSkeleton } from '../components/elections/PartyCard'
 import { useAllElectionMapPins } from '../hooks/useAllElectionMapPins'
@@ -139,6 +140,11 @@ export function ElectionsPage({
                     בדקו את איזו מפלגה הכי מתאימה לכם
                   </Link>
                 </p>
+                <p className="elections-page__link">
+                  <Link href="/elections/dream-government">
+                    בנו את ממשלת החלומות שלכם
+                  </Link>
+                </p>
               </nav>
             </header>
           </div>
@@ -174,6 +180,8 @@ export function ElectionsPage({
             ) : null}
           </div>
         </section>
+
+        <DreamGovernmentPromo />
 
         {!error ? (
           <section className="elections-page__map">

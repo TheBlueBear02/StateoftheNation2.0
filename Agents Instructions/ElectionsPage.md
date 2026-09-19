@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md), [DesignLanguage.md](./DesignLanguage.md), and [Database.md](./Database.md) for shared conventions and schema details.
 
-Frontend module for the 2026 elections. It has a party index at `/elections`, a party detail page at `/elections/[partyId]`, a list rating game at `/elections/lists`, and a password-gated candidate editor at `/elections/edit`.
+Frontend module for the 2026 elections. It has a party index at `/elections`, a party detail page at `/elections/[partyId]`, a list rating game at `/elections/lists`, a dream-government builder at `/elections/dream-government`, and a password-gated candidate editor at `/elections/edit`.
 
 ## Routes
 
@@ -11,12 +11,13 @@ Frontend module for the 2026 elections. It has a party index at `/elections`, a 
 | `/elections` | `src/views/ElectionsPage.tsx` | Cards for confirmed parties (`party_status = 'confirmed'`) |
 | `/elections/polls` | `src/views/ElectionsPollsPage.tsx` | Weighted poll averages, trend chart, poll table |
 | `/elections/lists` | `src/views/ElectionListsGamePage.tsx` | Client-only list rating game (green / orange / red) with fit score and share image |
+| `/elections/dream-government` | `src/views/DreamGovernmentPage.tsx` | Client-only dream cabinet builder (PM + 6 offices) with clipboard PNG share |
 | `/elections/edit` | `src/views/ElectionCandidatesEditPage.tsx` | Password-gated editor for existing candidate + person fields |
 | `/elections/[partyId]` | `src/views/ElectionPartyPage.tsx` | Detail page for one party, keyed by `election_parties.id` |
 
-App Router uses static segments (`edit`, `lists`, `polls`) under `src/app/elections/`; the dynamic party detail is `src/app/elections/[partyId]/page.tsx`. Public `page.tsx` wrappers own metadata, server-fetch Supabase data for SEO HTML, attach JSON-LD, and pass `initial*` props into the views in `src/views/…`.
+App Router uses static segments (`edit`, `lists`, `polls`, `dream-government`) under `src/app/elections/`; the dynamic party detail is `src/app/elections/[partyId]/page.tsx`. Public `page.tsx` wrappers own metadata, server-fetch Supabase data for SEO HTML, attach JSON-LD, and pass `initial*` props into the views in `src/views/…`.
 
-The homepage hero button **בחירות 2026** links to `/elections`. The homepage project section **משחק הרשימות** links to `/elections/lists`.
+The homepage hero button **בחירות 2026** links to `/elections`. The homepage project sections **משחק הרשימות** and **ממשלת החלומות** link to `/elections/lists` and `/elections/dream-government`.
 
 ## Files
 
@@ -25,12 +26,19 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/views/ElectionsPage.tsx` / `.css` | Party index page, party-card grid, and all-parties residence map |
 | `src/views/ElectionPartyPage.tsx` / `.css` | Party detail layout and section styles |
 | `src/views/ElectionListsGamePage.tsx` / `.css` | List rating game: pick party → rate candidates → fit report + share PNG |
+| `src/views/DreamGovernmentPage.tsx` / `.css` | Dream cabinet: pick PM + 6 ministers from party lists, then copy PNG to clipboard |
 | `src/views/ElectionCandidatesEditPage.tsx` / `.css` | Password gate, party picker, per-candidate edit forms, and party pipeline panel |
 | `src/components/elections/lists/ListPartyPicker.tsx` | Confirmed-party picker with full-bleed list-leader photo cards |
 | `src/components/elections/lists/ListRatingStep.tsx` | Tinder-style one-card rating deck with progress and action buttons |
 | `src/components/elections/lists/CandidateRateCard.tsx` | Full-bleed candidate swipe card (overlay details + pointer swipe) |
 | `src/components/elections/lists/ListFitReport.tsx` | Fit score report + download/share actions |
 | `src/components/elections/lists/ShareableListReport.tsx` | Fixed-size offscreen card for `html-to-image` PNG export |
+| `src/components/elections/dream/DreamOfficeSquare.tsx` | Empty (+) or filled office/PM square; office title above the portrait, person name under it, party logo overlaid on the bottom corner of the portrait |
+| `src/components/elections/dream/DreamOfficePickerModal.tsx` | 2-step modal: pick party → pick person from `useElectionCandidates` |
+| `src/components/elections/dream/ShareableGovernment.tsx` | Fixed-size offscreen cabinet card for clipboard PNG export |
+| `src/lib/dreamGovernmentOffices.ts` | PM + 6 minister office ids and Hebrew labels |
+| `src/lib/inlineImagesForExport.ts` | Clones the share card off-DOM, inlines `<img>` sources as data URLs, then `toPng` (avoids React resetting remote src mid-export) |
+| `src/app/api/image-proxy/route.ts` | Same-origin image proxy for share-export CORS. Allows **any** public http(s) image host (candidate photos live on many domains: Wikimedia, `raw.githubusercontent.com`, `fs.knesset.gov.il`, campaign sites, etc.) with an SSRF guard that blocks localhost and private/internal IPs (incl. DNS resolution) |
 | `src/lib/listFitScore.ts` | Position-weighted fit score and `realisticSeatBand` helpers |
 | `src/components/elections/PartyPipelinePanel.tsx` | Dev-only full pipeline UI for parties with 0–3 candidates |
 | `src/components/elections/EditablePartyPanel.tsx` | Collapsible party metadata editor on `/elections/edit` |
@@ -51,6 +59,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/components/elections/SeatsTrend.tsx` | Party-hero last-5-polls average + sparkline from `polls` / `poll_results` |
 | `src/components/elections/StatsBar.tsx` | Average age, % new MKs, and % women stat blocks |
 | `src/components/elections/ListsGamePromo.tsx` | Homepage-style lists-game teaser linking to `/elections/lists`; reused on `/elections/[partyId]` |
+| `src/components/elections/DreamGovernmentPromo.tsx` | Homepage / elections teaser linking to `/elections/dream-government` |
 | `src/components/elections/CandidateMap.tsx` | Public Israel map SVG with one projected dot per geocoded candidate |
 | `src/components/elections/ElectionsOverviewMap.tsx` | All-parties map on `/elections` with per-party color pins and checkbox filter (default: all parties) |
 | `src/components/elections/CandidateMapTooltip.tsx` | Fixed-position map tooltip matching the Knesset page style; lists all candidates in the hovered city (party name on overview map) |
@@ -63,7 +72,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 
 `/elections` and `/elections/[partyId]` Server Components call `fetchElectionParties` / `loadElectionPartyPage` (anon key) and pass results into the client views so party cards, descriptions, and candidate lists appear in the first HTML. Hooks skip the browser refetch when initial data is provided. `useAllElectionMapPins` on the index remains client-fetched after parties hydrate.
 
-`fetchElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר and הרשימה המשותפת (replacing separate חד״ש־תע״ל / בל״ד cards); יש עתיד, חד״ש־תע״ל, בל״ד, and נועם stay `polled_only` (still in polls, not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero has no subtitle; under the election date it links to `/elections/polls` (weighted poll averages) and `/elections/lists` (list rating game).
+`fetchElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר, הרשימה המשותפת (replacing separate חד״ש־תע״ל / בל״ד cards), עמך ישראל, and המילואימניקים; יש עתיד, חד״ש־תע״ל, בל״ד, and נועם stay `polled_only` (still in polls, not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero has no subtitle; under the election date it links to `/elections/polls` (weighted poll averages), `/elections/lists` (list rating game), and `/elections/dream-government` (dream cabinet). A `DreamGovernmentPromo` section also appears on `/elections` (above the overview map) and on the homepage after `ListsGamePromo`.
 
 `fetchElectionCandidates(client, partyId)` / `useElectionCandidates(partyId)` load ordered `election_candidates` joined to `people`. They then query `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merge overlapping terms with `computeMemberTenureStats`, and attach `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
 
@@ -95,6 +104,16 @@ Client-only game (no DB writes). Flow: **pick party → rate every candidate →
 6. **Realistic seats band** — `E = round(seatsAvg)` from the last 5 regular polls. Positions `E−1`, `E`, and `E+1` (clamped to `1…N`) mark the realistic zone on cards with a badge. No separate band summary text is shown above the deck.
 7. **Fit score** — position-weighted: green=1, orange=0.5, red=0; weight for position `p` is `N − p + 1`. Score = `round(100 × Σ(rating×weight) / Σ(weight))`.
 8. **Report / share** — single dark-blue card (`#0a1628`): white share icon (top-left) exports/shares a PNG; white site logo top-right; fit score and rating counts centered in white at the top; candidates in list order as small portrait cards (same 3∶4.2 ratio as the swipe cards) with green/orange/red borders, a list-position badge on each card, and no names. The portrait grid uses `direction: ltr` so place 1 starts on the left and continues left-to-right (rows wrap naturally). Below the card: centered **בחר מפלגה אחרת** and a Hebrew note explaining the weighted score (green=1, orange=0.5, red=0; higher list positions weigh more; 0–100).
+
+## Dream Government (`/elections/dream-government`)
+
+Client-only interactive page (no DB writes). Users build a personal dream cabinet from confirmed parties' candidate lists, then copy a share image to the clipboard.
+
+1. **Layout** — page header with title `ממשלת החלומות שלי`, subtitle explaining picks from Knesset candidates, breadcrumb `בחירות 2026 / ממשלת החלומות`. The interactive cabinet lives inside a dark report card matching the lists-game fit report (`#0a1628`, 12px radius): white site logo top-right, share icon top-left, centered card heading (`ממשלת החלומות שלי` only — no `בחירות 2026` subtitle), then a PM portrait (same size as ministers) above a responsive grid of 6 minister portraits.
+2. **Offices** — defined in `src/lib/dreamGovernmentOffices.ts`: `ראש/ת הממשלה`, then `שר/ת הביטחון`, `שר/ת החוץ`, `שר/ת האוצר`, `שר/ת המשפטים`, `שר/ת החינוך`, `שר/ת לביטחון לאומי`. PM is fully selectable (7 picks total).
+3. **Empty / filled portraits** — slots use the same 3∶4.2 rounded portrait ratio as the lists report. Empty slots are dashed with a muted `+`. After a pick, the slot shows the candidate photo (or initials). The office title sits **above** the portrait; the person name sits under it. The party logo overlays the **bottom corner** of the portrait (white padded badge) instead of a party name line. Clicking a filled slot reopens the picker. The same person may be chosen for multiple offices (no dedup).
+4. **Picker modal** — 2 steps: (a) party grid from `useElectionParties` (parties without a list leader disabled, same visual language as the lists-game picker); (b) person list from `useElectionCandidates(partyId)` with list position, photo, and name. Escape / backdrop / close button dismiss; back returns to the party step.
+5. **Share** — white share icon on the dark card (disabled until at least one office is filled). Export uses `exportNodeToPng`: clones the offscreen card, routes **every** cross-origin portrait through `/api/image-proxy` (no client-side host allowlist; keeps jpeg/png/webp data URLs as-is; rasterizes the SVG logo to PNG with explicit size), embeds Heebo via `getFontEmbedCSS`, retries `toPng` at `pixelRatio` 2 then 1, then copies the PNG to the clipboard (download fallback). Share card is fixed **1080×1350 (Instagram 4∶5 feed post)** so the export is social-ready without cropping; PM and all ministers use the same portrait size (~220×308) with enough bottom padding so person names on the last row are never clipped. Notes: same-origin/localhost URLs are **not** upgraded http→https (otherwise the dev logo would be misrouted to the proxy); images already inlined as data URLs are never dropped even if `decode()` times out.
 
 ## Candidate Edit Page (`/elections/edit`)
 

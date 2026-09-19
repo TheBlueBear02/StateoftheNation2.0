@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from './components/SiteLayout'
 import { ListsGamePromo } from './components/elections/ListsGamePromo'
+import { DreamGovernmentPromo } from './components/elections/DreamGovernmentPromo'
 import { useSiteUpdates } from './hooks/useSiteUpdates'
 
 const HERO_BUTTONS = [
@@ -145,6 +146,8 @@ function App() {
         ) : null}
 
         <ListsGamePromo />
+
+        <DreamGovernmentPromo />
 
         <section
           id="mandate-polls"
