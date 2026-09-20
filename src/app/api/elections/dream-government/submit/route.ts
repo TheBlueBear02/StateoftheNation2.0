@@ -144,7 +144,8 @@ export async function POST(request: NextRequest) {
       candidate_id: pick.candidateId,
       person_id: candidate.person_id as number,
       party_id: candidate.party_id as number,
-      updated_at: new Date().toISOString(),
+      // `updated_at` is stamped in Postgres as Asia/Jerusalem local time
+      // (BEFORE INSERT / BEFORE UPDATE triggers). Do not send UTC here.
     }
   })
 

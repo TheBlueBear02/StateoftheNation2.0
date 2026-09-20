@@ -12,6 +12,7 @@ Frontend module for the 2026 elections. It has a party index at `/elections`, a 
 | `/elections/polls` | `src/views/ElectionsPollsPage.tsx` | Weighted poll averages, trend chart, poll table |
 | `/elections/lists` | `src/views/ElectionListsGamePage.tsx` | Client-only list rating game (green / orange / red) with fit score and share image |
 | `/elections/dream-government` | `src/views/DreamGovernmentPage.tsx` | Dream cabinet builder (PM + 6 offices), clipboard PNG share, site-wide pick % badges |
+| `/elections/dream-government/dashboard` | `src/views/DreamGovernmentDashboardPage.tsx` | Dev-only ops dashboard: unique voters, daily activity, per-office leaderboards |
 | `/elections/edit` | `src/views/ElectionCandidatesEditPage.tsx` | Password-gated editor for existing candidate + person fields |
 | `/elections/[partyId]` | `src/views/ElectionPartyPage.tsx` | Detail page for one party, keyed by `election_parties.id` |
 
@@ -27,6 +28,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/views/ElectionPartyPage.tsx` / `.css` | Party detail layout and section styles |
 | `src/views/ElectionListsGamePage.tsx` / `.css` | List rating game: pick party → rate candidates → fit report + share PNG |
 | `src/views/DreamGovernmentPage.tsx` / `.css` | Dream cabinet: pick PM + 6 ministers, share PNG, show site-wide pick % badges |
+| `src/views/DreamGovernmentDashboardPage.tsx` / `.css` | Dev-only dashboard: unique voters, 30-day activity chart, per-office leaderboards |
 | `src/views/ElectionCandidatesEditPage.tsx` / `.css` | Password gate, party picker, per-candidate edit forms, and party pipeline panel |
 | `src/components/elections/lists/ListPartyPicker.tsx` | Confirmed-party picker with full-bleed list-leader photo cards |
 | `src/components/elections/lists/ListRatingStep.tsx` | Tinder-style one-card rating deck with progress and action buttons |
@@ -36,12 +38,17 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/components/elections/dream/DreamOfficeSquare.tsx` | Empty (+) or filled office/PM square; circular bottom-left % badge colored by popularity band |
 | `src/components/elections/dream/DreamOfficePickerModal.tsx` | 2-step modal: pick party → pick person from `useElectionCandidates` |
 | `src/components/elections/dream/ShareableGovernment.tsx` | Fixed-size offscreen cabinet card for clipboard PNG export (includes circular % badges on filled seats) |
+| `src/components/elections/dream/DreamLeadersPoster.tsx` | Dashboard poster: top-3 leaders per office with % badges (share-card visual language) |
+| `src/components/elections/dream/DreamActivityChart.tsx` | SVG bar chart of unique daily sharers for the dream-gov dashboard |
 | `src/lib/dreamGovernmentOffices.ts` | PM + 6 minister office ids, neutral/male/female Hebrew labels, `getDreamOfficeLabel` |
 | `src/lib/dreamGovClientId.ts` | Anonymous UUID in `localStorage` (`dream-gov-client-id`) for share upserts |
 | `src/lib/fetchDreamCabinetStats.ts` | Stats GET + submit POST helpers; `getDreamPickPercentage` |
+| `src/lib/fetchDreamCabinetDashboard.ts` | Dev dashboard payload builder + GET helper (leaderboards, unique voters, daily activity) |
 | `src/hooks/useDreamCabinetStats.ts` | Loads / refetches dream pick aggregates |
+| `src/hooks/useDreamCabinetDashboard.ts` | Loads / refetches dream-gov dashboard aggregates (dev only) |
 | `src/app/api/elections/dream-government/submit/route.ts` | Public upsert of filled seats (service role; no edit secret) |
 | `src/app/api/elections/dream-government/stats/route.ts` | Public aggregate GET via `get_dream_cabinet_pick_stats` RPC |
+| `src/app/api/elections/dream-government/dashboard/route.ts` | Dev-only dashboard GET (service role; unique voters + activity + leaderboards) |
 | `src/lib/inlineImagesForExport.ts` | Clones the share card off-DOM, inlines `<img>` sources as data URLs, then `toPng` (avoids React resetting remote src mid-export) |
 | `src/app/api/image-proxy/route.ts` | Same-origin image proxy for share-export CORS. Allows **any** public http(s) image host (candidate photos live on many domains: Wikimedia, `raw.githubusercontent.com`, `fs.knesset.gov.il`, campaign sites, etc.) with an SSRF guard that blocks localhost and private/internal IPs (incl. DNS resolution) |
 | `src/lib/listFitScore.ts` | Position-weighted fit score and `realisticSeatBand` helpers |
@@ -132,6 +139,17 @@ Interactive dream cabinet builder. Users pick PM + 6 ministers from confirmed pa
 | `src/hooks/useDreamCabinetStats.ts` | Load/refetch site aggregates; `applyLocalPicks` for instant post-share bars |
 | `src/app/api/elections/dream-government/submit/route.ts` | Public upsert (service role) |
 | `src/app/api/elections/dream-government/stats/route.ts` | Public aggregate GET (service role RPC) |
+| `src/app/api/elections/dream-government/dashboard/route.ts` | Dev-only dashboard GET (unique voters, daily activity, enriched leaderboards) |
+| `src/views/DreamGovernmentDashboardPage.tsx` | Dev-only UI at `/elections/dream-government/dashboard` (`notFound` when `NODE_ENV !== 'development'`) |
+
+## Dream Government Dashboard (`/elections/dream-government/dashboard`)
+
+Dev-only ops view (`isDev` / `NODE_ENV === 'development'`). Production builds return 404; the API returns 403. Open directly at `/elections/dream-government/dashboard` while running `npm run dev`. `noindex`, excluded from sitemap, disallowed in `robots.ts`.
+
+1. **KPIs** — unique `client_id` count across `dream_cabinet_picks`, plus total active pick rows.
+2. **Activity chart** — last 30 Israel-calendar days; bars = unique clients who updated any pick that day (`updated_at`, stored as Israel local wall-clock); tooltip also shows pick-write count.
+3. **Per-office leaderboards** — top 10 candidates by pick count for each dream office (name, photo, party, %, count), using `get_dream_cabinet_pick_stats` + candidate/person/party joins.
+4. **Leaders poster** — bottom visual (`DreamLeadersPoster`) matching the share-card look (dark topographic bg, logo, % popularity badges): PM + 6 minister offices, each showing top 3 candidates in podium order (2nd · 1st · 3rd) with the #1 centered and slightly larger; rank chip, portrait, name, party, and %. Top-left white share icon exports a PNG via `exportNodeToPng` (clipboard copy, download fallback); the button sits outside the export node so it is not in the image. Export pins the clone to the on-screen pixel width so `width: 100%` does not expand to the viewport (avoids empty side gutters).
 
 ## Candidate Edit Page (`/elections/edit`)
 

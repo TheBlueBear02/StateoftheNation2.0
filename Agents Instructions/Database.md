@@ -394,15 +394,15 @@ Anonymous per-seat votes from `/elections/dream-government`. One current pick pe
 | `candidate_id` | bigint | FK → `election_candidates.id` |
 | `person_id` | bigint | FK → `people.id` (denormalized from candidate) |
 | `party_id` | bigint | FK → `election_parties.id` (denormalized from candidate) |
-| `updated_at` | timestamptz | Last upsert time |
+| `updated_at` | timestamp (no tz) | Last upsert time as **Israel local wall-clock** (`Asia/Jerusalem`, DST-aware). Set by DB triggers — not by the API. |
 
 **Unique:** `(election_id, client_id, office_id)` — re-share updates the same browser’s vote for that seat.
 
-**Schema file:** `Layer 1 - Gathering Data/schema_dream_cabinet_picks.sql` (apply in Supabase SQL editor).
+**Schema file:** `Layer 1 - Gathering Data/schema_dream_cabinet_picks.sql` (apply in Supabase SQL editor). If the table already exists with `timestamptz`, run the migration block at the bottom of that file (convert via `timezone('Asia/Jerusalem', updated_at)`), then re-apply the INSERT/UPDATE triggers.
 
 **RLS:** enabled with **no** anon/authenticated policies on the base table (hides `client_id`). Writes via service role from `POST /api/elections/dream-government/submit`. Aggregates via security-definer RPC `get_dream_cabinet_pick_stats(p_election_id)` (executable by anon; also used by `GET /api/elections/dream-government/stats` with the service key).
 
-**API:** public Next routes under `src/app/api/elections/dream-government/` (no edit secret).
+**API:** public Next routes under `src/app/api/elections/dream-government/` for submit + stats (no edit secret). Dev-only dashboard at `GET /api/elections/dream-government/dashboard` (`NODE_ENV=development`) reads the base table via service role for unique voters and daily activity.
 
 ---
 

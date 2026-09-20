@@ -78,6 +78,7 @@ StateoftheNation2.0/
 | `/elections/edit` | `src/app/elections/edit/page.tsx` |
 | `/elections/lists` | `src/app/elections/lists/page.tsx` |
 | `/elections/dream-government` | `src/app/elections/dream-government/page.tsx` |
+| `/elections/dream-government/dashboard` | `src/app/elections/dream-government/dashboard/page.tsx` (dev-only) |
 | `/elections/[partyId]` | `src/app/elections/[partyId]/page.tsx` |
 | `/government` | `src/app/government/page.tsx` |
 | `/knesset` | `src/app/knesset/page.tsx` |
@@ -88,6 +89,7 @@ StateoftheNation2.0/
 | `/api/elections/[...path]` | Local-dev pipeline / edit API |
 | `/api/elections/dream-government/submit` | Public dream-gov pick upsert (service role) |
 | `/api/elections/dream-government/stats` | Public dream-gov pick aggregates |
+| `/api/elections/dream-government/dashboard` | Dev-only dream-gov dashboard aggregates |
 | `/api/knesset/[...path]` | Local-dev pipeline / faction API |
 | `/api/polls/[...path]` | Local-dev polls pipeline API |
 | `/sitemap.xml` | `src/app/sitemap.ts` |
