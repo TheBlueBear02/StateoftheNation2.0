@@ -18,12 +18,17 @@ import {
   markDreamGovernmentShared,
 } from '../lib/dreamGovClientId'
 import {
+  loadDreamGovPicksFromCookie,
+  saveDreamGovPicksToCookie,
+} from '../lib/dreamGovPicksCookie'
+import {
   DREAM_ALL_OFFICES,
   DREAM_MINISTER_OFFICES,
   DREAM_PM_OFFICE,
   type DreamOffice,
   type DreamOfficeId,
 } from '../lib/dreamGovernmentOffices'
+import { fetchElectionCandidates } from '../lib/fetchElectionCandidates'
 import {
   getDreamPickStatForDisplay,
   submitDreamCabinetPicks,
@@ -34,6 +39,7 @@ import {
   mockDreamPickStat,
 } from '../lib/dreamGovMockStats'
 import { exportNodeToPng } from '../lib/inlineImagesForExport'
+import { supabase } from '../lib/supabase'
 import './DreamGovernmentPage.css'
 
 function downloadDataUrl(dataUrl: string, filename: string) {
@@ -75,6 +81,7 @@ export function DreamGovernmentPage() {
   const [selections, setSelections] = useState<
     Partial<Record<DreamOfficeId, DreamOfficeSelection>>
   >({})
+  const [picksReady, setPicksReady] = useState(false)
   const [activeOffice, setActiveOffice] = useState<DreamOffice | null>(null)
   const [exporting, setExporting] = useState(false)
   const [copiedFlash, setCopiedFlash] = useState(false)
@@ -96,6 +103,64 @@ export function DreamGovernmentPage() {
     }
     setShowPickStats(hasSharedDreamGovernment())
   }, [])
+
+  // Restore cabinet picks from cookie once party list is available.
+  useEffect(() => {
+    if (picksReady) return
+    if (partiesLoading) return
+    if (partiesError) {
+      setPicksReady(true)
+      return
+    }
+
+    const stored = loadDreamGovPicksFromCookie()
+    if (stored.length === 0 || !supabase) {
+      setPicksReady(true)
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      const partyIds = [...new Set(stored.map((pick) => pick.partyId))]
+      const candidatesByParty = new Map<
+        number,
+        Awaited<ReturnType<typeof fetchElectionCandidates>>['candidates']
+      >()
+
+      await Promise.all(
+        partyIds.map(async (partyId) => {
+          const result = await fetchElectionCandidates(supabase, partyId)
+          candidatesByParty.set(partyId, result.candidates)
+        }),
+      )
+
+      if (cancelled) return
+
+      const next: Partial<Record<DreamOfficeId, DreamOfficeSelection>> = {}
+      for (const pick of stored) {
+        const party = parties.find((row) => row.id === pick.partyId)
+        const candidate = candidatesByParty
+          .get(pick.partyId)
+          ?.find((row) => row.id === pick.candidateId)
+        if (!party || !candidate) continue
+        next[pick.officeId] = { candidate, party }
+      }
+
+      setSelections(next)
+      setPicksReady(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [parties, partiesError, partiesLoading, picksReady])
+
+  // Persist picks to cookie after hydration (and on every later change).
+  useEffect(() => {
+    if (!picksReady) return
+    saveDreamGovPicksToCookie(selections)
+  }, [selections, picksReady])
 
   const pickStatFor = (officeId: DreamOfficeId) => {
     if (!showPickStats) return null
