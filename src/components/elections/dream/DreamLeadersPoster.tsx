@@ -12,6 +12,7 @@ import type {
   DreamDashboardOfficeBoard,
 } from '../../../lib/fetchDreamCabinetDashboard'
 import { exportNodeToPng } from '../../../lib/inlineImagesForExport'
+import { sharePngImage } from '../../../lib/sharePngImage'
 import { getDreamPickPopularity } from './DreamOfficeSquare'
 
 const TOP_N = 3
@@ -19,32 +20,6 @@ const TOP_N = 3
 type DreamLeadersPosterProps = {
   offices: DreamDashboardOfficeBoard[]
   uniqueVoters: number
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement('a')
-  link.download = filename
-  link.href = dataUrl
-  link.click()
-}
-
-async function copyImageToClipboard(blob: Blob): Promise<boolean> {
-  if (
-    typeof navigator === 'undefined' ||
-    !navigator.clipboard ||
-    typeof ClipboardItem === 'undefined'
-  ) {
-    return false
-  }
-
-  try {
-    await navigator.clipboard.write([
-      new ClipboardItem({ 'image/png': blob }),
-    ])
-    return true
-  } catch {
-    return false
-  }
 }
 
 export function DreamLeadersPoster({
@@ -74,22 +49,28 @@ export function DreamLeadersPoster({
     setShareError(null)
 
     try {
-      const dataUrl = await exportNodeToPng(node, {
-        pixelRatio: 2,
-        backgroundColor: '#040a14',
-        skipAutoScale: true,
+      const shareResult = await sharePngImage({
+        filename: 'dream-government-leaders.png',
+        shareTitle: 'המובילים בממשלת החלומות · מצב האומה',
+        shareText: 'שלושת המועמדים המובילים בכל משרד',
+        makeBlob: async () => {
+          const dataUrl = await exportNodeToPng(node, {
+            pixelRatio: 2,
+            backgroundColor: '#040a14',
+            skipAutoScale: true,
+          })
+          const response = await fetch(dataUrl)
+          return response.blob()
+        },
       })
-      const response = await fetch(dataUrl)
-      const blob = await response.blob()
-      if (blob.size < 100) {
-        throw new Error('Exported image was empty')
-      }
-      const copied = await copyImageToClipboard(blob)
 
-      if (copied) {
+      if (!shareResult.ok) {
+        throw new Error(shareResult.error)
+      }
+
+      if (shareResult.method === 'clipboard') {
         setCopiedFlash(true)
-      } else {
-        downloadDataUrl(dataUrl, 'dream-government-leaders.png')
+      } else if (shareResult.method === 'download') {
         setShareError('התמונה הורדה — העלו אותה לרשת החברתית')
       }
     } catch (error) {

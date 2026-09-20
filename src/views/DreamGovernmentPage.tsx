@@ -39,34 +39,9 @@ import {
   mockDreamPickStat,
 } from '../lib/dreamGovMockStats'
 import { exportNodeToPng } from '../lib/inlineImagesForExport'
+import { sharePngImage } from '../lib/sharePngImage'
 import { supabase } from '../lib/supabase'
 import './DreamGovernmentPage.css'
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement('a')
-  link.download = filename
-  link.href = dataUrl
-  link.click()
-}
-
-async function copyImageToClipboard(blob: Blob): Promise<boolean> {
-  if (
-    typeof navigator === 'undefined' ||
-    !navigator.clipboard ||
-    typeof ClipboardItem === 'undefined'
-  ) {
-    return false
-  }
-
-  try {
-    await navigator.clipboard.write([
-      new ClipboardItem({ 'image/png': blob }),
-    ])
-    return true
-  } catch {
-    return false
-  }
-}
 
 export function DreamGovernmentPage() {
   const { parties, loading: partiesLoading, error: partiesError } =
@@ -238,24 +213,31 @@ export function DreamGovernmentPage() {
         })
       }
 
-      // Clone + inline off-DOM so React re-renders (setExporting) cannot
-      // reset portrait <img src> back to remote URLs mid-export.
-      const dataUrl = await exportNodeToPng(node, {
-        pixelRatio: 2,
-        backgroundColor: '#040a14',
-        skipAutoScale: true,
+      // Safari/iOS: start clipboard.write in this gesture turn with a
+      // Promise<Blob> (export runs inside the promise). Falls back to Web
+      // Share / download when clipboard image write is unavailable.
+      const shareResult = await sharePngImage({
+        filename: 'dream-government.png',
+        shareTitle: 'ממשלת החלומות · מצב האומה',
+        shareText: 'הרכיבו גם את ממשלת החלומות שלכם',
+        makeBlob: async () => {
+          const dataUrl = await exportNodeToPng(node, {
+            pixelRatio: 2,
+            backgroundColor: '#040a14',
+            skipAutoScale: true,
+          })
+          const response = await fetch(dataUrl)
+          return response.blob()
+        },
       })
-      const response = await fetch(dataUrl)
-      const blob = await response.blob()
-      if (blob.size < 100) {
-        throw new Error('Exported image was empty')
-      }
-      const copied = await copyImageToClipboard(blob)
 
-      if (copied) {
+      if (!shareResult.ok) {
+        throw new Error(shareResult.error)
+      }
+
+      if (shareResult.method === 'clipboard') {
         setCopiedFlash(true)
-      } else {
-        downloadDataUrl(dataUrl, 'dream-government.png')
+      } else if (shareResult.method === 'download') {
         setShareError('התמונה הורדה — העלו אותה לרשת החברתית')
       }
 
