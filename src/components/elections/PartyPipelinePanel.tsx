@@ -117,7 +117,7 @@ export function PartyPipelinePanel({
     for (let stage = fromStage; stage <= 6; stage += 1) {
       progress.beginStep(stage)
 
-      const result = await runPartyPipelineStage(stage)
+      const result = await runPartyPipelineStage(stage, party.id)
       if (!result.ok) {
         progress.finishStep(stage)
         setPhase('error')

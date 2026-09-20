@@ -118,12 +118,13 @@ export function DreamGovernmentPage() {
     for (const office of DREAM_ALL_OFFICES) {
       const selection = selections[office.id]
       if (!selection) continue
-      next[office.id] = USE_DREAM_GOV_MOCK_STATS
+      const stat = USE_DREAM_GOV_MOCK_STATS
         ? mockDreamPickStat(mockPercentages[office.id])
         : getDreamPickStatForDisplay(
             stats.offices[office.id],
             selection.candidate.id,
           )
+      if (stat) next[office.id] = stat
     }
     return next
   }, [selections, stats, mockPercentages])

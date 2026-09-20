@@ -72,18 +72,24 @@ def get_election_id(sb: Client, year: int = 2026) -> int:
     return rows[0]["id"]
 
 
-def load_candidates_without_wikipedia(sb: Client, election_id: int) -> list[dict]:
+def load_candidates_without_wikipedia(
+    sb: Client,
+    election_id: int,
+    party_id: int | None = None,
+) -> list[dict]:
     """
     Returns people rows (id, full_name) for election candidates
     who are missing wikipedia_url.
     """
-    ec_rows = (
+    query = (
         sb.table("election_candidates")
         .select("person_id")
         .eq("election_id", election_id)
-        .execute()
-        .data
     )
+    if party_id is not None:
+        query = query.eq("party_id", party_id)
+
+    ec_rows = query.execute().data
     if not ec_rows:
         log.info("No election candidates found.")
         return []
@@ -138,9 +144,11 @@ def sparql_query(names: list[str]) -> dict[str, str]:
         return {}
 
 
-def run(sb: Client, dry_run: bool) -> None:
+def run(sb: Client, dry_run: bool, party_id: int | None = None) -> None:
     election_id = get_election_id(sb)
-    candidates  = load_candidates_without_wikipedia(sb, election_id)
+    candidates  = load_candidates_without_wikipedia(
+        sb, election_id, party_id=party_id,
+    )
 
     if not candidates:
         log.info("Nothing to do.")
@@ -194,10 +202,11 @@ def main():
         description="Fetch Hebrew Wikipedia URLs from Wikidata for election candidates"
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--party-id", type=int, default=None)
     args = parser.parse_args()
 
     sb = get_supabase()
-    run(sb, args.dry_run)
+    run(sb, args.dry_run, party_id=args.party_id)
 
 
 if __name__ == "__main__":

@@ -77,21 +77,15 @@ export function getDreamPickStat(
 }
 
 /**
- * After share unlock, always return a bar for a filled seat.
- * If aggregates are empty/unavailable (or this pick is not in them yet),
- * show this browser's pick as 100% of 1 until a refetch arrives.
+ * Display stat for a filled seat after share unlock.
+ * Returns null when this office has no aggregate votes yet (do not invent 100%).
+ * A sole voter who shared that candidate still correctly sees 100% from real totals.
  */
 export function getDreamPickStatForDisplay(
   officeStats: DreamCabinetOfficeStats | undefined,
   candidateId: number,
-): { percentage: number; total: number; count: number } {
-  return (
-    getDreamPickStat(officeStats, candidateId) ?? {
-      percentage: 100,
-      total: 1,
-      count: 1,
-    }
-  )
+): { percentage: number; total: number; count: number } | null {
+  return getDreamPickStat(officeStats, candidateId)
 }
 
 /** Merge the current browser's shared picks into aggregates for instant UI. */
