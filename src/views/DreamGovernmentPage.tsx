@@ -238,7 +238,9 @@ export function DreamGovernmentPage() {
       if (shareResult.method === 'clipboard') {
         setCopiedFlash(true)
       } else if (shareResult.method === 'download') {
-        setShareError('התמונה הורדה — העלו אותה לרשת החברתית')
+        setShareError(
+          'התמונה נפתחה או הורדה — במובייל לחצו לחיצה ארוכה כדי לשתף או לשמור',
+        )
       }
 
       markDreamGovernmentShared()

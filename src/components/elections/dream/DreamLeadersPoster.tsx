@@ -71,7 +71,9 @@ export function DreamLeadersPoster({
       if (shareResult.method === 'clipboard') {
         setCopiedFlash(true)
       } else if (shareResult.method === 'download') {
-        setShareError('התמונה הורדה — העלו אותה לרשת החברתית')
+        setShareError(
+          'התמונה נפתחה או הורדה — במובייל לחצו לחיצה ארוכה כדי לשתף או לשמור',
+        )
       }
     } catch (error) {
       console.error('[dream-government] leaders poster export failed', error)

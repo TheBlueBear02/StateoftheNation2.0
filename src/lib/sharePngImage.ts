@@ -31,14 +31,105 @@ function asPngBlob(blob: Blob): Blob {
   return new Blob([blob], { type: 'image/png' })
 }
 
+function isLikelyMobile(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  if (/Android|iPhone|iPad|iPod|Mobile|SamsungBrowser/i.test(ua)) {
+    return true
+  }
+  try {
+    return window.matchMedia('(pointer: coarse)').matches
+  } catch {
+    return false
+  }
+}
+
+/** Android / Samsung Internet: clipboard images are unreliable — prefer Web Share. */
+function prefersNativeFileShare(): boolean {
+  if (typeof navigator === 'undefined') return false
+  if (typeof navigator.share !== 'function') return false
+  const ua = navigator.userAgent || ''
+  return /Android|SamsungBrowser/i.test(ua) || isLikelyMobile()
+}
+
+function canUseClipboardImageWrite(): boolean {
+  return (
+    typeof navigator !== 'undefined' &&
+    Boolean(navigator.clipboard) &&
+    typeof navigator.clipboard.write === 'function' &&
+    typeof ClipboardItem !== 'undefined'
+  )
+}
+
+async function tryNativeFileShare(
+  blob: Blob,
+  filename: string,
+  shareTitle?: string,
+  shareText?: string,
+): Promise<'shared' | 'aborted' | 'unsupported' | 'blocked'> {
+  if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') {
+    return 'unsupported'
+  }
+
+  const file = new File([blob], filename, { type: 'image/png' })
+  const payload = {
+    files: [file],
+    ...(shareTitle ? { title: shareTitle } : {}),
+    ...(shareText ? { text: shareText } : {}),
+  }
+
+  // Soft check only — Samsung Internet sometimes reports canShare=false
+  // even though share({ files }) works.
+  if (typeof navigator.canShare === 'function') {
+    try {
+      const allowed =
+        navigator.canShare({ files: [file] }) || navigator.canShare(payload)
+      if (!allowed) {
+        // Still attempt share() below.
+      }
+    } catch {
+      // continue to share()
+    }
+  }
+
+  try {
+    await navigator.share(payload)
+    return 'shared'
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return 'aborted'
+    }
+    if (error instanceof DOMException && error.name === 'NotAllowedError') {
+      return 'blocked'
+    }
+    return 'unsupported'
+  }
+}
+
+/**
+ * Open the PNG so the user can long-press → Share / Save (mobile fallback).
+ */
+function openBlobInNewTab(blob: Blob): boolean {
+  try {
+    const url = URL.createObjectURL(blob)
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    // Revoke later so the tab has time to load.
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    return Boolean(opened)
+  } catch {
+    return false
+  }
+}
+
 /**
  * Copy / share a PNG that is built asynchronously.
  *
- * Safari / iOS WebKit drop user-activation if you `await` export work *before*
- * calling `navigator.clipboard.write`. Pass a `Promise<Blob>` into
- * `ClipboardItem` and invoke `write()` in the same turn as the click instead.
- *
- * Fallback order: clipboard → Web Share (files) → download.
+ * - **iOS Safari:** `clipboard.write` must start in the click turn with a
+ *   `Promise<Blob>` inside `ClipboardItem` (export runs inside the promise).
+ * - **Android / Samsung Internet:** image clipboard is unreliable; prefer the
+ *   native share sheet. Trying clipboard first can consume the user gesture
+ *   and then block `navigator.share`.
+ * - Fallback: open image tab (long-press share) → `<a download>`.
  */
 export async function sharePngImage(options: {
   makeBlob: () => Promise<Blob>
@@ -47,6 +138,7 @@ export async function sharePngImage(options: {
   shareText?: string
 }): Promise<SharePngResult> {
   const { makeBlob, filename, shareTitle, shareText } = options
+  const preferShare = prefersNativeFileShare()
 
   let blobPromise: Promise<Blob> | null = null
   const getBlob = () => {
@@ -62,45 +154,46 @@ export async function sharePngImage(options: {
     return blobPromise
   }
 
-  if (
-    typeof navigator !== 'undefined' &&
-    navigator.clipboard &&
-    typeof navigator.clipboard.write === 'function' &&
-    typeof ClipboardItem !== 'undefined'
-  ) {
+  // Desktop / iOS: try clipboard first (Safari-safe Promise form).
+  if (!preferShare && canUseClipboardImageWrite()) {
     try {
-      // Critical: construct ClipboardItem + call write() without awaiting
-      // makeBlob first — Safari needs this inside the user-gesture turn.
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': getBlob() }),
       ])
       return { ok: true, method: 'clipboard' }
     } catch {
-      // Clipboard image write unsupported or activation lost — try share/download.
+      // Fall through to share / download.
     }
   }
 
   try {
     const blob = await getBlob()
-    const file = new File([blob], filename, { type: 'image/png' })
 
-    if (
-      typeof navigator !== 'undefined' &&
-      typeof navigator.canShare === 'function' &&
-      navigator.canShare({ files: [file] })
-    ) {
+    const shareResult = await tryNativeFileShare(
+      blob,
+      filename,
+      shareTitle,
+      shareText,
+    )
+    if (shareResult === 'shared' || shareResult === 'aborted') {
+      return { ok: true, method: 'share' }
+    }
+
+    // Desktop leftover path: clipboard after share unsupported.
+    if (!preferShare && canUseClipboardImageWrite()) {
       try {
-        await navigator.share({
-          files: [file],
-          ...(shareTitle ? { title: shareTitle } : {}),
-          ...(shareText ? { text: shareText } : {}),
-        })
-        return { ok: true, method: 'share' }
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return { ok: true, method: 'share' }
-        }
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob }),
+        ])
+        return { ok: true, method: 'clipboard' }
+      } catch {
+        // continue
       }
+    }
+
+    // Mobile: opening the image is more useful than a silent <a download>.
+    if (preferShare && openBlobInNewTab(blob)) {
+      return { ok: true, method: 'download' }
     }
 
     const dataUrl = await blobToDataUrl(blob)
