@@ -114,7 +114,8 @@ export function DreamGovernmentPage() {
     }
 
     const stored = loadDreamGovPicksFromCookie()
-    if (stored.length === 0 || !supabase) {
+    const client = supabase
+    if (stored.length === 0 || !client) {
       setPicksReady(true)
       return
     }
@@ -130,7 +131,7 @@ export function DreamGovernmentPage() {
 
       await Promise.all(
         partyIds.map(async (partyId) => {
-          const result = await fetchElectionCandidates(supabase, partyId)
+          const result = await fetchElectionCandidates(client, partyId)
           candidatesByParty.set(partyId, result.candidates)
         }),
       )
