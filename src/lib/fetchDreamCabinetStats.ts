@@ -17,6 +17,11 @@ export type DreamCabinetStatsRpcRow = {
   pick_count: number | string
 }
 
+export type DreamCabinetSubmitPick = {
+  officeId: DreamOfficeId
+  candidateId: number
+}
+
 export function emptyDreamCabinetStats(
   electionId: number | null = null,
 ): DreamCabinetStats {
@@ -71,6 +76,52 @@ export function getDreamPickStat(
   }
 }
 
+/**
+ * After share unlock, always return a bar for a filled seat.
+ * If aggregates are empty/unavailable (or this pick is not in them yet),
+ * show this browser's pick as 100% of 1 until a refetch arrives.
+ */
+export function getDreamPickStatForDisplay(
+  officeStats: DreamCabinetOfficeStats | undefined,
+  candidateId: number,
+): { percentage: number; total: number; count: number } {
+  return (
+    getDreamPickStat(officeStats, candidateId) ?? {
+      percentage: 100,
+      total: 1,
+      count: 1,
+    }
+  )
+}
+
+/** Merge the current browser's shared picks into aggregates for instant UI. */
+export function mergeLocalPicksIntoStats(
+  stats: DreamCabinetStats,
+  picks: DreamCabinetSubmitPick[],
+): DreamCabinetStats {
+  const next = emptyDreamCabinetStats(stats.electionId)
+
+  for (const office of DREAM_ALL_OFFICES) {
+    const incoming = stats.offices[office.id]
+    next.offices[office.id] = {
+      total: incoming.total,
+      byCandidate: { ...incoming.byCandidate },
+    }
+  }
+
+  for (const pick of picks) {
+    const office = next.offices[pick.officeId]
+    if (!office) continue
+    const prev = office.byCandidate[pick.candidateId] ?? 0
+    if (prev <= 0) {
+      office.byCandidate[pick.candidateId] = 1
+      office.total += 1
+    }
+  }
+
+  return next
+}
+
 /** Load aggregates via public Next API (service-role RPC under the hood). */
 export async function fetchDreamCabinetStats(
   electionId?: number | null,
@@ -114,11 +165,6 @@ export async function fetchDreamCabinetStats(
   }
 
   return base
-}
-
-export type DreamCabinetSubmitPick = {
-  officeId: DreamOfficeId
-  candidateId: number
 }
 
 export async function submitDreamCabinetPicks(input: {

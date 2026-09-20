@@ -17,11 +17,23 @@ export type DreamOfficePickStat = {
   count: number
 }
 
+/** Popularity band for % badge color (site-wide pick share). */
+export type DreamPickPopularity = 'low' | 'mid' | 'high' | 'top'
+
+export function getDreamPickPopularity(
+  percentage: number,
+): DreamPickPopularity {
+  if (percentage >= 75) return 'top'
+  if (percentage >= 50) return 'high'
+  if (percentage >= 25) return 'mid'
+  return 'low'
+}
+
 type DreamOfficeSquareProps = {
   office: DreamOffice
   selection: DreamOfficeSelection | null
   onClick: () => void
-  /** Site-wide share stat for the selected candidate; null = hide bar. */
+  /** Site-wide share stat for the selected candidate; null = hide %. */
   pickStat?: DreamOfficePickStat | null
 }
 
@@ -36,10 +48,11 @@ export function DreamOfficeSquare({
     office,
     selection?.candidate.gender,
   )
-  const showBar = selection != null && pickStat != null
-  const barHeight = showBar
-    ? Math.max(0, Math.min(100, pickStat.percentage))
-    : 0
+  const showPct = selection != null && pickStat != null
+  const popularity =
+    showPct && pickStat
+      ? getDreamPickPopularity(pickStat.percentage)
+      : null
 
   return (
     <div
@@ -51,33 +64,7 @@ export function DreamOfficeSquare({
     >
       <p className="dream-office__title">{officeLabel}</p>
 
-      <div
-        className={
-          showBar
-            ? 'dream-office__portrait-row dream-office__portrait-row--with-pct'
-            : 'dream-office__portrait-row'
-        }
-      >
-        {showBar && pickStat ? (
-          <div
-            className="dream-office__pct"
-            aria-label={`${pickStat.percentage}% מהבחירות באתר למשרד זה (מתוך ${pickStat.total})`}
-          >
-            <span className="dream-office__pct-label">
-              {pickStat.percentage}%
-            </span>
-            <div className="dream-office__pct-track" aria-hidden="true">
-              <div
-                className="dream-office__pct-fill"
-                style={{ height: `${barHeight}%` }}
-              />
-            </div>
-            <span className="dream-office__pct-total" aria-hidden="true">
-              {pickStat.total}
-            </span>
-          </div>
-        ) : null}
-
+      <div className="dream-office__portrait-row">
         <button
           type="button"
           className={
@@ -126,6 +113,14 @@ export function DreamOfficeSquare({
                 <path d="M12 20h9" />
                 <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
               </svg>
+            </span>
+          ) : null}
+          {showPct && pickStat && popularity ? (
+            <span
+              className={`dream-office__pct-badge dream-office__pct-badge--${popularity}`}
+              aria-label={`${pickStat.percentage}% מהבחירות באתר למשרד זה (מתוך ${pickStat.total})`}
+            >
+              {pickStat.percentage}%
             </span>
           ) : null}
         </button>

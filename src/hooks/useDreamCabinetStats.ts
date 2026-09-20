@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   emptyDreamCabinetStats,
   fetchDreamCabinetStats,
+  mergeLocalPicksIntoStats,
   type DreamCabinetStats,
+  type DreamCabinetSubmitPick,
 } from '../lib/fetchDreamCabinetStats'
 
 export type UseDreamCabinetStatsResult = {
@@ -12,6 +14,8 @@ export type UseDreamCabinetStatsResult = {
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
+  /** Instantly include this browser's picks so % bars appear before refetch. */
+  applyLocalPicks: (picks: DreamCabinetSubmitPick[]) => void
 }
 
 export function useDreamCabinetStats(): UseDreamCabinetStatsResult {
@@ -35,9 +39,14 @@ export function useDreamCabinetStats(): UseDreamCabinetStatsResult {
     }
   }, [])
 
+  const applyLocalPicks = useCallback((picks: DreamCabinetSubmitPick[]) => {
+    if (picks.length === 0) return
+    setStats((prev) => mergeLocalPicksIntoStats(prev, picks))
+  }, [])
+
   useEffect(() => {
     void refetch()
   }, [refetch])
 
-  return { stats, loading, error, refetch }
+  return { stats, loading, error, refetch, applyLocalPicks }
 }

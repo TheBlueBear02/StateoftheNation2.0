@@ -383,7 +383,7 @@ using (true);
 
 ### `dream_cabinet_picks`
 
-Anonymous per-seat votes from `/elections/dream-government`. One current pick per browser (`client_id`) per office per election. Written on successful share (upsert); read as aggregates for the vertical % bars.
+Anonymous per-seat votes from `/elections/dream-government`. One current pick per browser (`client_id`) per office per election. Written on successful share (upsert); read as aggregates for the bottom-left % badges.
 
 | Column | Type | Description |
 |--------|------|-------------|

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { SiteLayout } from '../components/SiteLayout'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { DreamOfficePickerModal } from '../components/elections/dream/DreamOfficePickerModal'
@@ -17,15 +18,21 @@ import {
   markDreamGovernmentShared,
 } from '../lib/dreamGovClientId'
 import {
+  DREAM_ALL_OFFICES,
   DREAM_MINISTER_OFFICES,
   DREAM_PM_OFFICE,
   type DreamOffice,
   type DreamOfficeId,
 } from '../lib/dreamGovernmentOffices'
 import {
-  getDreamPickStat,
+  getDreamPickStatForDisplay,
   submitDreamCabinetPicks,
 } from '../lib/fetchDreamCabinetStats'
+import {
+  USE_DREAM_GOV_MOCK_STATS,
+  buildMockDreamPickPercentages,
+  mockDreamPickStat,
+} from '../lib/dreamGovMockStats'
 import { exportNodeToPng } from '../lib/inlineImagesForExport'
 import './DreamGovernmentPage.css'
 
@@ -58,7 +65,11 @@ async function copyImageToClipboard(blob: Blob): Promise<boolean> {
 export function DreamGovernmentPage() {
   const { parties, loading: partiesLoading, error: partiesError } =
     useElectionParties()
-  const { stats, refetch: refetchStats } = useDreamCabinetStats()
+  const {
+    stats,
+    refetch: refetchStats,
+    applyLocalPicks,
+  } = useDreamCabinetStats()
   const shareRef = useRef<HTMLDivElement>(null)
 
   const [selections, setSelections] = useState<
@@ -68,7 +79,10 @@ export function DreamGovernmentPage() {
   const [exporting, setExporting] = useState(false)
   const [copiedFlash, setCopiedFlash] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
-  const [showPickStats, setShowPickStats] = useState(false)
+  const [showPickStats, setShowPickStats] = useState(
+    () => USE_DREAM_GOV_MOCK_STATS,
+  )
+  const [mockPercentages] = useState(buildMockDreamPickPercentages)
 
   const filledCount = useMemo(
     () => Object.keys(selections).length,
@@ -76,6 +90,10 @@ export function DreamGovernmentPage() {
   )
 
   useEffect(() => {
+    if (USE_DREAM_GOV_MOCK_STATS) {
+      setShowPickStats(true)
+      return
+    }
     setShowPickStats(hasSharedDreamGovernment())
   }, [])
 
@@ -83,8 +101,32 @@ export function DreamGovernmentPage() {
     if (!showPickStats) return null
     const selection = selections[officeId]
     if (!selection) return null
-    return getDreamPickStat(stats.offices[officeId], selection.candidate.id)
+    if (USE_DREAM_GOV_MOCK_STATS) {
+      return mockDreamPickStat(mockPercentages[officeId])
+    }
+    return getDreamPickStatForDisplay(
+      stats.offices[officeId],
+      selection.candidate.id,
+    )
   }
+
+  /** Always include % on the export card for filled seats (not gated by unlock). */
+  const sharePickStats = useMemo(() => {
+    const next: Partial<
+      Record<DreamOfficeId, ReturnType<typeof getDreamPickStatForDisplay>>
+    > = {}
+    for (const office of DREAM_ALL_OFFICES) {
+      const selection = selections[office.id]
+      if (!selection) continue
+      next[office.id] = USE_DREAM_GOV_MOCK_STATS
+        ? mockDreamPickStat(mockPercentages[office.id])
+        : getDreamPickStatForDisplay(
+            stats.offices[office.id],
+            selection.candidate.id,
+          )
+    }
+    return next
+  }, [selections, stats, mockPercentages])
 
   useEffect(() => {
     if (!copiedFlash) return
@@ -111,7 +153,24 @@ export function DreamGovernmentPage() {
     setCopiedFlash(false)
     setShareError(null)
 
+    const picks = (
+      Object.entries(selections) as Array<
+        [DreamOfficeId, DreamOfficeSelection]
+      >
+    ).map(([officeId, selection]) => ({
+      officeId,
+      candidateId: selection.candidate.id,
+    }))
+
     try {
+      // Fold this share into local aggregates before export so the PNG
+      // includes up-to-date % badges (first sharer sees 100%, etc.).
+      if (picks.length > 0) {
+        flushSync(() => {
+          applyLocalPicks(picks)
+        })
+      }
+
       // Clone + inline off-DOM so React re-renders (setExporting) cannot
       // reset portrait <img src> back to remote URLs mid-export.
       const dataUrl = await exportNodeToPng(node, {
@@ -136,16 +195,8 @@ export function DreamGovernmentPage() {
       markDreamGovernmentShared()
       setShowPickStats(true)
 
-      // Best-effort: count picks after a successful share export.
+      // Best-effort: persist picks after a successful share export.
       try {
-        const picks = (
-          Object.entries(selections) as Array<
-            [DreamOfficeId, DreamOfficeSelection]
-          >
-        ).map(([officeId, selection]) => ({
-          officeId,
-          candidateId: selection.candidate.id,
-        }))
         if (picks.length > 0) {
           await submitDreamCabinetPicks({
             clientId: getOrCreateDreamGovClientId(),
@@ -181,7 +232,7 @@ export function DreamGovernmentPage() {
             </h1>
             <p className="dream-gov-page__subtitle">
               אם יכולתם לבחור את השרים בבחירות ישירות איך הייתה נראת הממשלה
-              שלכם?
+              שלכם? לאחר שתבחרו תוכלו לראות כמה אנשים בחרו כמוכם.
             </p>
           </header>
 
@@ -333,7 +384,11 @@ export function DreamGovernmentPage() {
       ) : null}
 
       <div className="dream-share-card-host" aria-hidden="true">
-        <ShareableGovernment ref={shareRef} selections={selections} />
+        <ShareableGovernment
+          ref={shareRef}
+          selections={selections}
+          pickStats={sharePickStats}
+        />
       </div>
     </SiteLayout>
   )

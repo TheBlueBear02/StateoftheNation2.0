@@ -7,16 +7,22 @@ import {
   type DreamOffice,
   type DreamOfficeId,
 } from '../../../lib/dreamGovernmentOffices'
-import type { DreamOfficeSelection } from './DreamOfficeSquare'
+import {
+  getDreamPickPopularity,
+  type DreamOfficePickStat,
+  type DreamOfficeSelection,
+} from './DreamOfficeSquare'
 
 type ShareableGovernmentProps = {
   selections: Partial<Record<DreamOfficeId, DreamOfficeSelection>>
+  /** Site-wide % for filled seats; omitted offices hide the badge. */
+  pickStats?: Partial<Record<DreamOfficeId, DreamOfficePickStat | null>>
 }
 
 export const ShareableGovernment = forwardRef<
   HTMLDivElement,
   ShareableGovernmentProps
->(function ShareableGovernment({ selections }, ref) {
+>(function ShareableGovernment({ selections, pickStats = {} }, ref) {
   const pmSelection = selections.pm ?? null
 
   return (
@@ -43,7 +49,11 @@ export const ShareableGovernment = forwardRef<
       </header>
 
       <div className="dream-share-card__pm">
-        <ShareSlot office={DREAM_PM_OFFICE} selection={pmSelection} />
+        <ShareSlot
+          office={DREAM_PM_OFFICE}
+          selection={pmSelection}
+          pickStat={pickStats.pm ?? null}
+        />
       </div>
 
       <ul className="dream-share-card__grid">
@@ -52,13 +62,14 @@ export const ShareableGovernment = forwardRef<
             <ShareSlot
               office={office}
               selection={selections[office.id] ?? null}
+              pickStat={pickStats[office.id] ?? null}
             />
           </li>
         ))}
       </ul>
 
       <p className="dream-share-card__cta">
-        הרכיבו ושתפו את ממשלת החלומות שלכם באתר מצב האומה
+        הרכיבו גם את ממשלת החלומות שלכם באתר מצב האומה
         <span className="dream-share-card__cta-url">
           www.stateofthenation.co.il
         </span>
@@ -70,11 +81,17 @@ export const ShareableGovernment = forwardRef<
 function ShareSlot({
   office,
   selection,
+  pickStat,
 }: {
   office: DreamOffice
   selection: DreamOfficeSelection | null
+  pickStat: DreamOfficePickStat | null
 }) {
   const officeLabel = getDreamOfficeLabel(office, selection?.candidate.gender)
+  const showPct = selection != null && pickStat != null
+  const popularity = showPct && pickStat
+    ? getDreamPickPopularity(pickStat.percentage)
+    : null
 
   return (
     <div className="dream-share-slot">
@@ -94,6 +111,13 @@ function ShareSlot({
         ) : (
           <span className="dream-share-slot__empty">+</span>
         )}
+        {showPct && pickStat && popularity ? (
+          <span
+            className={`dream-share-slot__pct dream-share-slot__pct--${popularity}`}
+          >
+            {pickStat.percentage}%
+          </span>
+        ) : null}
       </div>
       {selection ? (
         <>
