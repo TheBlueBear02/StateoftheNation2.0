@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
 import { IndexTrendChart } from '../components/government/IndexTrendChart'
+import { OfficeErasBar } from '../components/government/OfficeErasBar'
 import { useOfficeDashboard } from '../hooks/useOfficeDashboard'
 import {
-  formatIndexValue,
-  formatPercentChange,
   type OfficeDashboardIndex,
   type OfficeDashboardOffice,
 } from '../lib/fetchOfficeDashboard'
@@ -30,6 +30,19 @@ function bubbleSizeClass(index: OfficeDashboardIndex, rank: number): string {
   if (index.alert || (index.isKpi && rank < 2)) return 'office-bubble--lg'
   if (index.isKpi || rank < 3) return 'office-bubble--md'
   return 'office-bubble--sm'
+}
+
+function parsePositiveInt(raw: string | null): number | null {
+  if (!raw) return null
+  const n = Number(raw)
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+function buildDashboardQuery(officeId: number, indexId: number | null): string {
+  const params = new URLSearchParams()
+  params.set('office', String(officeId))
+  if (indexId != null) params.set('index', String(indexId))
+  return params.toString()
 }
 
 type OfficeClusterProps = {
@@ -63,7 +76,17 @@ function OfficeCluster({ office, selected, onSelect }: OfficeClusterProps) {
             key={index.id}
             className={`${bubbleClass(index)} ${bubbleSizeClass(index, rank)}`}
             title={index.name}
-          />
+          >
+            <img
+              src={index.icon}
+              alt=""
+              className="office-bubble__icon"
+              width={40}
+              height={40}
+              loading="lazy"
+              decoding="async"
+            />
+          </span>
         ))}
         <span className="office-cluster__minister">
           {minister?.imageUrl ? (
@@ -71,8 +94,8 @@ function OfficeCluster({ office, selected, onSelect }: OfficeClusterProps) {
               src={minister.imageUrl}
               alt=""
               className="office-cluster__minister-img"
-              width={88}
-              height={88}
+              width={112}
+              height={112}
             />
           ) : (
             <span className="office-cluster__minister-initials">
@@ -95,42 +118,121 @@ function OfficeCluster({ office, selected, onSelect }: OfficeClusterProps) {
 }
 
 type DetailPanelProps = {
+  offices: OfficeDashboardOffice[]
   office: OfficeDashboardOffice
   selectedIndex: OfficeDashboardIndex | null
+  onSelectOffice: (officeId: number) => void
   onSelectIndex: (index: OfficeDashboardIndex) => void
-  onClose: () => void
+  shareUrl: string
 }
 
 function DetailPanel({
+  offices,
   office,
   selectedIndex,
+  onSelectOffice,
   onSelectIndex,
-  onClose,
+  shareUrl,
 }: DetailPanelProps) {
   const minister = office.minister
-  const cards = [...office.kpis, ...office.policies]
+  const indexes = [...office.kpis, ...office.policies]
+  const activeChipRef = useRef<HTMLButtonElement | null>(null)
+  const prevOfficeIdRef = useRef(office.id)
+  const pendingSlideRef = useRef<'from-left' | 'from-right' | null>(null)
+  const [slideDir, setSlideDir] = useState<'from-left' | 'from-right'>(
+    'from-right',
+  )
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'error'>(
+    'idle',
+  )
+  const officeIndex = offices.findIndex((item) => item.id === office.id)
+
+  const goToAdjacentOffice = (step: -1 | 1) => {
+    if (offices.length === 0 || officeIndex < 0) return
+    pendingSlideRef.current = step === 1 ? 'from-right' : 'from-left'
+    const next = (officeIndex + step + offices.length) % offices.length
+    onSelectOffice(offices[next]!.id)
+  }
+
+  useEffect(() => {
+    if (prevOfficeIdRef.current === office.id) return
+
+    const from = offices.findIndex((item) => item.id === prevOfficeIdRef.current)
+    const to = offices.findIndex((item) => item.id === office.id)
+    prevOfficeIdRef.current = office.id
+
+    if (pendingSlideRef.current) {
+      setSlideDir(pendingSlideRef.current)
+      pendingSlideRef.current = null
+      return
+    }
+
+    if (from < 0 || to < 0 || offices.length === 0) return
+    const forward = (to - from + offices.length) % offices.length
+    const backward = (from - to + offices.length) % offices.length
+    setSlideDir(forward <= backward ? 'from-right' : 'from-left')
+  }, [office.id, offices])
+
+  useEffect(() => {
+    activeChipRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'nearest',
+      block: 'nearest',
+    })
+  }, [selectedIndex?.id])
+
+  useEffect(() => {
+    if (shareStatus === 'idle') return
+    const timer = window.setTimeout(() => setShareStatus('idle'), 2000)
+    return () => window.clearTimeout(timer)
+  }, [shareStatus])
+
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setShareStatus('copied')
+    } catch {
+      setShareStatus('error')
+    }
+  }
+
+  const slideClass = `office-dashboard__slide office-dashboard__slide--${slideDir}`
 
   return (
     <aside
       className="office-dashboard__panel"
       aria-label={`פירוט ${office.name}`}
     >
-      <div className="office-dashboard__panel-header">
-        <div className="office-dashboard__panel-identity">
+      <div className="office-dashboard__office-switcher" dir="ltr">
+        <button
+          type="button"
+          className="office-dashboard__office-nav"
+          onClick={() => goToAdjacentOffice(-1)}
+          aria-label="משרד קודם"
+          disabled={offices.length < 2}
+        >
+          ‹
+        </button>
+
+        <div
+          key={office.id}
+          className={`office-dashboard__office-current ${slideClass}`}
+          dir="rtl"
+        >
           {minister?.imageUrl ? (
             <img
               src={minister.imageUrl}
               alt=""
               className="office-dashboard__panel-photo"
-              width={64}
-              height={64}
+              width={96}
+              height={96}
             />
           ) : (
             <span className="office-dashboard__panel-initials">
               {initials(minister?.fullName ?? office.name)}
             </span>
           )}
-          <div>
+          <div className="office-dashboard__office-current-text">
             <h2 className="office-dashboard__panel-title">{office.name}</h2>
             {minister ? (
               <p className="office-dashboard__panel-minister">
@@ -138,72 +240,62 @@ function DetailPanel({
                 {minister.dutyDesc ? ` · ${minister.dutyDesc}` : ''}
               </p>
             ) : null}
+            {office.info ? (
+              <p className="office-dashboard__panel-info office-dashboard__panel-info--inline">
+                {office.info}
+              </p>
+            ) : null}
           </div>
         </div>
+
         <button
           type="button"
-          className="office-dashboard__panel-close"
-          onClick={onClose}
-          aria-label="סגירת פירוט"
+          className="office-dashboard__office-nav"
+          onClick={() => goToAdjacentOffice(1)}
+          aria-label="משרד הבא"
+          disabled={offices.length < 2}
         >
-          ×
+          ›
         </button>
       </div>
 
-      {office.info ? (
-        <p className="office-dashboard__panel-info">{office.info}</p>
-      ) : null}
-
-      <div className="office-dashboard__cards" role="list">
-        {cards.map((index) => {
+      <div
+        className="office-dashboard__index-strip"
+        role="list"
+        aria-label="מדדי המשרד"
+      >
+        {indexes.map((index) => {
           const isActive = selectedIndex?.id === index.id
-          const change = formatPercentChange(index.percentChange)
-          const changeTone =
-            index.percentChange === null || index.percentChange === 0
-              ? ''
-              : index.percentChange > 0
-                ? ' office-dashboard__card-change--up'
-                : ' office-dashboard__card-change--down'
-
           return (
             <button
               key={index.id}
+              ref={isActive ? activeChipRef : undefined}
               type="button"
               role="listitem"
-              className={`office-dashboard__card${
-                index.alert ? ' office-dashboard__card--alert' : ''
-              }${index.isKpi ? '' : ' office-dashboard__card--policy'}${
-                isActive ? ' office-dashboard__card--active' : ''
+              className={`office-dashboard__index-chip${
+                index.alert ? ' office-dashboard__index-chip--alert' : ''
+              }${index.isKpi ? '' : ' office-dashboard__index-chip--policy'}${
+                isActive ? ' office-dashboard__index-chip--active' : ''
               }`}
               onClick={() => onSelectIndex(index)}
               aria-pressed={isActive}
+              aria-label={index.name}
+              title={index.name}
             >
               <span
-                className={`office-dashboard__card-dot${
-                  index.alert
-                    ? ' office-dashboard__card-dot--alert'
-                    : index.isKpi
-                      ? ' office-dashboard__card-dot--kpi'
-                      : ' office-dashboard__card-dot--policy'
-                }`}
+                className="office-dashboard__index-chip-circle"
                 aria-hidden="true"
-              />
-              <span className="office-dashboard__card-body">
-                <span className="office-dashboard__card-name">{index.name}</span>
-                <span className="office-dashboard__card-value">
-                  {formatIndexValue(index.latestValue)}
-                </span>
-                {index.latestLabel ? (
-                  <span className="office-dashboard__card-date">
-                    {index.latestLabel}
-                  </span>
-                ) : null}
+              >
+                <img
+                  src={index.icon}
+                  alt=""
+                  className="office-dashboard__index-chip-icon"
+                  width={36}
+                  height={36}
+                  loading="lazy"
+                  decoding="async"
+                />
               </span>
-              {change ? (
-                <span className={`office-dashboard__card-change${changeTone}`}>
-                  {change}
-                </span>
-              ) : null}
             </button>
           )
         })}
@@ -228,18 +320,38 @@ function DetailPanel({
                 </p>
               ) : null}
             </div>
-            {selectedIndex.source ? (
-              <a
-                className="office-dashboard__chart-source"
-                href={selectedIndex.source}
-                target="_blank"
-                rel="noopener noreferrer"
+            <div className="office-dashboard__chart-actions">
+              <button
+                type="button"
+                className="office-dashboard__chart-share"
+                onClick={() => {
+                  void copyShareLink()
+                }}
               >
-                מקור
-              </a>
-            ) : null}
+                {shareStatus === 'copied'
+                  ? 'הקישור הועתק'
+                  : shareStatus === 'error'
+                    ? 'ההעתקה נכשלה'
+                    : 'העתק קישור'}
+              </button>
+              {selectedIndex.source ? (
+                <a
+                  className="office-dashboard__chart-source"
+                  href={selectedIndex.source}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  מקור
+                </a>
+              ) : null}
+            </div>
           </div>
           <IndexTrendChart index={selectedIndex} />
+          <OfficeErasBar
+            eras={office.ministerHistory}
+            points={selectedIndex.points}
+            chartType={selectedIndex.chartType}
+          />
         </section>
       ) : (
         <p className="office-dashboard__chart-hint">
@@ -252,8 +364,12 @@ function DetailPanel({
 
 export function OfficeDashboardPage() {
   const { offices, loading, error } = useOfficeDashboard()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [selectedOfficeId, setSelectedOfficeId] = useState<number | null>(null)
   const [selectedIndexId, setSelectedIndexId] = useState<number | null>(null)
+  const hydratedFromUrlRef = useRef(false)
 
   const selectedOffice =
     offices.find((o) => o.id === selectedOfficeId) ?? null
@@ -261,13 +377,43 @@ export function OfficeDashboardPage() {
   const selectedIndex =
     selectedOffice?.indexes.find((i) => i.id === selectedIndexId) ?? null
 
-  useEffect(() => {
-    if (selectedOfficeId !== null) return
-    if (offices.length === 0) return
-    setSelectedOfficeId(offices[0]!.id)
-  }, [offices, selectedOfficeId])
+  const shareUrl = useMemo(() => {
+    if (selectedOfficeId == null) return ''
+    const qs = buildDashboardQuery(selectedOfficeId, selectedIndexId)
+    if (typeof window === 'undefined') {
+      return `${pathname}?${qs}`
+    }
+    return `${window.location.origin}${pathname}?${qs}`
+  }, [pathname, selectedOfficeId, selectedIndexId])
 
+  // Open office + index from ?office=&index= once data is ready.
   useEffect(() => {
+    if (hydratedFromUrlRef.current) return
+    if (offices.length === 0) return
+
+    const officeFromUrl = parsePositiveInt(searchParams.get('office'))
+    const indexFromUrl = parsePositiveInt(searchParams.get('index'))
+    const office =
+      (officeFromUrl != null
+        ? offices.find((item) => item.id === officeFromUrl)
+        : null) ?? offices[0]!
+
+    const index =
+      (indexFromUrl != null
+        ? office.indexes.find((item) => item.id === indexFromUrl)
+        : null) ??
+      office.kpis[0] ??
+      office.indexes[0] ??
+      null
+
+    hydratedFromUrlRef.current = true
+    setSelectedOfficeId(office.id)
+    setSelectedIndexId(index?.id ?? null)
+  }, [offices, searchParams])
+
+  // When switching offices after hydrate, keep a valid index for that office.
+  useEffect(() => {
+    if (!hydratedFromUrlRef.current) return
     if (!selectedOffice) {
       setSelectedIndexId(null)
       return
@@ -279,6 +425,30 @@ export function OfficeDashboardPage() {
     const first = selectedOffice.kpis[0] ?? selectedOffice.indexes[0] ?? null
     setSelectedIndexId(first?.id ?? null)
   }, [selectedOffice, selectedIndexId])
+
+  // Keep the address bar in sync so the current chart is shareable.
+  useEffect(() => {
+    if (!hydratedFromUrlRef.current) return
+    if (selectedOfficeId == null) return
+
+    const currentOffice = parsePositiveInt(searchParams.get('office'))
+    const currentIndex = parsePositiveInt(searchParams.get('index'))
+    if (
+      currentOffice === selectedOfficeId &&
+      currentIndex === selectedIndexId
+    ) {
+      return
+    }
+
+    const nextQuery = buildDashboardQuery(selectedOfficeId, selectedIndexId)
+    router.replace(`${pathname}?${nextQuery}`, { scroll: false })
+  }, [
+    pathname,
+    router,
+    searchParams,
+    selectedIndexId,
+    selectedOfficeId,
+  ])
 
   return (
     <SiteLayout className="office-dashboard-page">
@@ -326,6 +496,17 @@ export function OfficeDashboardPage() {
               selectedOffice ? ' office-dashboard__layout--open' : ''
             }`}
           >
+            {selectedOffice && !loading && !error ? (
+              <DetailPanel
+                offices={offices}
+                office={selectedOffice}
+                selectedIndex={selectedIndex}
+                onSelectOffice={setSelectedOfficeId}
+                onSelectIndex={(index) => setSelectedIndexId(index.id)}
+                shareUrl={shareUrl}
+              />
+            ) : null}
+
             <section
               className="office-dashboard__quadrant"
               aria-label="משרדים"
@@ -347,18 +528,6 @@ export function OfficeDashboardPage() {
                     />
                   ))}
             </section>
-
-            {selectedOffice && !loading && !error ? (
-              <DetailPanel
-                office={selectedOffice}
-                selectedIndex={selectedIndex}
-                onSelectIndex={(index) => setSelectedIndexId(index.id)}
-                onClose={() => {
-                  setSelectedOfficeId(null)
-                  setSelectedIndexId(null)
-                }}
-              />
-            ) : null}
           </div>
         </div>
       </main>

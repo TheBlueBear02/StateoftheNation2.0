@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { getSiteUrl } from '@/lib/runtimeEnv'
 import { OfficeDashboardPage } from '@/views/OfficeDashboardPage'
@@ -49,7 +50,9 @@ export default function Page() {
           },
         }}
       />
-      <OfficeDashboardPage />
+      <Suspense fallback={null}>
+        <OfficeDashboardPage />
+      </Suspense>
     </>
   )
 }

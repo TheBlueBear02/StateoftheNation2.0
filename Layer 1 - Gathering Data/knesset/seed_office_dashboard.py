@@ -72,6 +72,23 @@ def normalize_chart_type(raw: str | None) -> str:
     return "line"
 
 
+def normalize_icon_path(raw: str | None) -> str | None:
+    """Map old Flask ``static\\images\\offices\\...`` paths to public URLs."""
+    text = (raw or "").strip()
+    if not text:
+        return None
+    path = text.replace("\\", "/")
+    if path.startswith("static/images/"):
+        return "/" + path[len("static/") :]
+    if path.startswith("/static/images/"):
+        return path.replace("/static/", "/", 1)
+    if path.startswith("/images/"):
+        return path
+    if path.startswith("images/"):
+        return "/" + path
+    return None
+
+
 def parse_label_to_date(label: str) -> date | None:
     """Convert old labels (DD.MM.YYYY / DD.MM.YY / YYYY) to a date for recorded_at."""
     text = (label or "").strip()
@@ -268,7 +285,7 @@ def run(sb: Client, dry_run: bool = False) -> dict:
             "office_id": new_office_id,
             "name": name,
             "info": idx.get("info"),
-            "icon": None,  # old static paths not portable; UI uses CSS fallbacks
+            "icon": normalize_icon_path(idx.get("icon")),
             "is_kpi": bool(idx.get("is_kpi")),
             "alert": bool(idx.get("alert")),
             "chart_type": normalize_chart_type(idx.get("chart_type")),

@@ -1,13 +1,57 @@
+import { resolveFactionColor } from './hemicycle'
 import {
   supabase,
   supabaseConfigError,
   type GovernmentAppointmentRow,
+  type GovernmentMembershipFactionRow,
   type IndexChartType,
   type IndexDataRow,
   type IndexRow,
+  type KnessetFaction,
   type KnessetPerson,
   type OfficeDashboardOfficeRow,
 } from './supabase'
+import { OFFICE_INDEX_ICON_BY_NAME } from './officeIndexIconMap'
+
+/** PostgREST default page size; office dashboard series exceed one page. */
+const INDEX_DATA_PAGE_SIZE = 1000
+
+/**
+ * Fetch all index_data rows for the given index ids, paging past the ~1000-row
+ * PostgREST cap. Without this, the newest points (e.g. בן גביר years) are dropped
+ * because the query is ordered by recorded_at ascending.
+ */
+async function fetchAllIndexData(
+  indexIds: number[],
+): Promise<{ rows: IndexDataRow[]; error: string | null }> {
+  if (!supabase || indexIds.length === 0) {
+    return { rows: [], error: null }
+  }
+
+  const rows: IndexDataRow[] = []
+  let from = 0
+  for (;;) {
+    const to = from + INDEX_DATA_PAGE_SIZE - 1
+    const { data, error } = await supabase
+      .from('index_data')
+      .select('id, index_id, label, value, recorded_at')
+      .in('index_id', indexIds)
+      .order('recorded_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to)
+
+    if (error) {
+      return { rows: [], error: error.message }
+    }
+
+    const chunk = (data ?? []) as IndexDataRow[]
+    rows.push(...chunk)
+    if (chunk.length < INDEX_DATA_PAGE_SIZE) break
+    from += INDEX_DATA_PAGE_SIZE
+  }
+
+  return { rows, error: null }
+}
 
 /** Curated quadrant order (matches old site desired_order [3,2,5,4]). */
 export const OFFICE_DASHBOARD_DISPLAY_ORDER: string[] = [
@@ -17,11 +61,38 @@ export const OFFICE_DASHBOARD_DISPLAY_ORDER: string[] = [
   'חינוך',
 ]
 
+/**
+ * Extra name fragments that map onto a dashboard portfolio. National Security
+ * is the renamed Ministry of Public Security (ביטחון הפנים) and also succeeded
+ * the older Police Ministry (משטרה) — historical appointments live under those
+ * names and should appear as one continuous minister timeline.
+ */
+const PORTFOLIO_NAME_ALIASES: Record<string, string[]> = {
+  'ביטחון לאומי': [
+    'ביטחון לאומי',
+    'ביטחון הפנים',
+    'ביטחון פנים',
+    'בטחון הפנים',
+    'בטחון פנים',
+    'משטרה',
+  ],
+}
+
 export type OfficeDashboardMinister = {
   personId: number
   fullName: string
   imageUrl: string | null
   dutyDesc: string | null
+}
+
+export type OfficeDashboardMinisterEra = {
+  personId: number
+  fullName: string
+  imageUrl: string | null
+  factionName: string | null
+  factionColor: string | null
+  startDate: string
+  endDate: string
 }
 
 export type OfficeDashboardPoint = {
@@ -34,7 +105,7 @@ export type OfficeDashboardIndex = {
   id: number
   name: string
   info: string | null
-  icon: string | null
+  icon: string
   isKpi: boolean
   alert: boolean
   chartType: IndexChartType
@@ -52,6 +123,7 @@ export type OfficeDashboardOffice = {
   info: string | null
   logoUrl: string | null
   minister: OfficeDashboardMinister | null
+  ministerHistory: OfficeDashboardMinisterEra[]
   indexes: OfficeDashboardIndex[]
   kpis: OfficeDashboardIndex[]
   policies: OfficeDashboardIndex[]
@@ -83,12 +155,43 @@ function normalizeChartType(raw: string | null | undefined): IndexChartType {
   return 'line'
 }
 
+/** Public URL for an index icon; falls back to bag placeholders. */
+export function resolveIndexIconUrl(
+  icon: string | null | undefined,
+  opts?: { isKpi?: boolean; alert?: boolean; name?: string },
+): string {
+  const fallback =
+    opts?.isKpi || opts?.alert
+      ? '/images/offices/white_bag.png'
+      : '/images/offices/grey_bag.png'
+
+  const fromName = opts?.name
+    ? OFFICE_INDEX_ICON_BY_NAME[opts.name]
+    : undefined
+  const raw = icon?.trim() || fromName
+  if (!raw) return fallback
+
+  let path = raw.replace(/\\/g, '/')
+  if (path.startsWith('static/images/')) {
+    path = `/${path.slice('static/'.length)}`
+  } else if (path.startsWith('/static/images/')) {
+    path = path.replace('/static/', '/')
+  } else if (path.startsWith('images/')) {
+    path = `/${path}`
+  } else if (!path.startsWith('/')) {
+    path = `/${path}`
+  }
+  return path
+}
+
 function officeDisplayName(row: OfficeDashboardOfficeRow): string {
-  return (
-    row.knesset_category_name?.trim() ||
-    row.name?.trim() ||
-    'משרד ללא שם'
-  )
+  const name = row.name?.trim() || ''
+  const category = row.knesset_category_name?.trim() || ''
+  // Prefer the full office title (e.g. משרד האוצר) over short Knesset
+  // category labels (e.g. האוצר).
+  if (name) return name
+  if (category) return category
+  return 'משרד ללא שם'
 }
 
 function displayOrderRank(name: string): number {
@@ -123,7 +226,11 @@ function buildIndex(
     id: row.id,
     name: row.name,
     info: row.info,
-    icon: row.icon,
+    icon: resolveIndexIconUrl(row.icon, {
+      isKpi: Boolean(row.is_kpi),
+      alert: Boolean(row.alert),
+      name: row.name,
+    }),
     isKpi: Boolean(row.is_kpi),
     alert: Boolean(row.alert),
     chartType: normalizeChartType(row.chart_type),
@@ -151,14 +258,61 @@ function isActiveAt(row: GovernmentAppointmentRow, refDate: string): boolean {
   return !end || end >= refDate
 }
 
+function appointmentOfficeName(row: GovernmentAppointmentRow): string {
+  const office = unwrapRelation(row.office)
+  return (
+    office?.knesset_category_name?.trim() ||
+    office?.name?.trim() ||
+    ''
+  )
+}
+
+/** Knesset OData keeps many historical office rows with the same name; match by portfolio needle. */
+function appointmentMatchesOffice(
+  row: GovernmentAppointmentRow,
+  officeId: number,
+  officeName: string,
+): boolean {
+  if (row.office_id === officeId) return true
+
+  const apptName = appointmentOfficeName(row)
+  if (!apptName) return false
+
+  for (const needle of OFFICE_DASHBOARD_DISPLAY_ORDER) {
+    if (!officeName.includes(needle)) continue
+    const terms = portfolioMatchTerms(needle)
+    if (terms.some((term) => apptName.includes(term))) {
+      return true
+    }
+  }
+  return false
+}
+
+function ministerRank(row: GovernmentAppointmentRow): number {
+  const duty = (row.duty_desc ?? '').trim()
+  if (duty.startsWith('סגן') || duty.startsWith('סגנית')) return 40
+  if (duty.includes('ממלא מקום') || duty.includes('מ"מ') || row.is_acting) return 30
+  if (duty.startsWith('שר נוסף') || duty.startsWith('שרה נוספת')) return 20
+  return 0
+}
+
 function pickMinisterForOffice(
   rows: GovernmentAppointmentRow[],
   officeId: number,
+  officeName: string,
   refDate: string,
 ): OfficeDashboardMinister | null {
   const candidates = rows
-    .filter((row) => row.office_id === officeId && isActiveAt(row, refDate))
-    .sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))
+    .filter(
+      (row) =>
+        isActiveAt(row, refDate) &&
+        appointmentMatchesOffice(row, officeId, officeName),
+    )
+    .sort((a, b) => {
+      const rankDiff = ministerRank(a) - ministerRank(b)
+      if (rankDiff !== 0) return rankDiff
+      return (b.start_date ?? '').localeCompare(a.start_date ?? '')
+    })
 
   const row = candidates[0]
   if (!row) return null
@@ -170,6 +324,326 @@ function pickMinisterForOffice(
     imageUrl: person?.image_url ?? null,
     dutyDesc: row.duty_desc,
   }
+}
+
+function portfolioNeedle(officeName: string): string | null {
+  return (
+    OFFICE_DASHBOARD_DISPLAY_ORDER.find((needle) => officeName.includes(needle)) ??
+    null
+  )
+}
+
+function portfolioMatchTerms(needle: string): string[] {
+  return PORTFOLIO_NAME_ALIASES[needle] ?? [needle]
+}
+
+function officeMatchesNeedle(
+  row: { name: string | null; knesset_category_name: string | null },
+  needle: string,
+): boolean {
+  const name = row.name?.trim() || ''
+  const category = row.knesset_category_name?.trim() || ''
+  return portfolioMatchTerms(needle).some(
+    (term) => name.includes(term) || category.includes(term),
+  )
+}
+
+type MembershipForEra = {
+  personId: number
+  startDate: string | null
+  endDate: string | null
+  factionName: string | null
+  factionColor: string | null
+}
+
+/**
+ * Prefer DB short_name; otherwise compress Knesset list names like
+ * `הליכוד - …` / `הליכוד בהנהגת …` down to the base party label.
+ */
+function shortFactionLabel(
+  shortName: string | null | undefined,
+  fullName: string | null | undefined,
+): string | null {
+  const short = shortName?.trim()
+  if (short) return compressFactionLabel(short)
+
+  const full = fullName?.trim()
+  if (!full) return null
+  return compressFactionLabel(full)
+}
+
+/** Known base party labels, longest first (for prefix matching). */
+const KNOWN_PARTY_LABELS = [
+  'המחנה הממלכתי',
+  'הציונות הדתית',
+  'האיחוד הלאומי',
+  'הימין הממלכתי',
+  'עוצמה יהודית',
+  'ישראל ביתנו',
+  'יהדות התורה',
+  'כחול לבן',
+  'יש עתיד',
+  'הבית היהודי',
+  'חדש-תעל',
+  'העבודה',
+  'הליכוד',
+  'ימינה',
+  'עבודה',
+  'מרצ',
+  'כולנו',
+  'בלד',
+  'נעם',
+  'רעמ',
+  'שס',
+].sort((a, b) => b.length - a.length)
+
+function compressFactionLabel(raw: string): string {
+  const text = raw.replace(/["'״׳]/g, '').trim()
+  if (!text) return raw.trim()
+
+  // `הליכוד - תנועה לאומית…` / en/em dashes
+  const dashHead = text.split(/\s+[–—-]\s+/)[0]?.trim()
+  if (dashHead && dashHead !== text) {
+    return matchKnownPartyLabel(dashHead) ?? dashHead
+  }
+
+  // `הליכוד בהנהגת בנימין נתניהו…` (no dash)
+  const withoutLeader = text.replace(/\s+בהנהגת\b.*$/u, '').trim()
+  if (withoutLeader && withoutLeader !== text) {
+    return matchKnownPartyLabel(withoutLeader) ?? withoutLeader
+  }
+
+  return matchKnownPartyLabel(text) ?? text
+}
+
+function matchKnownPartyLabel(text: string): string | null {
+  const normalized = text.replace(/["'״׳]/g, '').trim()
+  for (const label of KNOWN_PARTY_LABELS) {
+    if (
+      normalized === label ||
+      normalized.startsWith(`${label} `) ||
+      normalized.startsWith(`${label}-`) ||
+      normalized.startsWith(`${label}–`) ||
+      normalized.startsWith(`${label}—`)
+    ) {
+      return label
+    }
+  }
+  return null
+}
+
+/** Strip quotes so "הליכוד" / ״הליכוד״ map to the same key. */
+function normalizePartyKey(name: string | null | undefined): string {
+  const compressed = compressFactionLabel(name ?? '')
+  return compressed.replace(/["'״׳]/g, '').trim()
+}
+
+/**
+ * Stable party colors for the eras bar (ported from the old site's party_colors.js).
+ * Same party name → same color across different ministers / Knesset faction rows.
+ */
+const OFFICE_DASHBOARD_PARTY_COLORS: Record<string, string> = {
+  הליכוד: '#4169e1',
+  'יש עתיד': '#ffb326',
+  'המחנה הממלכתי': '#80caff',
+  'כחול לבן': '#80caff',
+  עבודה: '#6a0dad',
+  העבודה: '#6a0dad',
+  מרצ: '#1c7f08',
+  'עוצמה יהודית': '#ff702e',
+  'הציונות הדתית': '#8dc035',
+  'האיחוד הלאומי': '#8dc035',
+  ימינה: '#8dc035',
+  'הבית היהודי': '#8dc035',
+  'הימין הממלכתי': '#00008b',
+  שס: '#363636',
+  'יהדות התורה': '#1a4082',
+  רעמ: '#008000',
+  'חדש-תעל': '#db2121',
+  'ישראל ביתנו': '#251aa1',
+  נעם: '#add8e6',
+  כולנו: '#488ba1',
+  בלד: '#b33900',
+}
+
+function partyColorForEra(
+  factionName: string | null,
+  dbColor: string | null | undefined,
+): string {
+  const key = normalizePartyKey(factionName)
+  if (key && OFFICE_DASHBOARD_PARTY_COLORS[key]) {
+    return OFFICE_DASHBOARD_PARTY_COLORS[key]!
+  }
+  const trimmed = dbColor?.trim()
+  if (trimmed) return trimmed
+  if (key) return resolveFactionColor(null, null, key)
+  return '#9a9a9a'
+}
+
+/**
+ * Within one eras strip, force identical party labels to share one color
+ * (Knesset OData often stores the same party under different faction_ids/colors).
+ */
+function unifyEraFactionColors(
+  eras: OfficeDashboardMinisterEra[],
+): OfficeDashboardMinisterEra[] {
+  const colorByParty = new Map<string, string>()
+
+  for (const era of eras) {
+    const key = normalizePartyKey(era.factionName)
+    if (!key) continue
+    const color = era.factionColor?.trim()
+    if (color && !colorByParty.has(key)) {
+      colorByParty.set(key, color)
+    }
+  }
+
+  for (const era of eras) {
+    const key = normalizePartyKey(era.factionName)
+    if (!key || colorByParty.has(key)) continue
+    colorByParty.set(key, partyColorForEra(era.factionName, null))
+  }
+
+  return eras.map((era) => {
+    const compressedName = era.factionName
+      ? compressFactionLabel(era.factionName)
+      : null
+    const key = normalizePartyKey(compressedName)
+    if (!key) {
+      return compressedName === era.factionName
+        ? era
+        : { ...era, factionName: compressedName }
+    }
+    const color = colorByParty.get(key) ?? partyColorForEra(compressedName, era.factionColor)
+    if (color === era.factionColor && compressedName === era.factionName) {
+      return era
+    }
+    return {
+      ...era,
+      factionName: compressedName,
+      factionColor: color,
+    }
+  })
+}
+
+function resolveFactionAtDate(
+  memberships: MembershipForEra[],
+  personId: number,
+  atDate: string,
+): { factionName: string | null; factionColor: string | null } {
+  const forPerson = memberships
+    .filter((m) => m.personId === personId)
+    .filter((m) => Boolean(m.factionName?.trim()))
+    .sort((a, b) => (b.startDate ?? '').localeCompare(a.startDate ?? ''))
+
+  const containing = forPerson.find((m) => {
+    const start = m.startDate
+    const end = m.endDate
+    if (start && start > atDate) return false
+    return !end || end >= atDate
+  })
+  if (containing) {
+    return {
+      factionName: containing.factionName,
+      factionColor: containing.factionColor,
+    }
+  }
+
+  // Some Knesset rows leave faction_id null on the current term; use the
+  // latest membership that still has a party label (e.g. רגב 2022–today).
+  const latestBefore = forPerson.find(
+    (m) => !m.startDate || m.startDate <= atDate,
+  )
+  if (latestBefore) {
+    return {
+      factionName: latestBefore.factionName,
+      factionColor: latestBefore.factionColor,
+    }
+  }
+
+  // Last resort: any known party for this person (even if membership dates
+  // don't cover the appointment — better than a grey unlabeled era).
+  const anyFaction = forPerson[0]
+  return {
+    factionName: anyFaction?.factionName ?? null,
+    factionColor: anyFaction?.factionColor ?? null,
+  }
+}
+
+/** Build chronological minister eras for one portfolio (primary ministers only). */
+function buildMinisterEras(
+  rows: GovernmentAppointmentRow[],
+  memberships: MembershipForEra[],
+  today: string,
+): OfficeDashboardMinisterEra[] {
+  const primary = rows
+    .filter((row) => ministerRank(row) === 0)
+    .filter((row) => normalizeDate(row.start_date))
+    .sort((a, b) =>
+      (normalizeDate(a.start_date) ?? '').localeCompare(
+        normalizeDate(b.start_date) ?? '',
+      ),
+    )
+
+  type Draft = {
+    personId: number
+    fullName: string
+    imageUrl: string | null
+    startDate: string
+    endDate: string | null
+  }
+
+  const drafts: Draft[] = []
+  for (const row of primary) {
+    const startDate = normalizeDate(row.start_date)!
+    const endDate = normalizeDate(row.end_date)
+    const person = unwrapRelation<KnessetPerson>(row.person)
+    const last = drafts[drafts.length - 1]
+    if (last && last.personId === row.person_id) {
+      // Merge consecutive terms for the same person; null end = still open.
+      if (!last.endDate) {
+        // keep open
+      } else if (!endDate || endDate > last.endDate) {
+        last.endDate = endDate
+      }
+      if (!last.imageUrl && person?.image_url) {
+        last.imageUrl = person.image_url
+      }
+      continue
+    }
+    drafts.push({
+      personId: row.person_id,
+      fullName: person?.full_name ?? 'שר/ה',
+      imageUrl: person?.image_url ?? null,
+      startDate,
+      endDate,
+    })
+  }
+
+  return unifyEraFactionColors(
+    drafts.map((draft, i) => {
+      const next = drafts[i + 1]
+      const endDate =
+        next?.startDate ?? draft.endDate ?? today
+      const faction = resolveFactionAtDate(
+        memberships,
+        draft.personId,
+        draft.startDate,
+      )
+      return {
+        personId: draft.personId,
+        fullName: draft.fullName,
+        imageUrl: draft.imageUrl,
+        factionName: faction.factionName,
+        factionColor: partyColorForEra(
+          faction.factionName,
+          faction.factionColor,
+        ),
+        startDate: draft.startDate,
+        endDate,
+      }
+    }),
+  )
 }
 
 export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
@@ -215,16 +689,11 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
 
   let dataRows: IndexDataRow[] = []
   if (indexIds.length > 0) {
-    const { data: points, error: dataError } = await supabase
-      .from('index_data')
-      .select('id, index_id, label, value, recorded_at')
-      .in('index_id', indexIds)
-      .order('recorded_at', { ascending: true })
-
+    const { rows: points, error: dataError } = await fetchAllIndexData(indexIds)
     if (dataError) {
-      return { offices: [], error: dataError.message }
+      return { offices: [], error: dataError }
     }
-    dataRows = (points ?? []) as IndexDataRow[]
+    dataRows = points
   }
 
   const dataByIndex = new Map<number, IndexDataRow[]>()
@@ -258,27 +727,114 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
 
   if (activeGov) {
     refDate = normalizeDate(activeGov.end_date) ?? refDate
+    // Load all appointments for the government. Dashboard offices and current
+    // minister appointments often use different historical office_id duplicates
+    // that share the same Hebrew name — matching falls back by portfolio name.
     const { data: appts } = await supabase
       .from('minister_appointments')
       .select(
-        'id, person_id, government_id, office_id, start_date, end_date, duty_desc, is_acting, person:people(full_name, image_url)',
+        'id, person_id, government_id, office_id, start_date, end_date, duty_desc, is_acting, person:people(full_name, image_url), office:offices(name, knesset_category_name)',
       )
       .eq('government_id', activeGov.id)
-      .in('office_id', officeIds)
 
     appointmentRows = (appts ?? []) as unknown as GovernmentAppointmentRow[]
+  }
+
+  // Historical minister eras: collect every duplicate office id per portfolio needle,
+  // then load appointments across all governments for those ids.
+  const { data: allOfficeRows } = await supabase
+    .from('offices')
+    .select('id, name, knesset_category_name')
+
+  const portfolioOfficeIds = new Map<string, number[]>()
+  for (const needle of OFFICE_DASHBOARD_DISPLAY_ORDER) {
+    const ids = ((allOfficeRows ?? []) as Array<{
+      id: number
+      name: string | null
+      knesset_category_name: string | null
+    }>)
+      .filter((row) => officeMatchesNeedle(row, needle))
+      .map((row) => row.id)
+    portfolioOfficeIds.set(needle, ids)
+  }
+
+  const historyOfficeIds = [
+    ...new Set([...portfolioOfficeIds.values()].flat()),
+  ]
+
+  let historyAppts: GovernmentAppointmentRow[] = []
+  if (historyOfficeIds.length > 0) {
+    const { data: historyData } = await supabase
+      .from('minister_appointments')
+      .select(
+        'id, person_id, government_id, office_id, start_date, end_date, duty_desc, is_acting, person:people(full_name, image_url), office:offices(name, knesset_category_name)',
+      )
+      .in('office_id', historyOfficeIds)
+      .order('start_date', { ascending: true })
+
+    historyAppts = (historyData ?? []) as unknown as GovernmentAppointmentRow[]
+  }
+
+  const historyPersonIds = [
+    ...new Set(historyAppts.map((row) => row.person_id).filter(Boolean)),
+  ]
+
+  let memberships: MembershipForEra[] = []
+  if (historyPersonIds.length > 0) {
+    const { data: factionData } = await supabase
+      .from('knesset_memberships')
+      .select(
+        'person_id, faction_id, start_date, end_date, faction:knesset_factions(name, short_name, color)',
+      )
+      .in('person_id', historyPersonIds)
+      .order('start_date', { ascending: false })
+
+    memberships = (
+      (factionData ?? []) as unknown as GovernmentMembershipFactionRow[]
+    ).map((row) => {
+      const faction = unwrapRelation<KnessetFaction>(row.faction)
+      const factionName = shortFactionLabel(faction?.short_name, faction?.name)
+      return {
+        personId: row.person_id,
+        startDate: normalizeDate(row.start_date),
+        endDate: normalizeDate(row.end_date),
+        factionName,
+        factionColor: resolveFactionColor(
+          row.faction_id,
+          faction?.color,
+          factionName,
+        ),
+      }
+    })
+  }
+
+  const today = toDateString(new Date())
+  const erasByNeedle = new Map<string, OfficeDashboardMinisterEra[]>()
+  for (const needle of OFFICE_DASHBOARD_DISPLAY_ORDER) {
+    const ids = new Set(portfolioOfficeIds.get(needle) ?? [])
+    const rows = historyAppts.filter(
+      (row) => row.office_id !== null && ids.has(row.office_id),
+    )
+    erasByNeedle.set(needle, buildMinisterEras(rows, memberships, today))
   }
 
   const result: OfficeDashboardOffice[] = offices
     .map((row) => {
       const name = officeDisplayName(row)
       const officeIndexes = indexesByOffice.get(row.id) ?? []
+      const needle = portfolioNeedle(name)
       return {
         id: row.id,
         name,
         info: row.info,
         logoUrl: row.logo_url,
-        minister: pickMinisterForOffice(appointmentRows, row.id, refDate),
+        minister: pickMinisterForOffice(
+          appointmentRows,
+          row.id,
+          name,
+          refDate,
+        ),
+        ministerHistory: needle ? (erasByNeedle.get(needle) ?? []) : [],
         indexes: officeIndexes,
         kpis: officeIndexes.filter((i) => i.isKpi),
         policies: officeIndexes.filter((i) => !i.isKpi),
