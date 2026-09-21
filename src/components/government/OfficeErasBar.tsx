@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   OfficeDashboardMinisterEra,
   OfficeDashboardPoint,
@@ -265,6 +265,12 @@ function clampTooltipCenter(leftPct: number, widthPct: number): number {
   )
 }
 
+/** Desktop / mobile photo diameters (must match OfficeErasBar.css). */
+const PHOTO_SIZE_DESKTOP_PX = 42
+const PHOTO_SIZE_MOBILE_PX = 30
+/** Horizontal clip padding when showing a photo (photo-only uses 4px each side). */
+const PHOTO_INLINE_PAD_PX = 8
+
 export function OfficeErasBar({
   eras,
   points,
@@ -273,7 +279,36 @@ export function OfficeErasBar({
   onHoverBand,
 }: OfficeErasBarProps) {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  const [plotWidthPx, setPlotWidthPx] = useState(0)
+  const plotRef = useRef<HTMLDivElement | null>(null)
   const lastTouchRef = useRef(0)
+
+  useLayoutEffect(() => {
+    const node = plotRef.current
+    if (!node) return
+    const apply = (w: number) => {
+      if (w > 0) {
+        setPlotWidthPx((prev) => (Math.abs(prev - w) < 0.5 ? prev : w))
+      }
+    }
+    apply(node.getBoundingClientRect().width)
+    const ro =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver((entries) => {
+            const entry = entries[0]
+            apply(entry?.contentRect.width || node.getBoundingClientRect().width)
+          })
+        : null
+    ro?.observe(node)
+    return () => ro?.disconnect()
+  }, [])
+
+  const photoSizePx =
+    plotWidthPx > 0 && plotWidthPx < 700
+      ? PHOTO_SIZE_MOBILE_PX
+      : PHOTO_SIZE_DESKTOP_PX
+  /** Segment must fit a perfect circle — never squeeze photos into ellipses. */
+  const minPhotoSegmentPx = photoSizePx + PHOTO_INLINE_PAD_PX
 
   const setEraHover = (
     key: string | null,
@@ -465,12 +500,19 @@ export function OfficeErasBar({
         ) : null}
       </div>
 
-      <div className="office-eras-bar__plot">
+      <div className="office-eras-bar__plot" ref={plotRef}>
         {visible.map(({ era, leftPct, widthPct }) => {
           const color = era.factionColor?.trim() || FALLBACK_COLOR
-          // Thresholds are % of full chart width (~same visual as before on the series).
+          // Name/party when the segment is fairly wide (% of chart).
           const showFull = widthPct >= 14
-          const showPhoto = widthPct >= 7
+          // Photos only when the segment is wide enough in CSS px for a true
+          // circle (avoids max-width:100% ellipses on narrow mobile segments).
+          const segmentPx =
+            plotWidthPx > 0 ? (widthPct / 100) * plotWidthPx : 0
+          const showPhoto =
+            plotWidthPx > 0
+              ? segmentPx >= minPhotoSegmentPx
+              : widthPct >= 7
           const photoOnly = showPhoto && !showFull
           const key = eraKey(era)
           const isHovered = hoveredKey === key
@@ -535,8 +577,8 @@ export function OfficeErasBar({
                         ? ''
                         : ' office-eras-bar__photo--placeholder'
                     }`}
-                    width={42}
-                    height={42}
+                    width={photoSizePx}
+                    height={photoSizePx}
                     loading="lazy"
                     decoding="async"
                   />

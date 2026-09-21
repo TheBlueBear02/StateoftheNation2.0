@@ -71,6 +71,9 @@
 .office-eras-bar__photo {
   width: 42px;
   height: 42px;
+  /* Beat global `img { max-width:100%; height:auto }` so circles stay round. */
+  max-width: none;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid rgba(255, 255, 255, 0.9);
@@ -242,6 +245,8 @@
   .office-eras-bar__photo {
     width: 36px;
     height: 36px;
+    max-width: none;
+    aspect-ratio: 1 / 1;
   }
 
   .office-eras-bar__name {

@@ -1224,6 +1224,8 @@
 .office-dashboard-page--mobile .office-eras-bar__photo {
   width: 30px;
   height: 30px;
+  max-width: none;
+  aspect-ratio: 1 / 1;
 }
 
 .office-dashboard-page--mobile .office-eras-bar__clip {
