@@ -145,6 +145,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Same news-block layout: title **מצב האומה: מדדי משרדי הממשלה לאורך זמן** + category tag **הממשלה** below it (no description / meta line).
 - Whole section links to `/government/dashboard` (KPI/policy quadrant; see [GovernmentDashboardPage.md](./GovernmentDashboardPage.md)).
 - `.project-section__inner.container`: ~`0.95fr / 1.2fr` grid (media larger). DOM order is content first, media second — text right, preview left in RTL.
+- ≤900px: same stack as the institutions cards — image above, title + tag below (`flex-direction: column-reverse` so media sits on top without changing DOM order). Desktop layout unchanged.
 - Hover on `.project-section__inner`: light grey background on the whole content box. Hover on title or media: title underline. Whole section remains clickable; focus-visible outline on the link.
 - Tag (`.project-section__tag`): square corners, `--color-blue` fill / white text.
 - Media: static screenshot `public/government-offices-homepage.png` (same pattern as polls/elections teasers — no live Supabase fetch on the homepage).
@@ -170,7 +171,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Each card stacks **image above text** (title + category tag); text stays RTL **right-aligned**.
 - RTL DOM order: **הממשלה** (`/government`, title **ממשלת ישראל: הרכב ממשלת ישראל כיום ובעבר**) first (visual right), **הכנסת** (`/knesset`, title **כנסת ישראל: הרכב הכנסת כיום ולאורך ההיסטוריה**) second (visual left).
 - Media: `government-building-homepage.svg` and `knesset-building-homepage.svg` (blue drawing style; no flags).
-- ≤900px: cards stack to a single column.
+- Stays **two columns on mobile** as well (tighter gap/padding and slightly smaller titles).
 - Hover/focus: light grey card background + title underline.
 
 ### 9. Footer (`site-footer`)
@@ -214,7 +215,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 ## Responsive Behavior
 
-- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Project sections keep the desktop side-by-side layout (text RTL-start / right, media left); gap and type scale down. Container padding remains fluid via `clamp()`.
+- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Single-project teasers (dream, dashboard, polls, lists) switch to **image above / text below** (`column-reverse` on `.project-section__inner`); desktop stays the side-by-side grid. The government + Knesset pair stays **two columns**. Container padding remains fluid via `clamp()`.
 - **≤480px:** Hero buttons become single column; header height, logo, and date text scale down (non-home / desktop-style header).
 
 ## Future Work

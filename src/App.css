@@ -578,16 +578,22 @@
     padding-block: 28px 36px;
   }
 
+  /* Stack image above text (media is second in DOM → column-reverse) */
   .project-section__inner {
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+    display: flex;
+    flex-direction: column-reverse;
     gap: 16px;
-    align-items: center;
+    align-items: stretch;
     padding: 12px;
   }
 
   .project-section__content {
     max-width: none;
-    gap: 10px;
+    width: 100%;
+    gap: 12px;
+    text-align: right;
+    padding-inline: clamp(12px, 2.5vw, 28px);
+    box-sizing: border-box;
   }
 
   .project-section__tag {
@@ -599,14 +605,24 @@
     font-size: clamp(1rem, 3.6vw, 1.25rem);
   }
 
+  /* Keep government + knesset side by side on mobile */
   .institutions-pair {
-    grid-template-columns: 1fr;
-    gap: 18px;
+    gap: 12px;
     padding: 12px;
+  }
+
+  .institutions-pair__card {
+    gap: 12px;
+    padding: 8px;
   }
 
   .institutions-pair__content {
     max-width: none;
+    padding-inline: 4px;
+  }
+
+  .institutions-pair__content .project-section__title {
+    font-size: clamp(0.9rem, 3.2vw, 1.1rem);
   }
 }
 
