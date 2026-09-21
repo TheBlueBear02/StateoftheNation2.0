@@ -312,3 +312,61 @@ export async function fetchPolls(
 
   return { polls, error: null }
 }
+
+/** Newest non-scenario poll fieldwork end for the active election (lightweight homepage meta). */
+export async function fetchLatestPollFieldworkEnd(
+  client: SupabaseClient,
+): Promise<{ fieldworkEnd: string | null; error: string | null }> {
+  const { data: electionData, error: electionError } = await client
+    .from('elections')
+    .select('id')
+    .eq('year', ACTIVE_ELECTION_YEAR)
+    .maybeSingle()
+
+  if (electionError || !electionData) {
+    return {
+      fieldworkEnd: null,
+      error: electionError?.message ?? 'Election not found',
+    }
+  }
+
+  const { data, error } = await client
+    .from('polls')
+    .select('fieldwork_end')
+    .eq('election_id', electionData.id)
+    .eq('is_scenario', false)
+    .order('fieldwork_end', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    return { fieldworkEnd: null, error: error.message }
+  }
+
+  return { fieldworkEnd: data?.fieldwork_end ?? null, error: null }
+}
+
+/** Format a poll date as `D.M.YYYY` in Asia/Jerusalem. */
+export function formatPollDateLabel(isoDate: string): string | null {
+  const raw = isoDate.includes('T') ? isoDate : `${isoDate}T12:00:00`
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Jerusalem',
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+  }).formatToParts(date)
+
+  const day = parts.find((part) => part.type === 'day')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const year = parts.find((part) => part.type === 'year')?.value
+  if (!day || !month || !year) {
+    return null
+  }
+
+  return `${Number(day)}.${Number(month)}.${year}`
+}

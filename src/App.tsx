@@ -6,6 +6,7 @@ import { SiteLayout } from './components/SiteLayout'
 import { ListsGamePromo } from './components/elections/ListsGamePromo'
 import { DreamGovernmentPromo } from './components/elections/DreamGovernmentPromo'
 import { useSiteUpdates } from './hooks/useSiteUpdates'
+import { useLatestPollDate } from './hooks/useLatestPollDate'
 
 const HERO_BUTTONS = [
   { label: 'בחירות 2026', to: '/elections' },
@@ -25,6 +26,7 @@ function App() {
   const [heroVideoReady, setHeroVideoReady] = useState(false)
   const [heroVideoFailed, setHeroVideoFailed] = useState(false)
   const { items: newsItems } = useSiteUpdates()
+  const { dateLabel: pollsUpdatedLabel } = useLatestPollDate()
 
   useEffect(() => {
     const video = heroVideoRef.current
@@ -199,6 +201,12 @@ function App() {
                     decoding="async"
                   />
                 </div>
+
+                {pollsUpdatedLabel ? (
+                  <p className="project-section__meta">
+                    עודכן לאחרונה {pollsUpdatedLabel}
+                  </p>
+                ) : null}
               </div>
             </div>
           </Link>
@@ -208,7 +216,7 @@ function App() {
 
         <section
           id="institutions"
-          className="project-section"
+          className="project-section project-section--alt"
           aria-label="הממשלה והכנסת"
         >
           <div className="container">
