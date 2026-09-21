@@ -39,6 +39,7 @@ Set `robots: { index: false, follow: false }` on:
 
 - `/elections/edit`
 - `/elections/polls/edit`
+- `/elections/dream-government/dashboard` (dev-only; also `notFound` outside development)
 - `/knesset/edit`
 - `/piplines` (internal docs)
 

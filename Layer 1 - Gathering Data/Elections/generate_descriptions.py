@@ -189,18 +189,25 @@ def generate_description(
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def run(sb: Client, openai_client: OpenAI, dry_run: bool) -> None:
+def run(
+    sb: Client,
+    openai_client: OpenAI,
+    dry_run: bool,
+    party_id: int | None = None,
+) -> None:
     election_id = get_election_id(sb)
 
     # Load candidates without a description, joined to people + party name
-    ec_rows = (
+    query = (
         sb.table("election_candidates")
         .select("id, person_id, party_id")
         .eq("election_id", election_id)
         .is_("description", "null")
-        .execute()
-        .data
     )
+    if party_id is not None:
+        query = query.eq("party_id", party_id)
+
+    ec_rows = query.execute().data
     if not ec_rows:
         log.info("All candidates already have descriptions.")
         return
@@ -276,11 +283,12 @@ def run(sb: Client, openai_client: OpenAI, dry_run: bool) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Stage 3 — generate Hebrew descriptions")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--party-id", type=int, default=None)
     args = parser.parse_args()
 
     sb     = get_supabase()
     openai = get_openai()
-    run(sb, openai, args.dry_run)
+    run(sb, openai, args.dry_run, party_id=args.party_id)
 
 
 if __name__ == "__main__":

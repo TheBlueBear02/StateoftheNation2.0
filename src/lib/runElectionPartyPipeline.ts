@@ -95,7 +95,10 @@ export async function insertPartyPipelineList(input: {
   return parseResponse(response)
 }
 
-export async function runPartyPipelineStage(stage: number): Promise<
+export async function runPartyPipelineStage(
+  stage: number,
+  partyId?: number,
+): Promise<
   | { ok: true; message?: string; reviewCount?: number }
   | PipelineError
 > {
@@ -106,7 +109,10 @@ export async function runPartyPipelineStage(stage: number): Promise<
   const response = await fetch('/api/elections/pipeline/stage', {
     method: 'POST',
     headers: getEditHeaders(),
-    body: JSON.stringify({ stage }),
+    body: JSON.stringify({
+      stage,
+      ...(partyId != null ? { partyId } : {}),
+    }),
   })
 
   return parseResponse(response)

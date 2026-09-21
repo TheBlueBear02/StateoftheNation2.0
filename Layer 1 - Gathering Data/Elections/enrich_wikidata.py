@@ -62,18 +62,25 @@ def get_election_id(sb: Client, year: int = 2026) -> int:
 
 # ── Fetch candidates needing enrichment ───────────────────────────────────────
 
-def load_candidates(sb: Client, election_id: int) -> list[dict]:
+def load_candidates(
+    sb: Client,
+    election_id: int,
+    party_id: int | None = None,
+) -> list[dict]:
     """
-    Return all election candidates joined with their people row,
-    so we know which fields are already populated.
+    Return election candidates joined with their people row.
+    Optionally scoped to one party. Only includes people who still
+    have at least one enrichable NULL field.
     """
-    ec_rows = (
+    query = (
         sb.table("election_candidates")
-        .select("id, person_id, city")
+        .select("id, person_id, city, party_id")
         .eq("election_id", election_id)
-        .execute()
-        .data
     )
+    if party_id is not None:
+        query = query.eq("party_id", party_id)
+
+    ec_rows = query.execute().data
     if not ec_rows:
         return []
 
@@ -94,21 +101,31 @@ def load_candidates(sb: Client, election_id: int) -> list[dict]:
 
     people_by_id = {p["id"]: p for p in people}
 
-    # Combine
+    # Combine — keep only rows that still need enrichment
     result = []
     for ec in ec_rows:
         person = people_by_id.get(ec["person_id"])
-        if person:
-            result.append({
-                "ec_id":      ec["id"],
-                "person_id":  ec["person_id"],
-                "full_name":  person["full_name"],
-                "birth_date": person["birth_date"],
-                "gender":     person["gender"],
-                "image_url":  person["image_url"],
-                "wikidata_id": person.get("wikidata_id"),
-                "ec_city":    ec["city"],
-            })
+        if not person:
+            continue
+        candidate = {
+            "ec_id":      ec["id"],
+            "person_id":  ec["person_id"],
+            "full_name":  person["full_name"],
+            "birth_date": person["birth_date"],
+            "gender":     person["gender"],
+            "image_url":  person["image_url"],
+            "wikidata_id": person.get("wikidata_id"),
+            "ec_city":    ec["city"],
+        }
+        if (
+            candidate["wikidata_id"]
+            and candidate["birth_date"]
+            and candidate["gender"]
+            and candidate["image_url"]
+            and candidate["ec_city"]
+        ):
+            continue
+        result.append(candidate)
     return result
 
 
@@ -240,10 +257,19 @@ def apply_enrichment(
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def run(sb: Client, dry_run: bool) -> None:
+def run(sb: Client, dry_run: bool, party_id: int | None = None) -> None:
     election_id = get_election_id(sb)
-    candidates  = load_candidates(sb, election_id)
-    log.info("Enriching %d election candidates via Wikidata…", len(candidates))
+    candidates  = load_candidates(sb, election_id, party_id=party_id)
+    scope = f"party_id={party_id}" if party_id is not None else "all parties"
+    log.info(
+        "Enriching %d election candidates via Wikidata (%s)…",
+        len(candidates),
+        scope,
+    )
+
+    if not candidates:
+        log.info("Nothing to enrich.")
+        return
 
     # Build name → candidate lookup
     name_map = {c["full_name"]: c for c in candidates}
@@ -276,10 +302,11 @@ def run(sb: Client, dry_run: bool) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Stage 2 — Wikidata enrichment")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--party-id", type=int, default=None)
     args = parser.parse_args()
 
     sb = get_supabase()
-    run(sb, args.dry_run)
+    run(sb, args.dry_run, party_id=args.party_id)
 
 
 if __name__ == "__main__":

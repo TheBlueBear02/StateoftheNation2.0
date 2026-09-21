@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { SiteLayout } from '../components/SiteLayout'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { DreamOfficePickerModal } from '../components/elections/dream/DreamOfficePickerModal'
@@ -9,59 +10,165 @@ import {
   type DreamOfficeSelection,
 } from '../components/elections/dream/DreamOfficeSquare'
 import { ShareableGovernment } from '../components/elections/dream/ShareableGovernment'
+import { useDreamCabinetStats } from '../hooks/useDreamCabinetStats'
 import { useElectionParties } from '../hooks/useElectionParties'
 import {
+  getOrCreateDreamGovClientId,
+  hasSharedDreamGovernment,
+  markDreamGovernmentShared,
+} from '../lib/dreamGovClientId'
+import {
+  loadDreamGovPicksFromCookie,
+  saveDreamGovPicksToCookie,
+} from '../lib/dreamGovPicksCookie'
+import {
+  DREAM_ALL_OFFICES,
   DREAM_MINISTER_OFFICES,
   DREAM_PM_OFFICE,
   type DreamOffice,
   type DreamOfficeId,
 } from '../lib/dreamGovernmentOffices'
+import { fetchElectionCandidates } from '../lib/fetchElectionCandidates'
+import {
+  getDreamPickStatForDisplay,
+  submitDreamCabinetPicks,
+} from '../lib/fetchDreamCabinetStats'
+import {
+  USE_DREAM_GOV_MOCK_STATS,
+  buildMockDreamPickPercentages,
+  mockDreamPickStat,
+} from '../lib/dreamGovMockStats'
 import { exportNodeToPng } from '../lib/inlineImagesForExport'
+import { sharePngImage } from '../lib/sharePngImage'
+import { supabase } from '../lib/supabase'
 import './DreamGovernmentPage.css'
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement('a')
-  link.download = filename
-  link.href = dataUrl
-  link.click()
-}
-
-async function copyImageToClipboard(blob: Blob): Promise<boolean> {
-  if (
-    typeof navigator === 'undefined' ||
-    !navigator.clipboard ||
-    typeof ClipboardItem === 'undefined'
-  ) {
-    return false
-  }
-
-  try {
-    await navigator.clipboard.write([
-      new ClipboardItem({ 'image/png': blob }),
-    ])
-    return true
-  } catch {
-    return false
-  }
-}
 
 export function DreamGovernmentPage() {
   const { parties, loading: partiesLoading, error: partiesError } =
     useElectionParties()
+  const {
+    stats,
+    refetch: refetchStats,
+    applyLocalPicks,
+  } = useDreamCabinetStats()
   const shareRef = useRef<HTMLDivElement>(null)
 
   const [selections, setSelections] = useState<
     Partial<Record<DreamOfficeId, DreamOfficeSelection>>
   >({})
+  const [picksReady, setPicksReady] = useState(false)
   const [activeOffice, setActiveOffice] = useState<DreamOffice | null>(null)
   const [exporting, setExporting] = useState(false)
   const [copiedFlash, setCopiedFlash] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
+  const [showPickStats, setShowPickStats] = useState(
+    () => USE_DREAM_GOV_MOCK_STATS,
+  )
+  const [mockPercentages] = useState(buildMockDreamPickPercentages)
 
   const filledCount = useMemo(
     () => Object.keys(selections).length,
     [selections],
   )
+
+  useEffect(() => {
+    if (USE_DREAM_GOV_MOCK_STATS) {
+      setShowPickStats(true)
+      return
+    }
+    setShowPickStats(hasSharedDreamGovernment())
+  }, [])
+
+  // Restore cabinet picks from cookie once party list is available.
+  useEffect(() => {
+    if (picksReady) return
+    if (partiesLoading) return
+    if (partiesError) {
+      setPicksReady(true)
+      return
+    }
+
+    const stored = loadDreamGovPicksFromCookie()
+    const client = supabase
+    if (stored.length === 0 || !client) {
+      setPicksReady(true)
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      const partyIds = [...new Set(stored.map((pick) => pick.partyId))]
+      const candidatesByParty = new Map<
+        number,
+        Awaited<ReturnType<typeof fetchElectionCandidates>>['candidates']
+      >()
+
+      await Promise.all(
+        partyIds.map(async (partyId) => {
+          const result = await fetchElectionCandidates(client, partyId)
+          candidatesByParty.set(partyId, result.candidates)
+        }),
+      )
+
+      if (cancelled) return
+
+      const next: Partial<Record<DreamOfficeId, DreamOfficeSelection>> = {}
+      for (const pick of stored) {
+        const party = parties.find((row) => row.id === pick.partyId)
+        const candidate = candidatesByParty
+          .get(pick.partyId)
+          ?.find((row) => row.id === pick.candidateId)
+        if (!party || !candidate) continue
+        next[pick.officeId] = { candidate, party }
+      }
+
+      setSelections(next)
+      setPicksReady(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [parties, partiesError, partiesLoading, picksReady])
+
+  // Persist picks to cookie after hydration (and on every later change).
+  useEffect(() => {
+    if (!picksReady) return
+    saveDreamGovPicksToCookie(selections)
+  }, [selections, picksReady])
+
+  const pickStatFor = (officeId: DreamOfficeId) => {
+    if (!showPickStats) return null
+    const selection = selections[officeId]
+    if (!selection) return null
+    if (USE_DREAM_GOV_MOCK_STATS) {
+      return mockDreamPickStat(mockPercentages[officeId])
+    }
+    return getDreamPickStatForDisplay(
+      stats.offices[officeId],
+      selection.candidate.id,
+    )
+  }
+
+  /** Always include % on the export card for filled seats (not gated by unlock). */
+  const sharePickStats = useMemo(() => {
+    const next: Partial<
+      Record<DreamOfficeId, ReturnType<typeof getDreamPickStatForDisplay>>
+    > = {}
+    for (const office of DREAM_ALL_OFFICES) {
+      const selection = selections[office.id]
+      if (!selection) continue
+      const stat = USE_DREAM_GOV_MOCK_STATS
+        ? mockDreamPickStat(mockPercentages[office.id])
+        : getDreamPickStatForDisplay(
+            stats.offices[office.id],
+            selection.candidate.id,
+          )
+      if (stat) next[office.id] = stat
+    }
+    return next
+  }, [selections, stats, mockPercentages])
 
   useEffect(() => {
     if (!copiedFlash) return
@@ -88,26 +195,69 @@ export function DreamGovernmentPage() {
     setCopiedFlash(false)
     setShareError(null)
 
-    try {
-      // Clone + inline off-DOM so React re-renders (setExporting) cannot
-      // reset portrait <img src> back to remote URLs mid-export.
-      const dataUrl = await exportNodeToPng(node, {
-        pixelRatio: 2,
-        backgroundColor: '#040a14',
-        skipAutoScale: true,
-      })
-      const response = await fetch(dataUrl)
-      const blob = await response.blob()
-      if (blob.size < 100) {
-        throw new Error('Exported image was empty')
-      }
-      const copied = await copyImageToClipboard(blob)
+    const picks = (
+      Object.entries(selections) as Array<
+        [DreamOfficeId, DreamOfficeSelection]
+      >
+    ).map(([officeId, selection]) => ({
+      officeId,
+      candidateId: selection.candidate.id,
+    }))
 
-      if (copied) {
+    try {
+      // Fold this share into local aggregates before export so the PNG
+      // includes up-to-date % badges (first sharer sees 100%, etc.).
+      if (picks.length > 0) {
+        flushSync(() => {
+          applyLocalPicks(picks)
+        })
+      }
+
+      // Safari/iOS: start clipboard.write in this gesture turn with a
+      // Promise<Blob> (export runs inside the promise). Falls back to Web
+      // Share / download when clipboard image write is unavailable.
+      const shareResult = await sharePngImage({
+        filename: 'dream-government.png',
+        shareTitle: 'ממשלת החלומות · מצב האומה',
+        shareText: 'הרכיבו גם את ממשלת החלומות שלכם',
+        makeBlob: async () => {
+          const dataUrl = await exportNodeToPng(node, {
+            pixelRatio: 2,
+            backgroundColor: '#040a14',
+            skipAutoScale: true,
+          })
+          const response = await fetch(dataUrl)
+          return response.blob()
+        },
+      })
+
+      if (!shareResult.ok) {
+        throw new Error(shareResult.error)
+      }
+
+      if (shareResult.method === 'clipboard') {
         setCopiedFlash(true)
-      } else {
-        downloadDataUrl(dataUrl, 'dream-government.png')
-        setShareError('התמונה הורדה — העלו אותה לרשת החברתית')
+      } else if (shareResult.method === 'download') {
+        setShareError(
+          'התמונה נפתחה או הורדה — במובייל לחצו לחיצה ארוכה כדי לשתף או לשמור',
+        )
+      }
+
+      markDreamGovernmentShared()
+      setShowPickStats(true)
+
+      // Best-effort: persist picks after a successful share export.
+      try {
+        if (picks.length > 0) {
+          await submitDreamCabinetPicks({
+            clientId: getOrCreateDreamGovClientId(),
+            electionId: stats.electionId,
+            picks,
+          })
+          void refetchStats()
+        }
+      } catch (submitError) {
+        console.error('[dream-government] pick submit failed', submitError)
       }
     } catch (error) {
       console.error('[dream-government] share export failed', error)
@@ -128,9 +278,12 @@ export function DreamGovernmentPage() {
                 { label: 'ממשלת החלומות', to: '/elections/dream-government' },
               ]}
             />
-            <h1 className="dream-gov-page__title">ממשלת החלומות שלי</h1>
+            <h1 className="dream-gov-page__title">
+              בחרו את ממשלת החלומות שלכם
+            </h1>
             <p className="dream-gov-page__subtitle">
-              בחרו את שרי החולומות שלכם מבין המועמדים לכנסת
+              אם יכולתם לבחור את השרים בבחירות ישירות איך הייתה נראת הממשלה
+              שלכם? לאחר שתבחרו תוכלו לראות כמה אנשים בחרו כמוכם.
             </p>
           </header>
 
@@ -222,6 +375,7 @@ export function DreamGovernmentPage() {
                     <DreamOfficeSquare
                       office={DREAM_PM_OFFICE}
                       selection={selections.pm ?? null}
+                      pickStat={pickStatFor('pm')}
                       onClick={() => setActiveOffice(DREAM_PM_OFFICE)}
                     />
                   </div>
@@ -232,6 +386,7 @@ export function DreamGovernmentPage() {
                         key={office.id}
                         office={office}
                         selection={selections[office.id] ?? null}
+                        pickStat={pickStatFor(office.id)}
                         onClick={() => setActiveOffice(office)}
                       />
                     ))}
@@ -280,7 +435,11 @@ export function DreamGovernmentPage() {
       ) : null}
 
       <div className="dream-share-card-host" aria-hidden="true">
-        <ShareableGovernment ref={shareRef} selections={selections} />
+        <ShareableGovernment
+          ref={shareRef}
+          selections={selections}
+          pickStats={sharePickStats}
+        />
       </div>
     </SiteLayout>
   )

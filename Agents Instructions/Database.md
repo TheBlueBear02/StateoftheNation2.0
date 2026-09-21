@@ -13,11 +13,11 @@ The schema is split into four logical groups:
 | **Knesset** | `people` · `knessets` · `knesset_factions` · `knesset_memberships` | Live — powers the Knesset page |
 | **Government** | `governments` · `offices` · `minister_appointments` | Seeded — powers the Government page |
 | **KPI data** | `indexes` · `index_data` | Live — `/government/dashboard` |
-| **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` | Live — `/elections`, party detail, lists game, edit |
+| **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` · `dream_cabinet_picks` | Live — `/elections`, party detail, lists game, dream government, edit |
 | **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` · `pollsters` | Live — `/elections/polls`, `/piplines` |
 | **Site** | `site_updates` | Live — homepage news strip |
 
-All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE.
+All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE. Dream-government pick upserts use a **public** service-role API (`/api/elections/dream-government/submit`) with an anonymous `client_id` (no edit secret).
 
 ---
 
@@ -32,6 +32,8 @@ people ──────────────────┬── knesset_m
         │
         └── election_candidates ── election_parties ── elections
                                           └── knesset_factions (post-election)
+
+dream_cabinet_picks ── elections / election_candidates / people / election_parties
 
 raw_candidate_lists ──► election_candidates  (via pipeline)
 
@@ -383,6 +385,31 @@ using (true);
 
 ---
 
+### `dream_cabinet_picks`
+
+Anonymous per-seat votes from `/elections/dream-government`. One current pick per browser (`client_id`) per office per election. Written on successful share (upsert); read as aggregates for the bottom-left % badges.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `election_id` | bigint | FK → `elections.id` |
+| `client_id` | uuid | Anonymous browser id (`localStorage` `dream-gov-client-id`) |
+| `office_id` | text | Dream seat id: `pm` \| `defense` \| `foreign` \| `finance` \| `justice` \| `education` \| `national_security` |
+| `candidate_id` | bigint | FK → `election_candidates.id` |
+| `person_id` | bigint | FK → `people.id` (denormalized from candidate) |
+| `party_id` | bigint | FK → `election_parties.id` (denormalized from candidate) |
+| `updated_at` | timestamp (no tz) | Last upsert time as **Israel local wall-clock** (`Asia/Jerusalem`, DST-aware). Set by DB triggers — not by the API. |
+
+**Unique:** `(election_id, client_id, office_id)` — re-share updates the same browser’s vote for that seat.
+
+**Schema file:** `Layer 1 - Gathering Data/schema_dream_cabinet_picks.sql` (apply in Supabase SQL editor). If the table already exists with `timestamptz`, run the migration block at the bottom of that file (convert via `timezone('Asia/Jerusalem', updated_at)`), then re-apply the INSERT/UPDATE triggers.
+
+**RLS:** enabled with **no** anon/authenticated policies on the base table (hides `client_id`). Writes via service role from `POST /api/elections/dream-government/submit`. Aggregates via security-definer RPC `get_dream_cabinet_pick_stats(p_election_id)` (executable by anon; also used by `GET /api/elections/dream-government/stats` with the service key).
+
+**API:** public Next routes under `src/app/api/elections/dream-government/` for submit + stats (no edit secret). Dev-only dashboard at `GET /api/elections/dream-government/dashboard` (`NODE_ENV=development`) reads the base table via service role for unique voters and daily activity.
+
+---
+
 ### `raw_candidate_lists`
 
 Staging table. The only place where data is inserted manually. The election pipeline reads from here and writes to `election_candidates`.
@@ -635,7 +662,7 @@ Live on Supabase (applied; one-shot migration scripts removed from the repo). In
 | `poll_aggregates` UNIQUE `(election_id, party_id, as_of_date, method)` | Idempotent aggregate upserts |
 | `pipeline_sync_state` UNIQUE `(pipeline, resource)` | One revid cache row per resource |
 | `raw_poll_rows` UNIQUE `(natural_key, content_hash)` | Dedup staging payloads |
-| `raw_candidate_lists` partial UNIQUE `(party_id, list_position) WHERE processed = false` | No duplicate open staging slots; allows kept `processed=true` rows when re-inserting |
+| `dream_cabinet_picks` UNIQUE `(election_id, client_id, office_id)` | One current dream-gov vote per browser per seat |
 | `pollster_house_effects` UNIQUE `(pollster, party_id, as_of_date)` | Idempotent house-effect upserts |
 | Partial unique on `knessets.is_active` / `governments.is_active` | At most one active term/government |
 | Date-order CHECKs | `end_date >= start_date` (or null end) on terms, memberships, appointments, factions, poll fieldwork |
@@ -650,7 +677,7 @@ Live on Supabase (applied; one-shot migration scripts removed from the repo). Co
 | Area | Indexes |
 |------|---------|
 | Knesset / government | `knesset_memberships` (person, knesset, faction); `knesset_factions(knesset_id)`; `minister_appointments` (person, government, office); `governments(knesset_id)` |
-| Elections | `election_candidates` (election, person); confirmed parties by election; `people(full_name)`; raw list pending/party |
+| Elections | `election_candidates` (election, person); confirmed parties by election; `people(full_name)`; raw list pending/party; `dream_cabinet_picks(election_id, office_id, candidate_id)` |
 | Polls | `polls` (election, fieldwork, regular, publisher); `poll_results(party_id)`; aggregates lookup; pending raw rows; aliases; lineage |
 | KPI | `indexes(office_id)`; `index_data(index_id, recorded_at)` |
 
@@ -685,6 +712,6 @@ Live on Supabase (applied; one-shot migration script removed from the repo).
 
 | Behavior | Relationships |
 |----------|----------------|
-| `CASCADE` | `poll_results` ← polls; aggregates/aliases/house effects/lineage ← `election_parties`; `index_data` ← indexes; `raw_candidate_lists` ← party |
+| `CASCADE` | `poll_results` ← polls; aggregates/aliases/house effects/lineage ← `election_parties`; `index_data` ← indexes; `raw_candidate_lists` ← party; `dream_cabinet_picks` ← election / candidate / person / party |
 | `SET NULL` | `polls.raw_poll_row_id`, `polls.publisher_id`, `polls.pollster_id`, `election_parties.knesset_faction_id` |
 | Restrict (default) | `people` / party / knesset roots — refuse delete while memberships, candidates, or appointments still reference them |

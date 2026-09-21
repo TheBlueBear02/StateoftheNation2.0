@@ -11,6 +11,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           '/elections/edit',
           '/elections/polls/edit',
+          '/elections/dream-government/dashboard',
           '/knesset/edit',
           '/piplines',
           '/api/',

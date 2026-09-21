@@ -16,11 +16,11 @@ export const maxDuration = 300
 const ENRICH_TIMEOUT_MS = 90_000
 const STAGE_TIMEOUT_MS: Record<number, number> = {
   1: 120_000,
-  2: 120_000,
+  2: 600_000,
   3: 600_000,
   4: 900_000,
-  5: 120_000,
-  6: 120_000,
+  5: 300_000,
+  6: 300_000,
 }
 const PIPELINE_DEFAULT_TIMEOUT_MS = 120_000
 
@@ -354,22 +354,39 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     if (route === 'pipeline/stage') {
-      const body = (await request.json()) as { stage?: number }
+      const body = (await request.json()) as {
+        stage?: number
+        partyId?: number
+      }
       const stage = Number(body?.stage)
+      const partyId =
+        body?.partyId !== undefined ? Number(body.partyId) : null
 
       if (!Number.isInteger(stage) || stage < 1 || stage > 6) {
         return jsonError('מספר שלב לא תקין', 400)
       }
 
+      if (
+        partyId !== null &&
+        (!Number.isInteger(partyId) || partyId < 1)
+      ) {
+        return jsonError('מזהה מפלגה לא תקין', 400)
+      }
+
+      const args = [
+        'run_party_pipeline_api.py',
+        'stage',
+        '--stage',
+        String(stage),
+        '--json',
+      ]
+      if (partyId !== null) {
+        args.push('--party-id', String(partyId))
+      }
+
       const result = await runPythonScript(
         ELECTIONS_DIR,
-        [
-          'run_party_pipeline_api.py',
-          'stage',
-          '--stage',
-          String(stage),
-          '--json',
-        ],
+        args,
         {
           timeoutMs: STAGE_TIMEOUT_MS[stage] ?? PIPELINE_DEFAULT_TIMEOUT_MS,
         },

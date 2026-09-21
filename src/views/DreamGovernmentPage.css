@@ -123,7 +123,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 48px 18px 28px;
+  padding: 48px 40px 28px;
   border-radius: 12px;
   background: var(--dream-report-bg);
   color: var(--color-white);
@@ -258,6 +258,7 @@
   align-items: center;
   gap: 12px;
   width: 100%;
+  overflow: visible;
 }
 
 .dream-gov-board__pm {
@@ -280,13 +281,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   width: 100%;
   max-width: var(--dream-slot-max);
 }
 
 .dream-office--pm {
   max-width: var(--dream-slot-max);
+}
+
+.dream-office__portrait-row {
+  position: relative;
+  display: block;
+  width: 100%;
 }
 
 .dream-office__square {
@@ -297,7 +304,7 @@
   aspect-ratio: var(--dream-face-ratio);
   height: auto;
   padding: 0;
-  border: 3px solid rgba(255, 255, 255, 0.18);
+  border: 3px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   background: #2a2a2a;
   overflow: hidden;
@@ -312,7 +319,7 @@
 }
 
 .dream-office__square:hover {
-  border-color: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.28);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
   transform: translateY(-2px);
 }
@@ -325,13 +332,13 @@
 .dream-office__square--empty {
   background: rgba(255, 255, 255, 0.08);
   border-style: dashed;
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .dream-office__square--filled {
   background: #2a2a2a;
   border-style: solid;
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .dream-office__plus {
@@ -351,6 +358,48 @@
   object-fit: cover;
   object-position: var(--dream-photo-position, center 18%);
   display: block;
+}
+
+.dream-office__pct-badge {
+  position: absolute;
+  z-index: 2;
+  /* Physical bottom-left of the portrait */
+  left: 6px;
+  bottom: 6px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px dashed currentColor;
+  background: rgba(2, 6, 14, 0.88);
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.45),
+    0 0 10px 2px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  pointer-events: none;
+}
+
+.dream-office__pct-badge--low {
+  color: #e8c547;
+}
+
+.dream-office__pct-badge--mid {
+  color: #fb923c;
+}
+
+.dream-office__pct-badge--high {
+  color: var(--color-blue, #4890fd);
+}
+
+.dream-office__pct-badge--top {
+  color: #a78bfa;
 }
 
 .dream-office__edit {
@@ -403,8 +452,8 @@
 }
 
 .dream-office__title {
-  margin: 0;
-  font-size: 1rem;
+  margin: 0 0 4px;
+  font-size: 1.12rem;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.92);
   line-height: 1.15;
@@ -773,7 +822,8 @@
   --dream-report-art-opacity: 1;
   /* Wide enough to cut side empty space; tall enough to keep portrait crop */
   --dream-share-slot: 278px;
-  --dream-share-face-h: 270px;
+  /* Slightly shorter faces so larger office titles + CTA still fit */
+  --dream-share-face-h: 252px;
   --dream-photo-position: center 18%;
   width: 1080px;
   height: 1350px;
@@ -785,7 +835,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 6px;
   overflow: hidden;
   font-family: var(--font-heebo), Heebo, sans-serif;
 }
@@ -849,7 +899,7 @@
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, var(--dream-share-slot));
-  gap: 8px 14px;
+  gap: 6px 14px;
   justify-content: center;
   width: max-content;
   max-width: 100%;
@@ -860,7 +910,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   width: var(--dream-share-slot);
   text-align: center;
   box-sizing: border-box;
@@ -873,9 +923,49 @@
   flex-shrink: 0;
   overflow: hidden;
   background: #2a2a2a;
-  border: 3px solid rgba(255, 255, 255, 0.18);
+  border: 3px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   box-sizing: border-box;
+}
+
+.dream-share-slot__pct {
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 50%;
+  border: 5px dashed currentColor;
+  background: rgba(2, 6, 14, 0.88);
+  box-shadow:
+    0 0 0 4px rgba(0, 0, 0, 0.45),
+    0 0 14px 3px rgba(0, 0, 0, 0.55),
+    0 3px 10px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-heebo), Heebo, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.dream-share-slot__pct--low {
+  color: #e8c547;
+}
+
+.dream-share-slot__pct--mid {
+  color: #fb923c;
+}
+
+.dream-share-slot__pct--high {
+  color: #4890fd;
+}
+
+.dream-share-slot__pct--top {
+  color: #a78bfa;
 }
 
 .dream-share-slot__photo {
@@ -909,8 +999,8 @@
 }
 
 .dream-share-slot__office {
-  margin: 0;
-  font-size: 24px;
+  margin: 0 0 4px;
+  font-size: 27px;
   font-weight: 800;
   line-height: 1.15;
   /* Reserve 2 lines so portraits in a row stay level when a label wraps */
@@ -940,7 +1030,7 @@
 }
 
 .dream-share-card__cta {
-  margin: 4px 0 0;
+  margin: auto 0 0;
   padding: 0 16px;
   text-align: center;
   font-size: 21px;
@@ -986,7 +1076,7 @@
   }
 
   .dream-gov-report__card {
-    padding: 48px 12px 24px;
+    padding: 48px 28px 24px;
   }
 
   .dream-gov-board__ministers {

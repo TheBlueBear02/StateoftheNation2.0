@@ -388,6 +388,7 @@ export async function exportNodeToPng(
   node: HTMLElement,
   options: ToPngOptions = {},
 ): Promise<string> {
+  const sourceWidth = Math.round(node.getBoundingClientRect().width)
   const clone = node.cloneNode(true) as HTMLElement
   clone.setAttribute('data-export-clone', 'true')
   clone.style.position = 'fixed'
@@ -396,6 +397,13 @@ export async function exportNodeToPng(
   clone.style.opacity = '1'
   clone.style.pointerEvents = 'none'
   clone.style.zIndex = '-1'
+  // Pin pixel width so `width: 100%` does not expand to the viewport
+  // when the clone is moved off-DOM (would leave empty side gutters).
+  if (sourceWidth > 0) {
+    clone.style.width = `${sourceWidth}px`
+    clone.style.maxWidth = `${sourceWidth}px`
+    clone.style.boxSizing = 'border-box'
+  }
   // Ensure Heebo is requested on the cloned card.
   clone.style.fontFamily = 'var(--font-heebo), Heebo, sans-serif'
   document.body.appendChild(clone)
@@ -407,6 +415,7 @@ export async function exportNodeToPng(
     })
     return await runToPng(clone, {
       ...options,
+      ...(sourceWidth > 0 ? { width: sourceWidth } : {}),
       style: {
         ...options.style,
         opacity: '1',
@@ -415,6 +424,12 @@ export async function exportNodeToPng(
         top: 'auto',
         pointerEvents: 'none',
         fontFamily: 'var(--font-heebo), Heebo, sans-serif',
+        ...(sourceWidth > 0
+          ? {
+              width: `${sourceWidth}px`,
+              maxWidth: `${sourceWidth}px`,
+            }
+          : {}),
       },
     })
   } finally {

@@ -16,9 +16,10 @@ Central reference for agents working on this repository. Use this file to unders
 | תיעוד צינורות | `/piplines/docs` | Live (noindex) |
 | דשבורד ממשלה — Government structure | `/government` | Live |
 | דשבורד מדדים — Office KPI dashboard | `/government/dashboard` | Live |
-| בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls`, `/elections/lists` | Live |
+| בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls`, `/elections/lists`, `/elections/dream-government` | Live |
 | סקרי מנדטים — Poll averages | `/elections/polls` | Live |
 | משחק הרשימות — List rating game | `/elections/lists` | Live |
+| ממשלת החלומות — Dream government | `/elections/dream-government` | Live |
 | עדכון סקרים (dev) | `/elections/polls/edit` | Live (password-gated, noindex) |
 | עריכת מועמדים (dev) | `/elections/edit` | Live (password-gated, noindex) |
 | סנכרון כנסת (dev) | `/knesset/edit` | Live (password-gated, noindex) |
@@ -77,6 +78,8 @@ StateoftheNation2.0/
 | `/elections/polls/edit` | `src/app/elections/polls/edit/page.tsx` |
 | `/elections/edit` | `src/app/elections/edit/page.tsx` |
 | `/elections/lists` | `src/app/elections/lists/page.tsx` |
+| `/elections/dream-government` | `src/app/elections/dream-government/page.tsx` |
+| `/elections/dream-government/dashboard` | `src/app/elections/dream-government/dashboard/page.tsx` (dev-only) |
 | `/elections/[partyId]` | `src/app/elections/[partyId]/page.tsx` |
 | `/government` | `src/app/government/page.tsx` |
 | `/government/dashboard` | `src/app/government/dashboard/page.tsx` |
@@ -86,6 +89,9 @@ StateoftheNation2.0/
 | `/piplines/docs/[[...slug]]` | `src/app/piplines/docs/[[...slug]]/page.tsx` |
 | `/piplines/[slug]` | `src/app/piplines/[slug]/page.tsx` (legacy → docs) |
 | `/api/elections/[...path]` | Local-dev pipeline / edit API |
+| `/api/elections/dream-government/submit` | Public dream-gov pick upsert (service role) |
+| `/api/elections/dream-government/stats` | Public dream-gov pick aggregates |
+| `/api/elections/dream-government/dashboard` | Dev-only dream-gov dashboard aggregates |
 | `/api/knesset/[...path]` | Local-dev pipeline / faction API |
 | `/api/polls/[...path]` | Local-dev polls pipeline API |
 | `/sitemap.xml` | `src/app/sitemap.ts` |

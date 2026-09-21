@@ -180,6 +180,7 @@ def cmd_insert(args) -> None:
 def cmd_stage(args) -> None:
     sb = insert_raw_list.get_supabase()
     stage = args.stage
+    party_id = getattr(args, "party_id", None)
     started_at = datetime.now()
 
     try:
@@ -196,16 +197,18 @@ def cmd_stage(args) -> None:
             return
 
         if stage == 2:
-            enrich_wikidata.run(sb, dry_run=False)
+            enrich_wikidata.run(sb, dry_run=False, party_id=party_id)
         elif stage == 3:
             openai_client = generate_descriptions.get_openai()
-            generate_descriptions.run(sb, openai_client, dry_run=False)
+            generate_descriptions.run(
+                sb, openai_client, dry_run=False, party_id=party_id,
+            )
         elif stage == 4:
-            geocode_cities.run(sb, dry_run=False)
+            geocode_cities.run(sb, dry_run=False, party_id=party_id)
         elif stage == 5:
-            fetch_candidate_birthdates.run(sb, dry_run=False)
+            fetch_candidate_birthdates.run(sb, dry_run=False, party_id=party_id)
         elif stage == 6:
-            fetch_candidate_wiki_urls.run(sb, dry_run=False)
+            fetch_candidate_wiki_urls.run(sb, dry_run=False, party_id=party_id)
         else:
             fail(f"שלב לא תקין: {stage}", args.json)
             return
@@ -361,6 +364,12 @@ def main() -> None:
 
     stage_cmd = subparsers.add_parser("stage", help="Run one pipeline stage (1-6)")
     stage_cmd.add_argument("--stage", type=int, choices=[1, 2, 3, 4, 5, 6], required=True)
+    stage_cmd.add_argument(
+        "--party-id",
+        type=int,
+        default=None,
+        help="Optional: scope stages 2-6 to one party (recommended from /elections/edit)",
+    )
     stage_cmd.add_argument("--json", **json_flag)
 
     review_cmd = subparsers.add_parser("review-queue", help="List review queue items for a party")

@@ -45,6 +45,7 @@ PARTIES = [
     {"short_name": "ישר", "name": "ישר", "party_status": "confirmed", "bloc": "opposition", "color": "#4169E1"},
     {"short_name": "עמך ישראל", "name": "עמך ישראל", "party_status": "confirmed", "bloc": "opposition", "color": "#C45C26"},
     {"short_name": "המילואימניקים", "name": "המילואימניקים", "party_status": "confirmed", "bloc": "opposition", "color": "#708090"},
+    {"short_name": "כחול לבן", "name": "כחול לבן", "party_status": "confirmed", "bloc": "opposition", "color": "#00bfe6"},
     # ── polled_only (hypothetical / minor lists not shown on /elections) ──
     {"short_name": 'חד"ש תע"ל', "name": 'חד"ש תע"ל', "party_status": "polled_only", "bloc": "opposition", "color": "#CC0000"},
     {"short_name": 'בל"ד', "name": 'בל"ד', "party_status": "polled_only", "bloc": "opposition", "color": "#006400"},
@@ -60,7 +61,6 @@ PARTIES = [
     {"short_name": "מרצ", "name": "מרצ", "party_status": "historical", "bloc": "opposition", "color": "#008080"},
     {"short_name": "תקווה חדשה", "name": "תקווה חדשה", "party_status": "historical", "bloc": "opposition", "color": "#32CD32"},
     {"short_name": "המחנה הממלכתי", "name": "המחנה הממלכתי", "party_status": "historical", "bloc": "opposition", "color": "#1E90FF"},
-    {"short_name": "כחול לבן", "name": "כחול לבן", "party_status": "historical", "bloc": "opposition", "color": "#0000CD"},
 ]
 
 def _fetch_parties(sb: Client, election_id: int) -> list[dict]:
