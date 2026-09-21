@@ -460,8 +460,71 @@
   height: auto;
 }
 
+.project-section__image--illustration {
+  max-width: 520px;
+  margin-inline: auto;
+  background: #f7fafd;
+}
+
 .project-section--alt {
   background: #fafafa;
+}
+
+/* Side-by-side government + knesset teasers — image above text */
+.institutions-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 40px);
+  align-items: stretch;
+  padding: clamp(16px, 2.5vw, 28px);
+}
+
+.institutions-pair__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: clamp(12px, 2vw, 20px);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.2s ease;
+}
+
+.institutions-pair__card:hover,
+.institutions-pair__card:focus-visible {
+  background-color: rgba(0, 0, 0, 0.03);
+  outline: none;
+}
+
+.institutions-pair__card:hover .project-section__title,
+.institutions-pair__card:focus-visible .project-section__title {
+  text-decoration: underline;
+}
+
+.institutions-pair__media {
+  width: 100%;
+  min-width: 0;
+}
+
+.institutions-pair__media .project-section__image--illustration {
+  max-width: 100%;
+}
+
+.institutions-pair__content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: right;
+  width: 100%;
+  max-width: none;
+  padding-inline: clamp(12px, 2.5vw, 28px);
+  box-sizing: border-box;
+}
+
+.institutions-pair__content .project-section__title {
+  font-size: clamp(1.1rem, 2.2vw, 1.45rem);
 }
 
 /* ── Responsive ── */
@@ -534,6 +597,16 @@
 
   .project-section__title {
     font-size: clamp(1rem, 3.6vw, 1.25rem);
+  }
+
+  .institutions-pair {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 12px;
+  }
+
+  .institutions-pair__content {
+    max-width: none;
   }
 }
 

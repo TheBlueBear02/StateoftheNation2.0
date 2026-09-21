@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" width="640" height="420" fill="none">
+  <!-- Knesset ? plaza frontal view, blue drawing style (no flags) -->
+  <rect width="640" height="420" fill="#F7FAFD"/>
+
+  <!-- Plaza pavement -->
+  <rect x="40" y="300" width="560" height="90" fill="#E8F1FC"/>
+  <rect x="40" y="300" width="560" height="2" fill="#C9DAF0"/>
+
+  <!-- Leading plaza stripes toward the entrance -->
+  <g fill="#D5E4F6" stroke="#76AAFC" stroke-width="1.5">
+    <path d="M210 390 L278 300 L298 300 L248 390 Z"/>
+    <path d="M300 390 L314 300 L326 300 L340 390 Z"/>
+    <path d="M392 390 L342 300 L362 300 L430 390 Z"/>
+  </g>
+  <!-- Plaza edge lines -->
+  <line x1="60" y1="390" x2="580" y2="390" stroke="#AEC8E8" stroke-width="2"/>
+  <line x1="80" y1="360" x2="560" y2="360" stroke="#C9DAF0" stroke-width="1.5"/>
+  <line x1="100" y1="330" x2="540" y2="330" stroke="#C9DAF0" stroke-width="1.5"/>
+
+  <!-- Building shadow under overhang -->
+  <rect x="112" y="148" width="416" height="12" fill="#C9DAF0" opacity="0.7"/>
+
+  <!-- Main facade body -->
+  <rect x="128" y="148" width="384" height="152" fill="#EEF4FB" stroke="#4890FD" stroke-width="3"/>
+
+  <!-- Vertical facade panels + narrow windows -->
+  <g stroke="#76AAFC" stroke-width="1.5">
+    <line x1="168" y1="156" x2="168" y2="292"/>
+    <line x1="208" y1="156" x2="208" y2="292"/>
+    <line x1="248" y1="156" x2="248" y2="292"/>
+    <line x1="288" y1="156" x2="288" y2="292"/>
+    <line x1="352" y1="156" x2="352" y2="292"/>
+    <line x1="392" y1="156" x2="392" y2="292"/>
+    <line x1="432" y1="156" x2="432" y2="292"/>
+    <line x1="472" y1="156" x2="472" y2="292"/>
+  </g>
+  <!-- Narrow dark vertical window slits -->
+  <g fill="#AEC8E8">
+    <rect x="164" y="160" width="8" height="128"/>
+    <rect x="204" y="160" width="8" height="128"/>
+    <rect x="244" y="160" width="8" height="128"/>
+    <rect x="284" y="160" width="8" height="128"/>
+    <rect x="348" y="160" width="8" height="128"/>
+    <rect x="388" y="160" width="8" height="128"/>
+    <rect x="428" y="160" width="8" height="128"/>
+    <rect x="468" y="160" width="8" height="128"/>
+  </g>
+
+  <!-- Central recessed entrance -->
+  <rect x="296" y="220" width="48" height="80" fill="#DCE8F8" stroke="#4890FD" stroke-width="2.5"/>
+  <rect x="308" y="240" width="24" height="60" fill="#FFFFFF" stroke="#3B7AE6" stroke-width="2"/>
+  <path d="M296 220 Q320 200 344 220" fill="#FFFFFF" stroke="#4890FD" stroke-width="2.5"/>
+
+  <!-- Thick flat overhanging roof -->
+  <path d="M96 128 L544 128 L532 156 L108 156 Z" fill="#6BA4FA"/>
+  <rect x="96" y="116" width="448" height="16" fill="#4890FD"/>
+  <rect x="96" y="116" width="448" height="4" fill="#76AAFC"/>
+
+  <!-- Colonnade pillars under the overhang -->
+  <g fill="#FFFFFF" stroke="#4890FD" stroke-width="2.5">
+    <rect x="132" y="156" width="16" height="144"/>
+    <rect x="176" y="156" width="16" height="144"/>
+    <rect x="220" y="156" width="16" height="144"/>
+    <rect x="264" y="156" width="16" height="144"/>
+    <rect x="360" y="156" width="16" height="144"/>
+    <rect x="404" y="156" width="16" height="144"/>
+    <rect x="448" y="156" width="16" height="144"/>
+    <rect x="492" y="156" width="16" height="144"/>
+  </g>
+  <!-- Pillar bases -->
+  <g fill="#4890FD">
+    <rect x="128" y="296" width="24" height="6"/>
+    <rect x="172" y="296" width="24" height="6"/>
+    <rect x="216" y="296" width="24" height="6"/>
+    <rect x="260" y="296" width="24" height="6"/>
+    <rect x="356" y="296" width="24" height="6"/>
+    <rect x="400" y="296" width="24" height="6"/>
+    <rect x="444" y="296" width="24" height="6"/>
+    <rect x="488" y="296" width="24" height="6"/>
+  </g>
+
+  <!-- Building plinth -->
+  <rect x="120" y="300" width="400" height="8" fill="#AEC8E8" stroke="#76AAFC" stroke-width="1.5"/>
+</svg>

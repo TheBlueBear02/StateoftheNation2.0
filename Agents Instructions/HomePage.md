@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and shared conventions.
 
-Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with seven visible sections including the government dashboard teaser.
+Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with project teasers for elections, polls, government dashboard, government structure, and Knesset.
 
 ## Page Structure
 
@@ -19,11 +19,17 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 │  Project: ממשלת החלומות (white, full-bleed)            │
 │    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
-│  Project: משחק הרשימות (#fafafa, full-bleed)           │
+│  Project: דשבורד מדדים (white, full-bleed)             │
 │    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
 │  Project: סקרי מנדטים (white, full-bleed)              │
 │    └─ .container — tag + title | media                  │
+├─────────────────────────────────────────────────────────┤
+│  Project: משחק הרשימות (white, full-bleed)             │
+│    └─ .container — tag + title | media                  │
+├─────────────────────────────────────────────────────────┤
+│  Project: הממשלה + הכנסת (white) — side-by-side cards   │
+│    └─ .container — image above text for each            │
 ├─────────────────────────────────────────────────────────┤
 │  Footer (blue, full-bleed) — logo + social + legal links + copyright│
 │    └─ .container — 3-column grid (end column: אודות / תנאי שימוש) │
@@ -43,6 +49,9 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
 | `src/components/elections/DreamGovernmentPromo.tsx` | Dream-government teaser linking to `/elections/dream-government` |
 | `public/dream-government-homepage.png` | Dream-government project section screenshot |
+| `public/government-offices-homepage.png` | Government dashboard project section screenshot |
+| `public/government-building-homepage.svg` | Government structure teaser — civic building illustration |
+| `public/knesset-building-homepage.svg` | Knesset teaser — Knesset building illustration |
 | `src/App.css` | `.container` primitive and section-specific styles |
 | `src/index.css` | Global reset, CSS variables |
 | `public/header-logo 3.svg` | Header logo (desktop / non-home) |
@@ -105,10 +114,10 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 |-------|--------|
 | בחירות 2026 | `/elections` (route) |
 | סקרי מנדטים | `/elections/polls` (route) |
-| הממשלה | `/government` (route) |
-| הכנסת | `/knesset` (route) |
+| ממשלת החלומות | `/elections/dream-government` (route) |
+| מדדי הממשלה | `/government/dashboard` (route) |
 
-**בחירות 2026** links to the live Elections page, **סקרי מנדטים** links to weighted poll averages, **הממשלה** links to the live Government page, and **הכנסת** links to the live Knesset hemicycle page.
+**בחירות 2026** links to the live Elections page, **סקרי מנדטים** links to weighted poll averages, **ממשלת החלומות** links to the dream-government builder, and **מדדי הממשלה** links to the office KPI dashboard.
 
 ### 3. News strip (`news-strip`)
 
@@ -124,29 +133,15 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 ### 4. Dream government project (`#dream-government`)
 
 - Rendered by `src/components/elections/DreamGovernmentPromo.tsx` (also used on `/elections`).
-- First project teaser on the homepage (white); sits above lists-game and polls.
+- First project teaser on the homepage (white).
 - News-block layout: title **ממשלת החלומות: בחרו שר לכל משרד מבין המועמדים לכנסת** + category tag **בחירות 2026**.
 - Whole section is a link to `/elections/dream-government`.
 - Media (`.project-section__media`): landscape collage from `public/dream-government-homepage.png` (same full-width media column as the other project teasers).
 
-### 5. Lists game project (`#lists-game`)
-
-- Rendered by shared `src/components/elections/ListsGamePromo.tsx` (also used at the bottom of `/elections/[partyId]`).
-- Second homepage project teaser; uses `.project-section--alt` (`#fafafa`) via the `alt` prop. Other teasers stay white.
-- News-block layout: title **משחק הרשימות: שחקו וגלו איזו רשימה הכי מתאימה לכם** + category tag **בחירות 2026** below it (no description / meta line).
-- Whole section is a link (`.project-section__link`) to `/elections/lists`.
-- Media (`.project-section__media`): screenshot from `public/election-game-homepage.png`.
-
-### 6. Mandate polls project (`#mandate-polls`)
-
-- White section below the grey lists-game teaser.
-- Same news-block layout: title **ניתוח כל סקרי המנדטים במקום אחד** + category tag **בחירות 2026** below it (no description / meta line).
-- Whole section is a link (`.project-section__link`) to `/elections/polls`.
-- Media (`.project-section__media`): screenshot from `public/polls-page-homepage.png`.
-
-### 7. Government Dashboard project (`#government-dashboard`)
+### 5. Government Dashboard project (`#government-dashboard`)
 
 - Controlled by `SHOW_GOVERNMENT_DASHBOARD = true` in `App.tsx`.
+- Second homepage project teaser (white, same as the other project sections).
 - Same news-block layout: title **מצב האומה: מדדי משרדי הממשלה לאורך זמן** + category tag **הממשלה** below it (no description / meta line).
 - Whole section links to `/government/dashboard` (KPI/policy quadrant; see [GovernmentDashboardPage.md](./GovernmentDashboardPage.md)).
 - `.project-section__inner.container`: ~`0.95fr / 1.2fr` grid (media larger). DOM order is content first, media second — text right, preview left in RTL.
@@ -154,7 +149,31 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Tag (`.project-section__tag`): square corners, `--color-blue` fill / white text.
 - Media: static screenshot `public/government-offices-homepage.png` (same pattern as polls/elections teasers — no live Supabase fetch on the homepage).
 
-### 8. Footer (`site-footer`)
+### 6. Mandate polls project (`#mandate-polls`)
+
+- White section below the dashboard teaser.
+- Same news-block layout: title **סקר הסקרים: סקרי המנדטים של כל הערוצים במקום אחד** + category tag **בחירות 2026** below it (no description / meta line).
+- Whole section is a link (`.project-section__link`) to `/elections/polls`.
+- Media (`.project-section__media`): screenshot from `public/polls-page-homepage.png`.
+
+### 7. Lists game project (`#lists-game`)
+
+- Rendered by shared `src/components/elections/ListsGamePromo.tsx` (also used at the bottom of `/elections/[partyId]`).
+- White section (no `alt` prop) below polls.
+- News-block layout: title **משחק הרשימות: שחקו וגלו איזו רשימה הכי מתאימה לכם** + category tag **בחירות 2026** below it (no description / meta line).
+- Whole section is a link (`.project-section__link`) to `/elections/lists`.
+- Media (`.project-section__media`): screenshot from `public/election-game-homepage.png`.
+
+### 8. Government + Knesset pair (`#institutions`)
+
+- One white section with two side-by-side cards (`.institutions-pair`).
+- Each card stacks **image above text** (title + category tag); text stays RTL **right-aligned**.
+- RTL DOM order: **הממשלה** (`/government`, title **ממשלת ישראל: הרכב ממשלת ישראל כיום ובעבר**) first (visual right), **הכנסת** (`/knesset`, title **כנסת ישראל: הרכב הכנסת כיום ולאורך ההיסטוריה**) second (visual left).
+- Media: `government-building-homepage.svg` and `knesset-building-homepage.svg` (blue drawing style; no flags).
+- ≤900px: cards stack to a single column.
+- Hover/focus: light grey card background + title underline.
+
+### 9. Footer (`site-footer`)
 
 - Blue background (`--color-blue: #4890FD`), white text.
 - Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: white logo brand (RTL start), centered social links, end column with legal links + copyright (RTL end).
@@ -200,7 +219,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 ## Future Work
 
-- (none for the government dashboard homepage teaser — static PNG for fast load)
+- (none for the government / Knesset homepage teasers — custom building SVGs)
 
 ## Verification
 
