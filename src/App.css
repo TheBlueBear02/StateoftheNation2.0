@@ -464,104 +464,6 @@
   background: #fafafa;
 }
 
-/* ── Dashboard homepage preview (live icons + ministers) ── */
-
-.dashboard-preview {
-  position: relative;
-  aspect-ratio: 1;
-  width: 100%;
-  max-width: 520px;
-  margin-inline: auto;
-  padding: 24px;
-}
-
-.dashboard-preview__grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  width: 100%;
-  height: 100%;
-}
-
-.dashboard-preview__cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: radial-gradient(#6ba4fa, #447dd3);
-  opacity: 0.95;
-  aspect-ratio: 1;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-/* Index icons sit smaller in their grid slot; ministers stay full-size. */
-.dashboard-preview__cell:not(.dashboard-preview__cell--minister) {
-  width: 68%;
-  max-width: 68%;
-  margin: auto;
-}
-
-.dashboard-preview__cell--kpi {
-  background: radial-gradient(#6ba4fa, #447dd3);
-}
-
-.dashboard-preview__cell--policy {
-  background: radial-gradient(#e3e3e3, #c3c3c3);
-}
-
-.dashboard-preview__cell--alert {
-  background: radial-gradient(#ff5d5d, #ee3f33);
-}
-
-.dashboard-preview__cell--minister {
-  background: #f0f0f0;
-  border: 3px solid #fff;
-  box-shadow: 0 0 0 2px rgba(72, 144, 253, 0.35);
-  opacity: 1;
-}
-
-.dashboard-preview__cell--skeleton {
-  background: linear-gradient(90deg, #e8e8e8, #f2f2f2, #e8e8e8);
-  opacity: 0.7;
-}
-
-.dashboard-preview__cell-img {
-  display: block;
-  width: 58%;
-  height: 58%;
-  object-fit: contain;
-  pointer-events: none;
-}
-
-.dashboard-preview__cell-img--photo {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.dashboard-preview__axis {
-  position: absolute;
-  background: rgba(0, 0, 0, 0.08);
-  pointer-events: none;
-}
-
-.dashboard-preview__axis--vertical {
-  top: 10%;
-  bottom: 10%;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-}
-
-.dashboard-preview__axis--horizontal {
-  left: 10%;
-  right: 10%;
-  top: 50%;
-  height: 1px;
-  transform: translateY(-50%);
-}
-
 /* ── Responsive ── */
 
 @media (max-width: 900px) {
@@ -632,11 +534,6 @@
 
   .project-section__title {
     font-size: clamp(1rem, 3.6vw, 1.25rem);
-  }
-
-  .dashboard-preview {
-    max-width: none;
-    padding: 12px;
   }
 }
 

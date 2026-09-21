@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { SiteLayout } from './components/SiteLayout'
 import { ListsGamePromo } from './components/elections/ListsGamePromo'
 import { DreamGovernmentPromo } from './components/elections/DreamGovernmentPromo'
-import { DashboardHomePreview } from './components/government/DashboardHomePreview'
 import { useSiteUpdates } from './hooks/useSiteUpdates'
 
 const HERO_BUTTONS = [
@@ -191,7 +190,15 @@ function App() {
                   </div>
 
                   <div className="project-section__media" aria-hidden="true">
-                    <DashboardHomePreview />
+                    <img
+                      src="/government-offices-homepage.png"
+                      alt=""
+                      className="project-section__image"
+                      width={384}
+                      height={423}
+                      loading="lazy"
+                      decoding="async"
+                    />
                   </div>
                 </div>
               </div>
