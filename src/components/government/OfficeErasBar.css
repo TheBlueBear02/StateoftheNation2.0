@@ -9,7 +9,7 @@
   right: 0;
   bottom: 100%;
   left: 0;
-  height: 92px;
+  height: 88px;
   pointer-events: none;
   z-index: 6;
 }
@@ -17,9 +17,9 @@
 .office-eras-bar__plot {
   position: relative;
   display: block;
-  height: 76px;
-  min-height: 76px;
-  background: rgba(0, 0, 0, 0.04);
+  height: 62px;
+  min-height: 62px;
+  background: var(--color-white);
   overflow: visible;
 }
 
@@ -54,7 +54,7 @@
   width: 100%;
   height: 100%;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 6px 8px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -69,8 +69,8 @@
 }
 
 .office-eras-bar__photo {
-  width: 52px;
-  height: 52px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid rgba(255, 255, 255, 0.9);
@@ -121,6 +121,27 @@
   text-overflow: ellipsis;
   text-align: right;
   direction: rtl;
+}
+
+.office-eras-bar__switches {
+  position: relative;
+  display: block;
+  height: 1.35rem;
+  margin-top: 4px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.office-eras-bar__switch {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--color-text-muted, #666);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .office-eras-bar__tooltip {
@@ -210,17 +231,17 @@
 
 @media (max-width: 640px) {
   .office-eras-bar__tooltip-lane {
-    height: 84px;
+    height: 80px;
   }
 
   .office-eras-bar__plot {
-    height: 64px;
-    min-height: 64px;
+    height: 52px;
+    min-height: 52px;
   }
 
   .office-eras-bar__photo {
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
   }
 
   .office-eras-bar__name {
@@ -229,6 +250,15 @@
 
   .office-eras-bar__party {
     font-size: 0.72rem;
+  }
+
+  .office-eras-bar__switches {
+    height: 1.2rem;
+    margin-top: 3px;
+  }
+
+  .office-eras-bar__switch {
+    font-size: 0.65rem;
   }
 
   .office-eras-bar__tooltip {

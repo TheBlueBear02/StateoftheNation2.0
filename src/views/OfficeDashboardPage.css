@@ -92,19 +92,24 @@
 
 .office-dashboard__layout--open .office-cluster {
   min-height: 0;
-  gap: 10px;
-  padding: 12px;
+  gap: 0;
+  padding: 0;
 }
 
 .office-dashboard__layout--open .office-cluster__bubbles {
-  min-height: 160px;
-  padding: 8px;
-  gap: 10px;
+  height: 128px;
+  min-height: 128px;
+  padding: 8px 8px 12px;
+  gap: 8px;
 }
 
 .office-dashboard__layout--open .office-cluster__minister {
   width: 104px;
   height: 104px;
+}
+
+.office-dashboard__layout--open .office-cluster__meta {
+  padding: 10px 12px 12px;
 }
 
 .office-dashboard__quadrant {
@@ -116,9 +121,9 @@
 .office-cluster {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-height: 220px;
-  padding: 16px;
+  gap: 0;
+  min-height: 0;
+  padding: 0;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 0;
   background: var(--color-white);
@@ -126,7 +131,8 @@
   cursor: pointer;
   font: inherit;
   color: inherit;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
 }
 
 .office-cluster:hover,
@@ -137,13 +143,120 @@
 
 .office-cluster--selected {
   border-color: var(--color-blue);
-  background: rgba(72, 144, 253, 0.06);
+  background: var(--color-white);
 }
 
-.office-cluster--skeleton {
-  min-height: 240px;
-  background: linear-gradient(90deg, #f2f2f2, #f7f7f7, #f2f2f2);
+.office-dashboard__panel--skeleton {
   pointer-events: none;
+}
+
+.office-dashboard__skel-block,
+.office-dashboard__skel-circle,
+.office-dashboard__skel-chart,
+.office-dashboard__skel-eras,
+.office-dashboard__skel-text {
+  background: linear-gradient(90deg, #e8e8e8, #f2f2f2, #e8e8e8);
+  background-size: 200% 100%;
+  animation: office-dashboard-skel-shine 1.4s ease-in-out infinite;
+}
+
+.office-dashboard__panel--skeleton .office-dashboard__panel-photo {
+  display: block;
+  background: linear-gradient(90deg, #e8e8e8, #f2f2f2, #e8e8e8);
+  background-size: 200% 100%;
+  animation: office-dashboard-skel-shine 1.4s ease-in-out infinite;
+  border-color: #e0e0e0;
+}
+
+.office-dashboard__skel-nav {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.office-dashboard__panel--skeleton .office-dashboard__office-current-text {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.office-dashboard__skel-text {
+  display: block;
+  flex: 0 0 auto;
+  max-width: 100%;
+  border-radius: 4px;
+  color: transparent !important;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.office-dashboard__skel-text--title {
+  width: 14rem;
+  max-width: 100%;
+}
+
+.office-dashboard__skel-text--minister {
+  width: 10rem;
+  max-width: 100%;
+}
+
+.office-dashboard__skel-text--info {
+  width: 28rem;
+  max-width: 100%;
+  /* Kill the 2-line clamp so the grey bar stays a single readable strip. */
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  -webkit-box-orient: unset;
+  height: 0.9rem;
+  margin-top: 0.45rem;
+}
+
+.office-dashboard__skel-circle {
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+}
+
+.office-dashboard__skel-text--chart-title {
+  width: 16rem;
+  max-width: 100%;
+}
+
+.office-dashboard__skel-text--chart-info {
+  width: 26rem;
+  max-width: 100%;
+  height: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.office-dashboard__skel-chart {
+  display: block;
+  width: 100%;
+  aspect-ratio: 960 / 460;
+  min-height: 220px;
+  border-radius: 0;
+  margin-top: 4px;
+}
+
+.office-dashboard__skel-eras {
+  display: block;
+  width: 100%;
+  height: 62px;
+  margin-top: 8px;
+}
+
+@keyframes office-dashboard-skel-shine {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .office-cluster__bubbles {
@@ -152,9 +265,23 @@
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 180px;
-  padding: 12px;
+  gap: 8px;
+  height: 140px;
+  min-height: 140px;
+  /* Ends just under the minister; outer KPI/policy circles may clip. */
+  padding: 10px 10px 14px;
+  background: rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.office-cluster:hover .office-cluster__bubbles,
+.office-cluster:focus-visible .office-cluster__bubbles {
+  background: rgba(72, 144, 253, 0.05);
+}
+
+.office-cluster--selected .office-cluster__bubbles {
+  background: rgba(72, 144, 253, 0.1);
 }
 
 .office-bubble {
@@ -233,7 +360,10 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: auto;
+  margin-top: 0;
+  padding: 12px 16px 14px;
+  background: var(--color-white);
+  box-sizing: border-box;
 }
 
 .office-cluster__title {
@@ -423,12 +553,13 @@
 .office-dashboard__index-strip {
   display: flex;
   flex-wrap: nowrap;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: 12px;
   width: 100%;
   max-width: 100%;
-  padding: 4px 2px 10px;
+  padding: 0 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x proximity;
@@ -444,7 +575,48 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
+.office-dashboard__index-strip-track {
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: max-content;
+  max-width: none;
+  min-height: 88px;
+  margin-inline: auto;
+  padding: 12px 4px;
+  box-sizing: border-box;
+}
+
+.office-dashboard__index-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  background: #c8c8c8;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  will-change: transform;
+}
+
+.office-dashboard__index-marker--visible {
+  opacity: 1;
+}
+
+.office-dashboard__index-marker--animate {
+  transition: transform 0.28s ease;
+}
+
 .office-dashboard__index-chip {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -480,15 +652,20 @@
 
 .office-dashboard__index-chip:hover .office-dashboard__index-chip-circle,
 .office-dashboard__index-chip:focus-visible .office-dashboard__index-chip-circle {
-  border-color: rgba(72, 144, 253, 0.55);
+  border-color: rgba(0, 0, 0, 0.28);
   outline: none;
-  transform: scale(1.06);
+  transform: scale(1.04);
 }
 
 .office-dashboard__index-chip--active .office-dashboard__index-chip-circle {
-  border-color: var(--color-blue);
-  box-shadow: 0 0 0 3px rgba(72, 144, 253, 0.25);
-  transform: scale(1.08);
+  border-color: transparent;
+  transform: none;
+}
+
+.office-dashboard__index-chip--active:hover .office-dashboard__index-chip-circle,
+.office-dashboard__index-chip--active:focus-visible
+  .office-dashboard__index-chip-circle {
+  transform: none;
 }
 
 .office-dashboard__index-chip-icon {
@@ -555,12 +732,20 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 16px;
+  /* LTR so share (first in DOM) is always the physical-left control. */
+  direction: ltr;
 }
 
 .office-dashboard__chart-share {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
   margin: 0;
-  padding: 0;
+  padding: 6px;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--color-blue-dark);
   font: inherit;
@@ -568,8 +753,23 @@
   cursor: pointer;
 }
 
-.office-dashboard__chart-share:hover {
-  text-decoration: underline;
+.office-dashboard__chart-share:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+.office-dashboard__chart-share:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.office-dashboard__chart-share-icon {
+  display: block;
+}
+
+.office-dashboard__chart-share-status {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .office-dashboard__chart-source {
@@ -593,28 +793,481 @@
 }
 
 @media (max-width: 960px) {
-  .office-dashboard__layout--open .office-dashboard__quadrant {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .office-dashboard__inner.container {
+    padding-inline: 12px;
   }
-}
 
-@media (max-width: 640px) {
+  .office-dashboard__layout--open {
+    gap: 28px;
+  }
+
   .office-dashboard__quadrant,
   .office-dashboard__layout--open .office-dashboard__quadrant {
     grid-template-columns: 1fr;
   }
 
+  .office-dashboard__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .office-dashboard__title {
+    font-size: 1.75rem;
+  }
+}
+
+/* JS-detected mobile (corrects Chrome DevTools spurious ~800px innerWidth). */
+.office-dashboard-page--mobile {
+  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
+}
+
+.office-dashboard-page--mobile .office-dashboard__main,
+.office-dashboard-page--mobile .office-dashboard__inner,
+.office-dashboard-page--mobile .office-dashboard__layout,
+.office-dashboard-page--mobile .office-dashboard__panel,
+.office-dashboard-page--mobile .office-dashboard__chart-block,
+.office-dashboard-page--mobile .office-dashboard__quadrant {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.office-dashboard-page--mobile .office-dashboard__main {
+  padding-block: 16px 28px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__inner {
+  gap: 14px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__inner.container {
+  padding-inline: 10px;
+  max-width: 100%;
+}
+
+.office-dashboard-page--mobile .office-dashboard__layout--open {
+  gap: 20px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__quadrant,
+.office-dashboard-page--mobile
+  .office-dashboard__layout--open
+  .office-dashboard__quadrant {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.office-dashboard-page--mobile .office-cluster,
+.office-dashboard-page--mobile
+  .office-dashboard__layout--open
+  .office-cluster {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.office-dashboard-page--mobile .office-dashboard__skel-circle {
+  width: 56px;
+  height: 56px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__skel-chart {
+  aspect-ratio: 960 / 560;
+  min-height: 260px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__skel-eras {
+  height: 52px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.office-dashboard-page--mobile .office-dashboard__title {
+  font-size: 1.45rem;
+}
+
+.office-dashboard-page--mobile .office-dashboard__subtitle {
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__legend {
+  gap: 8px 12px;
+  font-size: 0.8rem;
+}
+
+.office-dashboard-page--mobile .office-dashboard__panel {
+  gap: 12px;
+  min-height: 0;
+}
+
+.office-dashboard-page--mobile .office-dashboard__office-switcher {
+  min-height: 0;
+  max-width: 100%;
+}
+
+.office-dashboard-page--mobile .office-dashboard__office-current {
+  gap: 10px;
+  padding: 8px 4px;
+  min-width: 0;
+}
+
+.office-dashboard-page--mobile
+  .office-dashboard__office-current.office-dashboard__slide {
+  gap: 10px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__office-current-text {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.office-dashboard-page--mobile .office-dashboard__panel-photo,
+.office-dashboard-page--mobile .office-dashboard__panel-initials {
+  width: 52px;
+  height: 52px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__panel-initials {
+  font-size: 1rem;
+}
+
+.office-dashboard-page--mobile .office-dashboard__panel-title {
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.office-dashboard-page--mobile .office-dashboard__panel-minister {
+  font-size: 0.8rem;
+}
+
+.office-dashboard-page--mobile .office-dashboard__panel-info--inline {
+  display: none;
+}
+
+.office-dashboard-page--mobile .office-dashboard__office-nav {
+  flex: 0 0 26px;
+  width: 26px;
+  font-size: 1.35rem;
+}
+
+/* Index circles: wrap to a second row instead of widening the page. */
+.office-dashboard-page--mobile .office-dashboard__index-strip {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+.office-dashboard-page--mobile .office-dashboard__index-strip-track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  margin-inline: 0;
+  padding: 10px 2px;
+  box-sizing: border-box;
+}
+
+.office-dashboard-page--mobile .office-dashboard__index-marker {
+  /* Full-height sliding bar doesn't fit multi-row; use chip ring instead. */
+  display: none;
+}
+
+.office-dashboard-page--mobile
+  .office-dashboard__index-chip--active
+  .office-dashboard__index-chip-circle {
+  border-color: rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 0 0 3px #c8c8c8;
+}
+
+.office-dashboard-page--mobile .office-dashboard__index-chip-circle {
+  width: 48px;
+  height: 48px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__chart-block {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.office-dashboard-page--mobile .office-dashboard__chart-header {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.office-dashboard-page--mobile .office-dashboard__chart-header > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+}
+
+.office-dashboard-page--mobile .office-dashboard__chart-title {
+  font-size: 1.1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.office-dashboard-page--mobile .office-dashboard__chart-info {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+/* Physical left in RTL: actions come after the title in DOM → end side. */
+.office-dashboard-page--mobile .office-dashboard__chart-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-inline-start: auto;
+}
+
+.office-dashboard-page--mobile
+  .office-dashboard__layout--open
+  .office-cluster__bubbles {
+  height: 96px;
+  min-height: 96px;
+  padding: 6px;
+  max-width: 100%;
+}
+
+.office-dashboard-page--mobile
+  .office-dashboard__layout--open
+  .office-cluster__minister,
+.office-dashboard-page--mobile .office-cluster__minister {
+  width: 72px;
+  height: 72px;
+  /* Physical right — matches RTL reading start on this page. */
+  inset: 50% 12px auto auto;
+  transform: translateY(-50%);
+}
+
+.office-dashboard-page--mobile
+  .office-dashboard__layout--open
+  .office-cluster__meta {
+  padding: 8px 10px 10px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.office-dashboard-page--mobile .office-cluster__title {
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.office-dashboard-page--mobile .office-cluster__minister-name,
+.office-dashboard-page--mobile .office-cluster__counts {
+  font-size: 0.75rem;
+}
+
+.office-dashboard-page--mobile .office-bubble--lg {
+  width: 40px;
+  height: 40px;
+}
+
+.office-dashboard-page--mobile .office-bubble--md {
+  width: 34px;
+  height: 34px;
+}
+
+.office-dashboard-page--mobile .office-bubble--sm {
+  width: 28px;
+  height: 28px;
+}
+
+.office-dashboard-page--mobile .office-eras-bar {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__plot {
+  height: 44px;
+  min-height: 44px;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__photo {
+  width: 30px;
+  height: 30px;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__clip {
+  gap: 6px;
+  padding: 4px 6px;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__name {
+  font-size: 0.72rem;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__party {
+  font-size: 0.65rem;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__switches {
+  height: 1.05rem;
+  margin-top: 2px;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__switch {
+  font-size: 0.6rem;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__tooltip {
+  min-width: 0;
+  max-width: min(220px, 85vw);
+  padding: 8px;
+}
+
+.office-dashboard-page--mobile .office-eras-bar__tooltip-lane {
+  height: 72px;
+}
+
+.office-dashboard-page--mobile .index-trend-chart {
+  max-width: 100%;
+}
+
+.office-dashboard-page--mobile .index-trend-chart__tooltip {
+  max-width: min(160px, 68%);
+  font-size: 0.75rem;
+  padding: 6px 8px;
+}
+
+@media (max-width: 640px) {
   .office-cluster__minister,
   .office-dashboard__layout--open .office-cluster__minister {
     width: 88px;
     height: 88px;
   }
+
+  .office-dashboard__office-switcher {
+    min-height: 88px;
+  }
+
+  .office-dashboard__office-current {
+    gap: 12px;
+    padding: 10px 8px;
+  }
+
+  .office-dashboard__office-current.office-dashboard__slide {
+    gap: 12px;
+  }
+
+  .office-dashboard__panel-photo,
+  .office-dashboard__panel-initials {
+    width: 64px;
+    height: 64px;
+  }
+
+  .office-dashboard__panel-initials {
+    font-size: 1.1rem;
+  }
+
+  .office-dashboard__panel-title {
+    font-size: 1.1rem;
+  }
+
+  .office-dashboard__panel-minister {
+    font-size: 0.85rem;
+  }
+
+  .office-dashboard__panel-info--inline {
+    -webkit-line-clamp: 3;
+    font-size: 0.8rem;
+  }
+
+  .office-dashboard__office-nav {
+    flex: 0 0 28px;
+    width: 28px;
+    font-size: 1.5rem;
+  }
+
+  .office-dashboard__index-strip-track {
+    gap: 10px;
+    min-height: 76px;
+    padding: 10px 2px;
+  }
+
+  .office-dashboard__index-chip-circle {
+    width: 56px;
+    height: 56px;
+  }
+
+  .office-dashboard__chart-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .office-dashboard-page--mobile .office-dashboard__chart-header {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .office-dashboard__chart-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .office-dashboard-page--mobile .office-dashboard__chart-actions {
+    justify-content: flex-end;
+    margin-inline-start: auto;
+  }
+
+  .office-dashboard__chart-title {
+    font-size: 1.15rem;
+  }
+
+  .office-dashboard__chart-info {
+    font-size: 0.85rem;
+  }
+
+  .office-dashboard__layout--open .office-cluster__bubbles {
+    height: 112px;
+    min-height: 112px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .office-cluster,
-  .office-dashboard__index-chip-circle {
+  .office-dashboard__index-chip-circle,
+  .office-dashboard__index-marker--animate {
     transition: none;
+  }
+
+  .office-dashboard__skel-block,
+  .office-dashboard__skel-circle,
+  .office-dashboard__skel-chart,
+  .office-dashboard__skel-eras,
+  .office-dashboard__skel-text,
+  .office-dashboard__panel--skeleton .office-dashboard__panel-photo {
+    animation: none;
   }
 
   .office-dashboard__slide--from-right,

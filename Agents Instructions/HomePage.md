@@ -147,12 +147,12 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 ### 7. Government Dashboard project (`#government-dashboard`)
 
 - Controlled by `SHOW_GOVERNMENT_DASHBOARD = true` in `App.tsx`.
-- Same news-block layout: title **דשבורד ממשלה** + category tag **הממשלה** below it (no description / meta line).
+- Same news-block layout: title **מצב האומה: מדדי משרדי הממשלה לאורך זמן** + category tag **הממשלה** below it (no description / meta line).
 - Whole section links to `/government/dashboard` (KPI/policy quadrant; see [GovernmentDashboardPage.md](./GovernmentDashboardPage.md)).
 - `.project-section__inner.container`: ~`0.95fr / 1.2fr` grid (media larger). DOM order is content first, media second — text right, preview left in RTL.
 - Hover on `.project-section__inner`: light grey background on the whole content box. Hover on title or media: title underline. Whole section remains clickable; focus-visible outline on the link.
 - Tag (`.project-section__tag`): square corners, `--color-blue` fill / white text.
-- Media is still a CSS dashboard placeholder (`.dashboard-preview`).
+- Media: live `DashboardHomePreview` (`src/components/government/DashboardHomePreview.tsx`) — 4×4 circles from `useOfficeDashboard` / Supabase. Each **2×2 quarter** is one dashboard office (display order: תחבורה, ביטחון לאומי, אוצר, חינוך): **3 index icons** from that office (KPIs first, then policies) plus that office’s **minister** in the inner cell. Index circles ~68% of their slot (KPI blue / policy grey / alert red). Preview uses `dir=ltr` so quarters stay top-left→bottom-right. Crosshair axes stay as decoration.
 
 ### 8. Footer (`site-footer`)
 
@@ -174,6 +174,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 - Homepage project teasers remain static in `App.tsx`.
 - News strip loads generated rows from `site_updates` only (`src/hooks/useSiteUpdates.ts`); empty/error → strip hidden. See [PiplinesPage.md](./PiplinesPage.md) for the mandatory pipeline finish-hook.
+- Government dashboard teaser loads live office/index/minister data via `useOfficeDashboard` (same source as `/government/dashboard`).
 - The **בחירות 2026** hero CTA routes to the `/elections` module documented in `Agents Instructions/ElectionsPage.md`.
 - Knesset page uses `useKnessetMembers` hook with Supabase (see `Agents Instructions/KnessetPage.md`).
 
@@ -199,7 +200,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 ## Future Work
 
-- Replace the government dashboard homepage CSS placeholder with a final screenshot/asset.
+- (none for the government dashboard homepage teaser — it now uses live DB icons + ministers)
 
 ## Verification
 

@@ -10,18 +10,19 @@
   display: block;
   width: 100%;
   height: auto;
+  /* Default desktop; inline style overrides when tall mobile viewBox is used. */
   aspect-ratio: 960 / 460;
   direction: ltr;
 }
 
 .index-trend-chart__grid {
   stroke: rgba(0, 0, 0, 0.08);
-  stroke-width: 1;
+  /* stroke-width comes from the scaled SVG attribute */
 }
 
 .index-trend-chart__axis {
   fill: var(--color-text-muted);
-  font-size: 13px;
+  /* font-size comes from the scaled SVG attribute (uiScale) — do not override with px */
 }
 
 .index-trend-chart__axis--y {
@@ -33,15 +34,25 @@
 
 .index-trend-chart__line {
   stroke: var(--color-blue);
-  stroke-width: 3;
+  /* stroke-width comes from the scaled SVG attribute */
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+
+.index-trend-chart__area {
+  fill: rgba(72, 144, 253, 0.18);
+  stroke: none;
+  pointer-events: none;
+}
+
+.index-trend-chart__era-highlight {
+  pointer-events: none;
 }
 
 .index-trend-chart__dot {
   fill: var(--color-blue);
   stroke: #fff;
-  stroke-width: 1.5;
+  /* stroke-width comes from the scaled SVG attribute */
   cursor: pointer;
 }
 
@@ -66,23 +77,33 @@
   position: absolute;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: min(220px, 70%);
   padding: 8px 10px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 0;
   background: var(--color-white);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   font-size: 0.85rem;
+  line-height: 1.3;
   pointer-events: none;
   z-index: 4;
   transform: translate(-50%, calc(-100% - 10px));
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .index-trend-chart__tooltip--fallback {
   top: 8px;
   left: 50%;
   transform: translate(-50%, 0);
+}
+
+.index-trend-chart__tooltip strong,
+.index-trend-chart__tooltip span {
+  display: block;
+  line-height: 1.3;
 }
 
 .index-trend-chart__tooltip strong {
@@ -94,9 +115,21 @@
   color: var(--color-text-muted);
 }
 
+.index-trend-chart__hit {
+  cursor: pointer;
+}
+
 .index-trend-chart__empty {
   margin: 0;
   padding: 24px;
   text-align: center;
   color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+  .index-trend-chart__tooltip {
+    max-width: min(180px, 72%);
+    font-size: 0.8rem;
+    padding: 6px 8px;
+  }
 }

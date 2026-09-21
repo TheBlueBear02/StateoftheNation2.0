@@ -464,7 +464,7 @@
   background: #fafafa;
 }
 
-/* ── Dashboard preview placeholder ── */
+/* ── Dashboard homepage preview (live icons + ministers) ── */
 
 .dashboard-preview {
   position: relative;
@@ -484,14 +484,60 @@
 }
 
 .dashboard-preview__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
-  background: var(--color-blue);
-  opacity: 0.85;
+  background: radial-gradient(#6ba4fa, #447dd3);
+  opacity: 0.95;
   aspect-ratio: 1;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Index icons sit smaller in their grid slot; ministers stay full-size. */
+.dashboard-preview__cell:not(.dashboard-preview__cell--minister) {
+  width: 68%;
+  max-width: 68%;
+  margin: auto;
+}
+
+.dashboard-preview__cell--kpi {
+  background: radial-gradient(#6ba4fa, #447dd3);
+}
+
+.dashboard-preview__cell--policy {
+  background: radial-gradient(#e3e3e3, #c3c3c3);
 }
 
 .dashboard-preview__cell--alert {
-  background: var(--color-alert);
+  background: radial-gradient(#ff5d5d, #ee3f33);
+}
+
+.dashboard-preview__cell--minister {
+  background: #f0f0f0;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(72, 144, 253, 0.35);
+  opacity: 1;
+}
+
+.dashboard-preview__cell--skeleton {
+  background: linear-gradient(90deg, #e8e8e8, #f2f2f2, #e8e8e8);
+  opacity: 0.7;
+}
+
+.dashboard-preview__cell-img {
+  display: block;
+  width: 58%;
+  height: 58%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.dashboard-preview__cell-img--photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .dashboard-preview__axis {
@@ -514,25 +560,6 @@
   top: 50%;
   height: 1px;
   transform: translateY(-50%);
-}
-
-.dashboard-preview__center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-  transform: translate(-50%, -50%);
-}
-
-.dashboard-preview__portrait {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #c4c4c4, #8a8a8a);
-  border: 2px solid var(--color-white);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* ── Responsive ── */

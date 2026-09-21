@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { SiteLayout } from './components/SiteLayout'
 import { ListsGamePromo } from './components/elections/ListsGamePromo'
 import { DreamGovernmentPromo } from './components/elections/DreamGovernmentPromo'
+import { DashboardHomePreview } from './components/government/DashboardHomePreview'
 import { useSiteUpdates } from './hooks/useSiteUpdates'
 
 const HERO_BUTTONS = [
@@ -12,13 +13,6 @@ const HERO_BUTTONS = [
   { label: 'סקרי מנדטים', to: '/elections/polls' },
   { label: 'הממשלה', to: '/government' },
   { label: 'הכנסת', to: '/knesset' },
-] as const
-
-const DASHBOARD_ICONS = [
-  'justice', 'education', 'transport', 'health',
-  'finance', 'defense', 'interior', 'foreign',
-  'economy', 'welfare', 'environment', 'housing',
-  'agriculture', 'energy', 'science', 'culture',
 ] as const
 
 /** Homepage teaser for the office KPI dashboard. */
@@ -191,32 +185,13 @@ function App() {
                 <div className="project-section__inner">
                   <div className="project-section__content">
                     <h2 id="dashboard-title" className="project-section__title">
-                      דשבורד ממשלה
+                      מצב האומה: מדדי משרדי הממשלה לאורך זמן
                     </h2>
                     <span className="project-section__tag">הממשלה</span>
                   </div>
 
                   <div className="project-section__media" aria-hidden="true">
-                    <div className="dashboard-preview">
-                      <div className="dashboard-preview__grid">
-                        {DASHBOARD_ICONS.map((icon, index) => (
-                          <div
-                            key={icon}
-                            className={`dashboard-preview__cell dashboard-preview__cell--${icon}${
-                              index % 7 === 3 ? ' dashboard-preview__cell--alert' : ''
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <div className="dashboard-preview__axis dashboard-preview__axis--vertical" />
-                      <div className="dashboard-preview__axis dashboard-preview__axis--horizontal" />
-                      <div className="dashboard-preview__center">
-                        <span className="dashboard-preview__portrait" />
-                        <span className="dashboard-preview__portrait" />
-                        <span className="dashboard-preview__portrait" />
-                        <span className="dashboard-preview__portrait" />
-                      </div>
-                    </div>
+                    <DashboardHomePreview />
                   </div>
                 </div>
               </div>

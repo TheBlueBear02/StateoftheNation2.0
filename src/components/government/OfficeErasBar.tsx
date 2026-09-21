@@ -1,13 +1,16 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type {
   OfficeDashboardMinisterEra,
   OfficeDashboardPoint,
 } from '../../lib/fetchOfficeDashboard'
 import {
+  CHART_WIDTH,
+  chartBarEdgeXs,
+  chartPointIndexToX,
   estimateChartYAxisLeftMarginForPoints,
-  getChartSeriesHorizontalInsets,
+  getChartSeriesEdgeXs,
 } from './IndexTrendChart'
 import './OfficeErasBar.css'
 
@@ -15,6 +18,15 @@ type OfficeErasBarProps = {
   eras: OfficeDashboardMinisterEra[]
   points: OfficeDashboardPoint[]
   chartType?: string | null
+  /**
+   * Same uiScale as IndexTrendChart so the Y-gutter / series alignment stays in sync
+   * when fonts are enlarged on narrow viewports.
+   */
+  uiScale?: number
+  /** Fires with the hovered era band (% of chart width + party color), or null on leave. */
+  onHoverBand?: (
+    band: { leftPct: number; widthPct: number; color: string | null } | null,
+  ) => void
 }
 
 type VisibleEra = {
@@ -47,7 +59,7 @@ function yearFromPoint(point: OfficeDashboardPoint): string {
 }
 
 /**
- * Chart domain for era alignment. Year-only series span Jan 1 of the first
+ * Chart domain for era clipping. Year-only series span Jan 1 of the first
  * label year through Dec 31 of the last (old site pushed `YYYY-12`) so
  * late-year starts like בן גביר (29.12.2022) still cover following annual points.
  */
@@ -68,49 +80,135 @@ function chartDomain(points: OfficeDashboardPoint[]): {
   }
 }
 
-/** Linear calendar fraction within [domainStart, domainEnd] (old year-only timeline). */
-function dateToTimeFraction(
-  date: string,
-  domainStart: string,
-  domainEnd: string,
-): number {
-  const startMs = dateToMs(domainStart)
-  const endMs = dateToMs(domainEnd)
-  if (endMs <= startMs) return 0
-  const t = dateToMs(date)
-  if (t <= startMs) return 0
-  if (t >= endMs) return 1
-  return (t - startMs) / (endMs - startMs)
+/**
+ * Fraction through a calendar year: 0 = Jan 1, 0.5 ≈ mid-year, 1 = Dec 31.
+ */
+function yearProgress(value: string): number {
+  const iso = value.slice(0, 10)
+  const [ys, ms, ds] = iso.split('-')
+  const y = Number(ys)
+  const m = Number(ms)
+  const d = Number(ds)
+  if (!y || !m || !d) return 0
+  const start = Date.UTC(y, 0, 1)
+  const end = Date.UTC(y, 11, 31)
+  const t = Date.UTC(y, m - 1, d)
+  if (end <= start) return 0
+  return Math.min(1, Math.max(0, (t - start) / (end - start)))
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t
+}
+
+function xToWidthPct(x: number): number {
+  return (x / CHART_WIDTH) * 100
 }
 
 /**
- * Map a calendar date onto the chart's equal-spaced point axis by interpolating
- * between surrounding recordedAt values (so era edges sit under chart points).
+ * Map a calendar date to an absolute % of chart width (same coords as bar
+ * centers / x labels in IndexTrendChart).
+ *
+ * Year-only bar charts: each year occupies its bar — Jan 1 at the left edge,
+ * mid-year near the center, Dec 31 at the right edge — so 05.2015 sits in the
+ * middle of the 2015 bar instead of between 2015 and 2016 centers.
  */
-function dateToPointFraction(
+function dateToChartWidthPct(
   date: string,
   points: OfficeDashboardPoint[],
+  chartType: string | null | undefined,
+  leftMargin: number,
 ): number {
   if (points.length === 0) return 0
-  if (points.length === 1) return 0.5
-
+  const n = points.length
+  const yearOnly = isYearOnlySeries(points)
+  const domain = chartDomain(points)
   const target = dateToMs(date)
-  const first = dateToMs(points[0]!.recordedAt)
-  const last = dateToMs(points[points.length - 1]!.recordedAt)
+  const { startX, endX } = getChartSeriesEdgeXs(n, chartType, leftMargin)
+  const startPct = xToWidthPct(startX)
+  const endPct = xToWidthPct(endX)
+  const centerPct = (i: number) =>
+    xToWidthPct(chartPointIndexToX(i, n, chartType, leftMargin))
 
-  if (target <= first) return 0
-  if (target >= last) return 1
+  if (n === 1) {
+    if (yearOnly && chartType === 'bar') {
+      const { leftX, rightX } = chartBarEdgeXs(0, n, leftMargin)
+      return xToWidthPct(lerp(leftX, rightX, yearProgress(date)))
+    }
+    return centerPct(0)
+  }
 
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = dateToMs(points[i]!.recordedAt)
-    const b = dateToMs(points[i + 1]!.recordedAt)
+  if (yearOnly && domain) {
+    const domainStartMs = dateToMs(domain.start)
+    const domainEndMs = dateToMs(domain.end)
+    if (target <= domainStartMs) return startPct
+    if (target >= domainEndMs) return endPct
+
+    const years = points.map((p) => Number(yearFromPoint(p)))
+    const dateYear = Number(date.slice(0, 4))
+    const progress = yearProgress(date)
+
+    const exactIdx = years.indexOf(dateYear)
+    if (exactIdx >= 0) {
+      if (chartType === 'bar') {
+        const { leftX, rightX } = chartBarEdgeXs(exactIdx, n, leftMargin)
+        return xToWidthPct(lerp(leftX, rightX, progress))
+      }
+      // Line: each year spans halfway to the previous/next point.
+      const leftBound =
+        exactIdx === 0
+          ? startX
+          : (chartPointIndexToX(exactIdx - 1, n, chartType, leftMargin) +
+              chartPointIndexToX(exactIdx, n, chartType, leftMargin)) /
+            2
+      const rightBound =
+        exactIdx === n - 1
+          ? endX
+          : (chartPointIndexToX(exactIdx, n, chartType, leftMargin) +
+              chartPointIndexToX(exactIdx + 1, n, chartType, leftMargin)) /
+            2
+      return xToWidthPct(lerp(leftBound, rightBound, progress))
+    }
+
+    // Year not on the axis (gap between labeled years): place between neighbors.
+    for (let i = 0; i < n - 1; i++) {
+      const y0 = years[i]!
+      const y1 = years[i + 1]!
+      if (dateYear > y0 && dateYear < y1) {
+        const startMs = dateToMs(`${y0}-12-31`)
+        const endMs = dateToMs(`${y1}-01-01`)
+        const local =
+          endMs <= startMs ? 0 : (target - startMs) / (endMs - startMs)
+        if (chartType === 'bar') {
+          const left = chartBarEdgeXs(i, n, leftMargin).rightX
+          const right = chartBarEdgeXs(i + 1, n, leftMargin).leftX
+          return xToWidthPct(lerp(left, right, Math.min(1, Math.max(0, local))))
+        }
+        return lerp(centerPct(i), centerPct(i + 1), Math.min(1, Math.max(0, local)))
+      }
+    }
+
+    if (dateYear < years[0]!) return startPct
+    return endPct
+  }
+
+  const anchors = points.map((p) => dateToMs(p.recordedAt))
+  const first = anchors[0]!
+  const last = anchors[n - 1]!
+
+  if (target <= first) return centerPct(0)
+  if (target >= last) return centerPct(n - 1)
+
+  for (let i = 0; i < n - 1; i++) {
+    const a = anchors[i]!
+    const b = anchors[i + 1]!
     if (target >= a && target <= b) {
       const local = b === a ? 0 : (target - a) / (b - a)
-      return (i + local) / (points.length - 1)
+      return lerp(centerPct(i), centerPct(i + 1), local)
     }
   }
 
-  return 1
+  return centerPct(n - 1)
 }
 
 function formatDisplayDate(value: string): string {
@@ -120,14 +218,31 @@ function formatDisplayDate(value: string): string {
   return iso
 }
 
+/** Compact month.year for era-switch ticks under the bar. */
+function formatMonthYear(value: string): string {
+  const iso = value.slice(0, 10)
+  const [y, m] = iso.split('-')
+  if (y && m) return `${m}.${y}`
+  return iso
+}
+
+type EraSwitchTick = {
+  key: string
+  leftPct: number
+  label: string
+}
+
+/** Min horizontal gap (%) between switch labels so they stay readable. */
+const SWITCH_TICK_MIN_GAP_PCT = 7
+
 function formatEraRange(era: OfficeDashboardMinisterEra): string {
   const start = formatDisplayDate(era.startDate)
   const end = formatDisplayDate(era.endDate)
   const today = new Date().toISOString().slice(0, 10)
   if (era.endDate.slice(0, 10) >= today) {
-    return `${start} – היום`
+    return `היום – ${start}`
   }
-  return `${start} – ${end}`
+  return `${end} – ${start}`
 }
 
 function eraKey(era: OfficeDashboardMinisterEra): string {
@@ -150,8 +265,53 @@ function clampTooltipCenter(leftPct: number, widthPct: number): number {
   )
 }
 
-export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
+export function OfficeErasBar({
+  eras,
+  points,
+  chartType,
+  uiScale = 1,
+  onHoverBand,
+}: OfficeErasBarProps) {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  const lastTouchRef = useRef(0)
+
+  const setEraHover = (
+    key: string | null,
+    band: {
+      leftPct: number
+      widthPct: number
+      color: string | null
+    } | null,
+  ) => {
+    setHoveredKey(key)
+    onHoverBand?.(band)
+  }
+
+  const setEraHoverFromMouse = (
+    key: string | null,
+    band: {
+      leftPct: number
+      widthPct: number
+      color: string | null
+    } | null,
+  ) => {
+    if (Date.now() - lastTouchRef.current < 700) return
+    setEraHover(key, band)
+  }
+
+  const leftMargin = useMemo(
+    () =>
+      estimateChartYAxisLeftMarginForPoints(
+        points.map((p) => p.value),
+        Math.max(1, uiScale),
+      ),
+    [points, uiScale],
+  )
+
+  const seriesStartPct = useMemo(() => {
+    const { startX } = getChartSeriesEdgeXs(points.length, chartType, leftMargin)
+    return (startX / CHART_WIDTH) * 100
+  }, [points.length, chartType, leftMargin])
 
   const visible = useMemo((): VisibleEra[] => {
     if (eras.length === 0) return []
@@ -164,12 +324,6 @@ export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
       const domainEndMs = dateToMs(domainEnd)
       if (domainEndMs <= domainStartMs) return []
 
-      const yearOnly = isYearOnlySeries(points)
-      const toFrac = (date: string) =>
-        yearOnly
-          ? dateToTimeFraction(date, domainStart, domainEnd)
-          : dateToPointFraction(date, points)
-
       const result: VisibleEra[] = []
       for (const era of eras) {
         const eraStartMs = dateToMs(era.startDate)
@@ -179,23 +333,33 @@ export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
         const clampedStart =
           eraStartMs < domainStartMs ? domainStart : era.startDate
         const clampedEnd = eraEndMs > domainEndMs ? domainEnd : era.endDate
-        let startFrac = toFrac(clampedStart)
-        let endFrac = toFrac(clampedEnd)
-        let widthFrac = Math.max(0, endFrac - startFrac)
-        if (widthFrac <= 0) continue
-        // Keep short overlaps visible on dense monthly series.
-        const minWidth = 0.03
-        if (widthFrac < minWidth) {
-          widthFrac = minWidth
-          if (startFrac + widthFrac > 1) {
-            startFrac = Math.max(0, 1 - widthFrac)
+        let leftPct = dateToChartWidthPct(
+          clampedStart,
+          points,
+          chartType,
+          leftMargin,
+        )
+        const rightPct = dateToChartWidthPct(
+          clampedEnd,
+          points,
+          chartType,
+          leftMargin,
+        )
+        let widthPct = Math.max(0, rightPct - leftPct)
+        if (widthPct <= 0) continue
+        // Keep short overlaps visible on dense monthly series (~3% of chart).
+        const minWidth = 3
+        if (widthPct < minWidth) {
+          widthPct = minWidth
+          if (leftPct + widthPct > 100) {
+            leftPct = Math.max(0, 100 - widthPct)
           }
         }
 
         result.push({
           era,
-          leftPct: startFrac * 100,
-          widthPct: widthFrac * 100,
+          leftPct,
+          widthPct,
         })
       }
       return result
@@ -220,20 +384,32 @@ export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
         widthPct: Math.min(widthFrac, 1 - a) * 100,
       }
     })
-  }, [eras, points])
+  }, [eras, points, chartType, leftMargin])
 
   const hovered = useMemo(
     () => visible.find((item) => eraKey(item.era) === hoveredKey) ?? null,
     [visible, hoveredKey],
   )
 
-  if (visible.length === 0) return null
+  const switchTicks = useMemo((): EraSwitchTick[] => {
+    const sorted = [...visible].sort((a, b) => a.leftPct - b.leftPct)
+    const ticks: EraSwitchTick[] = []
+    for (const item of sorted) {
+      const leftPct = item.leftPct
+      // Skip the series left edge; only mark minister switches.
+      if (leftPct <= seriesStartPct + 0.4) continue
+      const prev = ticks[ticks.length - 1]
+      if (prev && leftPct - prev.leftPct < SWITCH_TICK_MIN_GAP_PCT) continue
+      ticks.push({
+        key: `switch-${eraKey(item.era)}`,
+        leftPct,
+        label: formatMonthYear(item.era.startDate),
+      })
+    }
+    return ticks
+  }, [visible, seriesStartPct])
 
-  const { insetLeftPct, insetRightPct } = getChartSeriesHorizontalInsets(
-    points.length,
-    chartType,
-    estimateChartYAxisLeftMarginForPoints(points.map((p) => p.value)),
-  )
+  if (visible.length === 0) return null
 
   return (
     <div
@@ -244,10 +420,6 @@ export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
     >
       <div
         className="office-eras-bar__tooltip-lane"
-        style={{
-          marginInlineStart: `${insetLeftPct}%`,
-          marginInlineEnd: `${insetRightPct}%`,
-        }}
         aria-hidden={!hovered}
       >
         {hovered ? (
@@ -293,18 +465,12 @@ export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
         ) : null}
       </div>
 
-      <div
-        className="office-eras-bar__plot"
-        style={{
-          marginInlineStart: `${insetLeftPct}%`,
-          marginInlineEnd: `${insetRightPct}%`,
-        }}
-      >
+      <div className="office-eras-bar__plot">
         {visible.map(({ era, leftPct, widthPct }) => {
           const color = era.factionColor?.trim() || FALLBACK_COLOR
-          // Photo is ~52px; only show when the segment can fit a full circle.
-          const showFull = widthPct >= 18
-          const showPhoto = widthPct >= 9
+          // Thresholds are % of full chart width (~same visual as before on the series).
+          const showFull = widthPct >= 14
+          const showPhoto = widthPct >= 7
           const photoOnly = showPhoto && !showFull
           const key = eraKey(era)
           const isHovered = hoveredKey === key
@@ -323,10 +489,36 @@ export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
                 backgroundColor: color,
               }}
               aria-label={ariaLabel}
-              onMouseEnter={() => setHoveredKey(key)}
-              onMouseLeave={() => setHoveredKey(null)}
-              onFocus={() => setHoveredKey(key)}
-              onBlur={() => setHoveredKey(null)}
+              onMouseEnter={() =>
+                setEraHoverFromMouse(key, {
+                  leftPct,
+                  widthPct,
+                  color: era.factionColor?.trim() || FALLBACK_COLOR,
+                })
+              }
+              onMouseLeave={() => setEraHoverFromMouse(null, null)}
+              onFocus={() =>
+                setEraHover(key, {
+                  leftPct,
+                  widthPct,
+                  color: era.factionColor?.trim() || FALLBACK_COLOR,
+                })
+              }
+              onBlur={() => setEraHover(null, null)}
+              onPointerUp={(e) => {
+                if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return
+                lastTouchRef.current = Date.now()
+                e.stopPropagation()
+                if (isHovered) {
+                  setEraHover(null, null)
+                } else {
+                  setEraHover(key, {
+                    leftPct,
+                    widthPct,
+                    color: era.factionColor?.trim() || FALLBACK_COLOR,
+                  })
+                }
+              }}
               tabIndex={0}
             >
               <div
@@ -343,8 +535,8 @@ export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
                         ? ''
                         : ' office-eras-bar__photo--placeholder'
                     }`}
-                    width={52}
-                    height={52}
+                    width={42}
+                    height={42}
                     loading="lazy"
                     decoding="async"
                   />
@@ -364,6 +556,20 @@ export function OfficeErasBar({ eras, points, chartType }: OfficeErasBarProps) {
           )
         })}
       </div>
+
+      {switchTicks.length > 0 ? (
+        <div className="office-eras-bar__switches" aria-hidden="true">
+          {switchTicks.map((tick) => (
+            <span
+              key={tick.key}
+              className="office-eras-bar__switch"
+              style={{ left: `${tick.leftPct}%` }}
+            >
+              {tick.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }

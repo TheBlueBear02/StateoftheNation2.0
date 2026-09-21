@@ -1,5 +1,5 @@
 import { Heebo } from 'next/font/google'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import {
   getDefaultOgImageUrl,
@@ -27,6 +27,12 @@ const defaultOgImage = {
   height: 630,
   type: 'image/png' as const,
   alt: 'מצב האומה | State of the Nation IL',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export const metadata: Metadata = {

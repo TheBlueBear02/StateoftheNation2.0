@@ -1,17 +1,88 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
-import { IndexTrendChart } from '../components/government/IndexTrendChart'
+import {
+  CHART_MOBILE_MAX_WIDTH,
+  chartTallForWidth,
+  chartUiScaleForWidth,
+  getChartLayoutWidthDebug,
+  IndexTrendChart,
+  readChartLayoutWidth,
+} from '../components/government/IndexTrendChart'
 import { OfficeErasBar } from '../components/government/OfficeErasBar'
 import { useOfficeDashboard } from '../hooks/useOfficeDashboard'
+import { exportOfficeChartImage } from '../lib/exportOfficeChartImage'
 import {
   type OfficeDashboardIndex,
   type OfficeDashboardOffice,
 } from '../lib/fetchOfficeDashboard'
 import './OfficeDashboardPage.css'
+
+/**
+ * Viewport width that tracks DevTools device mode.
+ * Uses readChartLayoutWidth() so a spurious innerWidth jump (375 → ~800)
+ * from Chrome device emulation does not flip the page to tablet/desktop.
+ * Always starts at the desktop breakpoint so SSR + first client paint match
+ * (avoids hydration mismatch on office-dashboard-page--mobile).
+ */
+function useViewportWidth(): number {
+  const [width, setWidth] = useState(CHART_MOBILE_MAX_WIDTH)
+
+  useEffect(() => {
+    let debounceId: number | null = null
+    const update = () => {
+      if (debounceId != null) window.clearTimeout(debounceId)
+      debounceId = window.setTimeout(() => {
+        setWidth(readChartLayoutWidth())
+      }, 50)
+    }
+    // Apply immediately after mount (no debounce) so mobile CSS kicks in fast.
+    setWidth(readChartLayoutWidth())
+    window.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('resize', update)
+    const mq640 = window.matchMedia('(max-width: 640px)')
+    const mq960 = window.matchMedia('(max-width: 960px)')
+    mq640.addEventListener('change', update)
+    mq960.addEventListener('change', update)
+    return () => {
+      if (debounceId != null) window.clearTimeout(debounceId)
+      window.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('resize', update)
+      mq640.removeEventListener('change', update)
+      mq960.removeEventListener('change', update)
+    }
+  }, [])
+
+  return width
+}
+
+async function copyImageToClipboard(blob: Blob): Promise<boolean> {
+  if (
+    typeof navigator === 'undefined' ||
+    !navigator.clipboard ||
+    typeof ClipboardItem === 'undefined'
+  ) {
+    return false
+  }
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'image/png': blob }),
+    ])
+    return true
+  } catch {
+    return false
+  }
+}
+
+function downloadDataUrl(dataUrl: string, filename: string) {
+  const link = document.createElement('a')
+  link.download = filename
+  link.href = dataUrl
+  link.click()
+}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -123,7 +194,6 @@ type DetailPanelProps = {
   selectedIndex: OfficeDashboardIndex | null
   onSelectOffice: (officeId: number) => void
   onSelectIndex: (index: OfficeDashboardIndex) => void
-  shareUrl: string
 }
 
 function DetailPanel({
@@ -132,20 +202,119 @@ function DetailPanel({
   selectedIndex,
   onSelectOffice,
   onSelectIndex,
-  shareUrl,
 }: DetailPanelProps) {
   const minister = office.minister
   const indexes = [...office.kpis, ...office.policies]
   const activeChipRef = useRef<HTMLButtonElement | null>(null)
+  const stripTrackRef = useRef<HTMLDivElement | null>(null)
+  const chipRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const markerAnimatedRef = useRef(false)
+  const [indexMarker, setIndexMarker] = useState<{
+    left: number
+    width: number
+    visible: boolean
+    animate: boolean
+  }>({ left: 0, width: 0, visible: false, animate: false })
   const prevOfficeIdRef = useRef(office.id)
   const pendingSlideRef = useRef<'from-left' | 'from-right' | null>(null)
   const [slideDir, setSlideDir] = useState<'from-left' | 'from-right'>(
     'from-right',
   )
-  const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'error'>(
-    'idle',
-  )
+  const [imageShareStatus, setImageShareStatus] = useState<
+    'idle' | 'copying' | 'copied' | 'downloaded' | 'error'
+  >('idle')
+  const [eraHighlightBand, setEraHighlightBand] = useState<{
+    leftPct: number
+    widthPct: number
+    color: string | null
+  } | null>(null)
+  const [chartMetrics, setChartMetrics] = useState<{
+    uiScale: number
+    tall: boolean
+    width: number
+  } | null>(null)
+  const chartCaptureRef = useRef<HTMLElement | null>(null)
+  const chartResizeObserverRef = useRef<ResizeObserver | null>(null)
+  const viewportWidth = useViewportWidth()
   const officeIndex = offices.findIndex((item) => item.id === office.id)
+
+  const bindChartCaptureRef = useCallback((node: HTMLElement | null) => {
+    chartCaptureRef.current = node
+    chartResizeObserverRef.current?.disconnect()
+    chartResizeObserverRef.current = null
+    if (!node) return
+
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      /* width tracked inside IndexTrendChart; keep ref for export */
+    })
+    ro.observe(node)
+    chartResizeObserverRef.current = ro
+  }, [])
+
+  // Viewport-based scale so DevTools device mode works even before the chart mounts.
+  const viewportChartWidth = Math.max(1, viewportWidth - 40)
+  const viewportScale = chartUiScaleForWidth(viewportChartWidth)
+  const viewportTall = chartTallForWidth(viewportChartWidth)
+  const uiScale = Math.max(viewportScale, chartMetrics?.uiScale ?? 1)
+  const tallChart = viewportTall || Boolean(chartMetrics?.tall)
+  const layoutMode: 'mobile' | 'desktop' =
+    tallChart || uiScale > 1.01 ? 'mobile' : 'desktop'
+
+  const onChartMetricsChange = useCallback(
+    (metrics: { uiScale: number; tall: boolean; width: number }) => {
+      setChartMetrics((prev) => {
+        if (
+          prev &&
+          Math.abs(prev.uiScale - metrics.uiScale) < 0.01 &&
+          prev.tall === metrics.tall &&
+          Math.abs(prev.width - metrics.width) < 0.5
+        ) {
+          return prev
+        }
+        return {
+          uiScale: metrics.uiScale,
+          tall: metrics.tall,
+          width: metrics.width,
+        }
+      })
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return
+    const debug = getChartLayoutWidthDebug()
+    // eslint-disable-next-line no-console -- intentional layout debug in dev
+    console.info(
+      `%c[office-dashboard] layout: ${layoutMode.toUpperCase()}`,
+      layoutMode === 'mobile'
+        ? 'color:#0a7;font-weight:700'
+        : 'color:#06c;font-weight:700',
+      {
+        mode: layoutMode,
+        correctedWidth: debug.corrected,
+        raw: {
+          inner: debug.inner,
+          client: debug.client,
+          visual: debug.visual,
+          screen: debug.screen,
+        },
+        viewportChartWidth,
+        chartMeasuredWidth: chartMetrics?.width ?? null,
+        uiScale: Number(uiScale.toFixed(2)),
+        tall: tallChart,
+        mobileBelowPx: CHART_MOBILE_MAX_WIDTH,
+      },
+    )
+  }, [
+    layoutMode,
+    viewportWidth,
+    viewportChartWidth,
+    chartMetrics?.width,
+    uiScale,
+    tallChart,
+  ])
 
   const goToAdjacentOffice = (step: -1 | 1) => {
     if (offices.length === 0 || officeIndex < 0) return
@@ -181,18 +350,94 @@ function DetailPanel({
     })
   }, [selectedIndex?.id])
 
-  useEffect(() => {
-    if (shareStatus === 'idle') return
-    const timer = window.setTimeout(() => setShareStatus('idle'), 2000)
-    return () => window.clearTimeout(timer)
-  }, [shareStatus])
+  useLayoutEffect(() => {
+    const updateMarker = () => {
+      const id = selectedIndex?.id
+      const track = stripTrackRef.current
+      if (id == null || !track) {
+        setIndexMarker((prev) => ({ ...prev, visible: false }))
+        return
+      }
+      const chip = chipRefs.current.get(id)
+      if (!chip) {
+        setIndexMarker((prev) => ({ ...prev, visible: false }))
+        return
+      }
+      const padX = 6
+      const width = chip.offsetWidth + padX * 2
+      const left = chip.offsetLeft + (chip.offsetWidth - width) / 2
+      const animate = markerAnimatedRef.current
+      markerAnimatedRef.current = true
+      setIndexMarker({ left, width, visible: true, animate })
+    }
 
-  const copyShareLink = async () => {
+    updateMarker()
+
+    const track = stripTrackRef.current
+    const ro =
+      typeof ResizeObserver !== 'undefined' && track
+        ? new ResizeObserver(() => updateMarker())
+        : null
+    if (track && ro) ro.observe(track)
+    window.addEventListener('resize', updateMarker)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', updateMarker)
+    }
+  }, [selectedIndex?.id, office.id, office.kpis, office.policies])
+
+  useEffect(() => {
+    // New office strip: snap marker without sliding from the previous office.
+    markerAnimatedRef.current = false
+  }, [office.id])
+
+  useEffect(() => {
+    setEraHighlightBand(null)
+  }, [selectedIndex?.id, office.id])
+
+  useEffect(() => {
+    if (
+      imageShareStatus === 'idle' ||
+      imageShareStatus === 'copying'
+    ) {
+      return
+    }
+    const timer = window.setTimeout(() => setImageShareStatus('idle'), 2500)
+    return () => window.clearTimeout(timer)
+  }, [imageShareStatus])
+
+  const copyChartImage = async () => {
+    const node = chartCaptureRef.current
+    if (!node || imageShareStatus === 'copying') return
+
+    setImageShareStatus('copying')
     try {
-      await navigator.clipboard.writeText(shareUrl)
-      setShareStatus('copied')
-    } catch {
-      setShareStatus('error')
+      const dataUrl = await exportOfficeChartImage(node, {
+        iconUrl: selectedIndex?.icon,
+        iconTone: selectedIndex?.alert
+          ? 'alert'
+          : selectedIndex?.isKpi
+            ? 'kpi'
+            : 'policy',
+      })
+      const response = await fetch(dataUrl)
+      const blob = await response.blob()
+      if (blob.size < 100) {
+        throw new Error('Exported image was empty')
+      }
+      const copied = await copyImageToClipboard(blob)
+      if (copied) {
+        setImageShareStatus('copied')
+      } else {
+        const safeName = (selectedIndex?.name || 'chart')
+          .replace(/[^\u0590-\u05FFa-zA-Z0-9-_]+/g, '-')
+          .slice(0, 40)
+        downloadDataUrl(dataUrl, `office-dashboard-${safeName}.png`)
+        setImageShareStatus('downloaded')
+      }
+    } catch (error) {
+      console.error('[office-dashboard] chart image export failed', error)
+      setImageShareStatus('error')
     }
   }
 
@@ -264,45 +509,64 @@ function DetailPanel({
         role="list"
         aria-label="מדדי המשרד"
       >
-        {indexes.map((index) => {
-          const isActive = selectedIndex?.id === index.id
-          return (
-            <button
-              key={index.id}
-              ref={isActive ? activeChipRef : undefined}
-              type="button"
-              role="listitem"
-              className={`office-dashboard__index-chip${
-                index.alert ? ' office-dashboard__index-chip--alert' : ''
-              }${index.isKpi ? '' : ' office-dashboard__index-chip--policy'}${
-                isActive ? ' office-dashboard__index-chip--active' : ''
-              }`}
-              onClick={() => onSelectIndex(index)}
-              aria-pressed={isActive}
-              aria-label={index.name}
-              title={index.name}
-            >
-              <span
-                className="office-dashboard__index-chip-circle"
-                aria-hidden="true"
+        <div className="office-dashboard__index-strip-track" ref={stripTrackRef}>
+          <span
+            className={`office-dashboard__index-marker${
+              indexMarker.visible ? ' office-dashboard__index-marker--visible' : ''
+            }${
+              indexMarker.animate ? ' office-dashboard__index-marker--animate' : ''
+            }`}
+            style={{
+              width: indexMarker.width,
+              transform: `translateX(${indexMarker.left}px)`,
+            }}
+            aria-hidden="true"
+          />
+          {indexes.map((index) => {
+            const isActive = selectedIndex?.id === index.id
+            return (
+              <button
+                key={index.id}
+                ref={(node) => {
+                  if (node) chipRefs.current.set(index.id, node)
+                  else chipRefs.current.delete(index.id)
+                  if (isActive) activeChipRef.current = node
+                }}
+                type="button"
+                role="listitem"
+                className={`office-dashboard__index-chip${
+                  index.alert ? ' office-dashboard__index-chip--alert' : ''
+                }${index.isKpi ? '' : ' office-dashboard__index-chip--policy'}${
+                  isActive ? ' office-dashboard__index-chip--active' : ''
+                }`}
+                onClick={() => onSelectIndex(index)}
+                aria-pressed={isActive}
+                aria-label={index.name}
+                title={index.name}
               >
-                <img
-                  src={index.icon}
-                  alt=""
-                  className="office-dashboard__index-chip-icon"
-                  width={36}
-                  height={36}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </span>
-            </button>
-          )
-        })}
+                <span
+                  className="office-dashboard__index-chip-circle"
+                  aria-hidden="true"
+                >
+                  <img
+                    src={index.icon}
+                    alt=""
+                    className="office-dashboard__index-chip-icon"
+                    width={36}
+                    height={36}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {selectedIndex ? (
         <section
+          ref={bindChartCaptureRef}
           className="office-dashboard__chart-block"
           aria-labelledby="office-index-chart-title"
         >
@@ -320,19 +584,75 @@ function DetailPanel({
                 </p>
               ) : null}
             </div>
-            <div className="office-dashboard__chart-actions">
+            <div className="office-dashboard__chart-actions" dir="ltr">
               <button
                 type="button"
-                className="office-dashboard__chart-share"
+                className={`office-dashboard__chart-share${
+                  imageShareStatus === 'copied' ||
+                  imageShareStatus === 'downloaded'
+                    ? ' office-dashboard__chart-share--done'
+                    : ''
+                }`}
                 onClick={() => {
-                  void copyShareLink()
+                  void copyChartImage()
                 }}
+                disabled={imageShareStatus === 'copying'}
+                aria-label={
+                  imageShareStatus === 'copying'
+                    ? 'מכין תמונה…'
+                    : imageShareStatus === 'copied'
+                      ? 'התמונה הועתקה'
+                      : imageShareStatus === 'downloaded'
+                        ? 'התמונה הורדה'
+                        : imageShareStatus === 'error'
+                          ? 'ייצוא התמונה נכשל'
+                          : 'שתפו את הגרף'
+                }
+                title={
+                  imageShareStatus === 'copied'
+                    ? 'התמונה הועתקה'
+                    : imageShareStatus === 'downloaded'
+                      ? 'התמונה הורדה'
+                      : imageShareStatus === 'error'
+                        ? 'ייצוא התמונה נכשל'
+                        : 'שתפו את הגרף'
+                }
               >
-                {shareStatus === 'copied'
-                  ? 'הקישור הועתק'
-                  : shareStatus === 'error'
-                    ? 'ההעתקה נכשלה'
-                    : 'העתק קישור'}
+                {imageShareStatus === 'copied' ||
+                imageShareStatus === 'downloaded' ? (
+                  <span className="office-dashboard__chart-share-status" role="status">
+                    {imageShareStatus === 'copied'
+                      ? 'הועתק'
+                      : 'הורד'}
+                  </span>
+                ) : imageShareStatus === 'copying' ? (
+                  <span className="office-dashboard__chart-share-status" role="status">
+                    …
+                  </span>
+                ) : imageShareStatus === 'error' ? (
+                  <span className="office-dashboard__chart-share-status" role="status">
+                    !
+                  </span>
+                ) : (
+                  <svg
+                    className="office-dashboard__chart-share-icon"
+                    viewBox="0 0 24 24"
+                    width="22"
+                    height="22"
+                    aria-hidden="true"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <path d="M8.59 13.51 15.42 17.49" />
+                    <path d="M15.41 6.51 8.59 10.49" />
+                  </svg>
+                )}
               </button>
               {selectedIndex.source ? (
                 <a
@@ -346,11 +666,19 @@ function DetailPanel({
               ) : null}
             </div>
           </div>
-          <IndexTrendChart index={selectedIndex} />
+          <IndexTrendChart
+            index={selectedIndex}
+            highlightBand={eraHighlightBand}
+            uiScale={uiScale}
+            tall={tallChart}
+            onMetricsChange={onChartMetricsChange}
+          />
           <OfficeErasBar
             eras={office.ministerHistory}
             points={selectedIndex.points}
             chartType={selectedIndex.chartType}
+            uiScale={uiScale}
+            onHoverBand={setEraHighlightBand}
           />
         </section>
       ) : (
@@ -358,6 +686,64 @@ function DetailPanel({
           בחרו מדד כדי לראות את הגרף לאורך זמן
         </p>
       )}
+    </aside>
+  )
+}
+
+function DetailPanelSkeleton() {
+  return (
+    <aside
+      className="office-dashboard__panel office-dashboard__panel--skeleton"
+      aria-hidden="true"
+    >
+      <div className="office-dashboard__office-switcher" dir="ltr">
+        <span className="office-dashboard__office-nav office-dashboard__skel-nav">
+          ‹
+        </span>
+        <div className="office-dashboard__office-current" dir="rtl">
+          <span className="office-dashboard__panel-photo office-dashboard__skel-block" />
+          <div className="office-dashboard__office-current-text">
+            <h2 className="office-dashboard__panel-title office-dashboard__skel-text office-dashboard__skel-text--title">
+              &nbsp;
+            </h2>
+            <p className="office-dashboard__panel-minister office-dashboard__skel-text office-dashboard__skel-text--minister">
+              &nbsp;
+            </p>
+            <p className="office-dashboard__panel-info office-dashboard__panel-info--inline office-dashboard__skel-text office-dashboard__skel-text--info">
+              &nbsp;
+            </p>
+          </div>
+        </div>
+        <span className="office-dashboard__office-nav office-dashboard__skel-nav">
+          ›
+        </span>
+      </div>
+
+      <div className="office-dashboard__index-strip">
+        <div className="office-dashboard__index-strip-track">
+          {Array.from({ length: 8 }, (_, i) => (
+            <span
+              key={i}
+              className="office-dashboard__skel-circle"
+            />
+          ))}
+        </div>
+      </div>
+
+      <section className="office-dashboard__chart-block">
+        <div className="office-dashboard__chart-header">
+          <div>
+            <h3 className="office-dashboard__chart-title office-dashboard__skel-text office-dashboard__skel-text--chart-title">
+              &nbsp;
+            </h3>
+            <p className="office-dashboard__chart-info office-dashboard__skel-text office-dashboard__skel-text--chart-info">
+              &nbsp;
+            </p>
+          </div>
+        </div>
+        <div className="office-dashboard__skel-chart" />
+        <div className="office-dashboard__skel-eras" />
+      </section>
     </aside>
   )
 }
@@ -370,21 +756,14 @@ export function OfficeDashboardPage() {
   const [selectedOfficeId, setSelectedOfficeId] = useState<number | null>(null)
   const [selectedIndexId, setSelectedIndexId] = useState<number | null>(null)
   const hydratedFromUrlRef = useRef(false)
+  const viewportWidth = useViewportWidth()
+  const isMobileLayout = viewportWidth < CHART_MOBILE_MAX_WIDTH
 
   const selectedOffice =
     offices.find((o) => o.id === selectedOfficeId) ?? null
 
   const selectedIndex =
     selectedOffice?.indexes.find((i) => i.id === selectedIndexId) ?? null
-
-  const shareUrl = useMemo(() => {
-    if (selectedOfficeId == null) return ''
-    const qs = buildDashboardQuery(selectedOfficeId, selectedIndexId)
-    if (typeof window === 'undefined') {
-      return `${pathname}?${qs}`
-    }
-    return `${window.location.origin}${pathname}?${qs}`
-  }, [pathname, selectedOfficeId, selectedIndexId])
 
   // Open office + index from ?office=&index= once data is ready.
   useEffect(() => {
@@ -451,7 +830,11 @@ export function OfficeDashboardPage() {
   ])
 
   return (
-    <SiteLayout className="office-dashboard-page">
+    <SiteLayout
+      className={`office-dashboard-page${
+        isMobileLayout ? ' office-dashboard-page--mobile' : ''
+      }`}
+    >
       <main className="office-dashboard__main">
         <div className="office-dashboard__inner container">
           <PageBreadcrumb
@@ -493,17 +876,18 @@ export function OfficeDashboardPage() {
 
           <div
             className={`office-dashboard__layout${
-              selectedOffice ? ' office-dashboard__layout--open' : ''
+              selectedOffice || loading ? ' office-dashboard__layout--open' : ''
             }`}
           >
-            {selectedOffice && !loading && !error ? (
+            {loading ? (
+              <DetailPanelSkeleton />
+            ) : selectedOffice && !error ? (
               <DetailPanel
                 offices={offices}
                 office={selectedOffice}
                 selectedIndex={selectedIndex}
                 onSelectOffice={setSelectedOfficeId}
                 onSelectIndex={(index) => setSelectedIndexId(index.id)}
-                shareUrl={shareUrl}
               />
             ) : null}
 
@@ -511,22 +895,16 @@ export function OfficeDashboardPage() {
               className="office-dashboard__quadrant"
               aria-label="משרדים"
             >
-              {loading
-                ? Array.from({ length: 4 }, (_, i) => (
-                    <div
-                      key={i}
-                      className="office-cluster office-cluster--skeleton"
-                      aria-hidden="true"
-                    />
-                  ))
-                : offices.map((office) => (
+              {!loading
+                ? offices.map((office) => (
                     <OfficeCluster
                       key={office.id}
                       office={office}
                       selected={office.id === selectedOfficeId}
                       onSelect={() => setSelectedOfficeId(office.id)}
                     />
-                  ))}
+                  ))
+                : null}
             </section>
           </div>
         </div>
