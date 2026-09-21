@@ -146,7 +146,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Same news-block layout: title **מצב האומה: מדדי משרדי הממשלה לאורך זמן** + category tag **הממשלה** below it (no description / meta line).
 - Whole section links to `/government/dashboard` (KPI/policy quadrant; see [GovernmentDashboardPage.md](./GovernmentDashboardPage.md)).
 - `.project-section__inner.container`: ~`0.95fr / 1.2fr` grid (media larger). DOM order is content first, media second — text right, preview left in RTL.
-- ≤900px: same stack as the institutions cards — image above, title + tag below (flex `order` on media/content). Desktop layout unchanged.
+- ≤900px: same stack as the institutions cards — image above, title + tag below (`flex-direction: column-reverse` so media sits on top without changing DOM order). Desktop layout unchanged.
 - Hover on `.project-section__inner`: light grey background on the whole content box. Hover on title or media: title underline. Whole section remains clickable; focus-visible outline on the link.
 - Tag (`.project-section__tag`): square corners, `--color-blue` fill / white text.
 - Media: static screenshot `public/government-offices-homepage.png` (same pattern as polls/elections teasers — no live Supabase fetch on the homepage).
@@ -154,7 +154,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 ### 6. Mandate polls project (`#mandate-polls`)
 
 - White section below the dashboard teaser.
-- News-block layout: title **סקר הסקרים: סקרי המנדטים של כל הערוצים במקום אחד** + category tag **בחירות 2026**. Meta line **עודכן לאחרונה {D.M.YYYY}** sits at the **bottom of the section** (full-width under the text+media grid; from the newest non-scenario poll’s `fieldwork_end` via `useLatestPollDate` / `fetchLatestPollFieldworkEnd`). Meta is omitted while loading or if the query fails/empty.
+- News-block layout: title **סקר הסקרים: סקרי המנדטים של כל הערוצים במקום אחד** + category tag **בחירות 2026** + meta line **עודכן לאחרונה {D.M.YYYY}** from the newest non-scenario poll’s `fieldwork_end` (`useLatestPollDate` / `fetchLatestPollFieldworkEnd`). Meta is omitted while loading or if the query fails/empty.
 - Whole section is a link (`.project-section__link`) to `/elections/polls`.
 - Media (`.project-section__media`): screenshot from `public/polls-page-homepage.png`.
 
@@ -216,7 +216,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 ## Responsive Behavior
 
-- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Single-project teasers (dream, dashboard, polls, lists) switch to **image above / text below** (flex `order` on media/content); polls meta stays last when present. Desktop stays the side-by-side grid. The government + Knesset pair stays **two columns**. Container padding remains fluid via `clamp()`.
+- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Single-project teasers (dream, dashboard, polls, lists) switch to **image above / text below** (`column-reverse` on `.project-section__inner`); desktop stays the side-by-side grid. The government + Knesset pair stays **two columns**. Container padding remains fluid via `clamp()`.
 - **≤480px:** Hero buttons become single column; header height, logo, and date text scale down (non-home / desktop-style header).
 
 ## Future Work

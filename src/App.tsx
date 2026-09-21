@@ -188,6 +188,11 @@ function App() {
                     סקר הסקרים: סקרי המנדטים של כל הערוצים במקום אחד
                   </h2>
                   <span className="project-section__tag">בחירות 2026</span>
+                  {pollsUpdatedLabel ? (
+                    <p className="project-section__meta">
+                      עודכן לאחרונה {pollsUpdatedLabel}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="project-section__media" aria-hidden="true">
@@ -201,12 +206,6 @@ function App() {
                     decoding="async"
                   />
                 </div>
-
-                {pollsUpdatedLabel ? (
-                  <p className="project-section__meta">
-                    עודכן לאחרונה {pollsUpdatedLabel}
-                  </p>
-                ) : null}
               </div>
             </div>
           </Link>

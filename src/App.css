@@ -434,8 +434,6 @@
 
 .project-section__meta {
   margin: 0;
-  grid-column: 1 / -1;
-  justify-self: start;
   font-size: 0.88rem;
   font-weight: 500;
   color: rgba(0, 0, 0, 0.55);
@@ -588,32 +586,22 @@
     padding-block: 28px 36px;
   }
 
-  /* Stack image above text; meta (if any) stays at the bottom */
+  /* Stack image above text (media is second in DOM → column-reverse) */
   .project-section__inner {
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse;
     gap: 16px;
     align-items: stretch;
     padding: 12px;
   }
 
-  .project-section__media {
-    order: 1;
-  }
-
   .project-section__content {
-    order: 2;
     max-width: none;
     width: 100%;
     gap: 12px;
     text-align: right;
     padding-inline: clamp(12px, 2.5vw, 28px);
     box-sizing: border-box;
-  }
-
-  .project-section__meta {
-    order: 3;
-    padding-inline: clamp(12px, 2.5vw, 28px);
   }
 
   .project-section__tag {
