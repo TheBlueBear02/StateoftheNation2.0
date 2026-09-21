@@ -21,6 +21,11 @@ type IndexTrendChartProps = {
   uiScale?: number
   /** Use a taller viewBox on narrow screens for more vertical plot room. */
   tall?: boolean
+  /**
+   * Ignore viewport/self measurement — keep the explicit uiScale/tall props.
+   * Used by the offscreen PNG export shell so mobile shares match desktop.
+   */
+  fixedLayout?: boolean
   /** Notify parent when self-measured scale changes (keeps eras bar in sync). */
   onMetricsChange?: (metrics: { uiScale: number; tall: boolean; width: number }) => void
 }
@@ -283,6 +288,7 @@ export function IndexTrendChart({
   highlightBand = null,
   uiScale: uiScaleProp,
   tall: tallProp,
+  fixedLayout = false,
   onMetricsChange,
 }: IndexTrendChartProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
@@ -340,17 +346,21 @@ export function IndexTrendChart({
     effectiveWidth > 0 ? chartUiScaleForWidth(effectiveWidth) : 1
   const selfTall =
     effectiveWidth > 0 ? chartTallForWidth(effectiveWidth) : false
-  const scale = Math.max(1, uiScaleProp ?? 1, selfScale)
-  const tall = Boolean(tallProp) || selfTall
+  const scale = fixedLayout
+    ? Math.max(1, uiScaleProp ?? 1)
+    : Math.max(1, uiScaleProp ?? 1, selfScale)
+  const tall = fixedLayout
+    ? Boolean(tallProp)
+    : Boolean(tallProp) || selfTall
 
   useEffect(() => {
-    if (effectiveWidth <= 0) return
+    if (fixedLayout || effectiveWidth <= 0) return
     onMetricsChange?.({
       uiScale: selfScale,
       tall: selfTall,
       width: effectiveWidth,
     })
-  }, [selfScale, selfTall, effectiveWidth, onMetricsChange])
+  }, [fixedLayout, selfScale, selfTall, effectiveWidth, onMetricsChange])
 
   const height = tall ? CHART_HEIGHT_TALL : CHART_HEIGHT
   // Scaled x-label fonts need a deeper bottom gutter so they sit under the bars.

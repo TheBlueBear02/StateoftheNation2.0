@@ -217,13 +217,22 @@ function lockChartSvgSize(
  * Export the office dashboard chart block (title + info + SVG + eras) to PNG.
  * Keeps chart + eras on the same content width (padding outside), and inlines
  * SVG paint so html-to-image does not fall back to black fills.
+ *
+ * Prefer capturing `.office-dashboard__chart-block--export` (fixed 960px
+ * desktop layout) so mobile shares match PC proportions.
  */
 export async function exportOfficeChartImage(
   liveNode: HTMLElement,
   options: OfficeChartExportOptions = {},
 ): Promise<string> {
+  const isDesktopExport = liveNode.classList.contains(
+    'office-dashboard__chart-block--export',
+  )
   const liveWidth = Math.round(liveNode.getBoundingClientRect().width)
-  const contentWidth = liveWidth || liveNode.offsetWidth
+  // Desktop export shell is authored at 960px; fall back if not laid out yet.
+  const contentWidth = isDesktopExport
+    ? Math.max(liveWidth, 960)
+    : liveWidth || liveNode.offsetWidth || 960
   const clone = liveNode.cloneNode(true) as HTMLElement
   clone.setAttribute('data-export-clone', 'true')
   clone.style.position = 'fixed'
@@ -235,11 +244,16 @@ export async function exportOfficeChartImage(
   clone.style.boxSizing = 'border-box'
   // Padding is inside the box; widen by 2*pad so content width === live chart width.
   clone.style.width = `${contentWidth + EXPORT_PAD_PX * 2}px`
+  clone.style.maxWidth = `${contentWidth + EXPORT_PAD_PX * 2}px`
   clone.style.padding = `22px ${EXPORT_PAD_PX}px 12px`
   clone.style.background = '#ffffff'
   clone.style.overflow = 'hidden'
   clone.style.fontFamily = 'var(--font-heebo), Heebo, sans-serif'
   clone.dir = 'rtl'
+  // Drop offscreen positioning from the live export shell so the clone lays out.
+  clone.classList.remove('office-dashboard__chart-block--export')
+  clone.style.left = '-10000px'
+  clone.style.visibility = 'visible'
 
   for (const selector of SKIP_EXPORT_SELECTORS) {
     clone.querySelectorAll(selector).forEach((el) => el.remove())

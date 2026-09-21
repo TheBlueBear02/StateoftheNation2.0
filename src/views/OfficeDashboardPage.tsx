@@ -211,6 +211,8 @@ function DetailPanel({
     width: number
   } | null>(null)
   const chartCaptureRef = useRef<HTMLElement | null>(null)
+  /** Fixed desktop-layout chart used for PNG export (matches PC share). */
+  const chartExportRef = useRef<HTMLElement | null>(null)
   const chartResizeObserverRef = useRef<ResizeObserver | null>(null)
   const viewportWidth = useViewportWidth()
   const officeIndex = offices.findIndex((item) => item.id === office.id)
@@ -384,7 +386,8 @@ function DetailPanel({
   }, [imageShareStatus])
 
   const copyChartImage = async () => {
-    const node = chartCaptureRef.current
+    // Prefer the offscreen desktop-layout chart so mobile shares match PC.
+    const node = chartExportRef.current ?? chartCaptureRef.current
     if (!node || imageShareStatus === 'copying') return
 
     setImageShareStatus('copying')
@@ -396,9 +399,10 @@ function DetailPanel({
       office.id,
       selectedIndex?.id ?? null,
     )}`
-    const shareBody = office.name
-      ? `${office.name} — מדדי משרדי הממשלה`
-      : 'מדדי משרדי הממשלה'
+    const indexDescription = selectedIndex?.info?.trim() || ''
+    const shareText = indexDescription
+      ? `${indexDescription}\nמאתר מצב האומה\n${chartUrl}`
+      : `מאתר מצב האומה\n${chartUrl}`
 
     try {
       // Same path as dream-government: Safari-safe clipboard Promise,
@@ -406,8 +410,14 @@ function DetailPanel({
       const shareResult = await sharePngImage({
         filename: `office-dashboard-${safeName}.png`,
         shareTitle: `${indexName} · מצב האומה`,
-        shareText: `${shareBody}\n${chartUrl}`,
+        shareText,
         makeBlob: async () => {
+          // Let the offscreen desktop chart finish layout before capture.
+          await new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => resolve())
+            })
+          })
           const dataUrl = await exportOfficeChartImage(node, {
             iconUrl: selectedIndex?.icon,
             iconTone: selectedIndex?.alert
@@ -563,122 +573,159 @@ function DetailPanel({
       </div>
 
       {selectedIndex ? (
-        <section
-          ref={bindChartCaptureRef}
-          className="office-dashboard__chart-block"
-          aria-labelledby="office-index-chart-title"
-        >
-          <div className="office-dashboard__chart-header">
-            <div>
-              <h3
-                id="office-index-chart-title"
-                className="office-dashboard__chart-title"
-              >
-                {selectedIndex.name}
-              </h3>
-              {selectedIndex.info ? (
-                <p className="office-dashboard__chart-info">
-                  {selectedIndex.info}
-                </p>
-              ) : null}
-            </div>
-            <div className="office-dashboard__chart-actions" dir="ltr">
-              <button
-                type="button"
-                className={`office-dashboard__chart-share${
-                  imageShareStatus === 'copied' ||
-                  imageShareStatus === 'downloaded'
-                    ? ' office-dashboard__chart-share--done'
-                    : ''
-                }`}
-                onClick={() => {
-                  void copyChartImage()
-                }}
-                disabled={imageShareStatus === 'copying'}
-                aria-label={
-                  imageShareStatus === 'copying'
-                    ? 'מכין תמונה…'
-                    : imageShareStatus === 'copied'
+        <>
+          <section
+            ref={bindChartCaptureRef}
+            className="office-dashboard__chart-block"
+            aria-labelledby="office-index-chart-title"
+          >
+            <div className="office-dashboard__chart-header">
+              <div>
+                <h3
+                  id="office-index-chart-title"
+                  className="office-dashboard__chart-title"
+                >
+                  {selectedIndex.name}
+                </h3>
+                {selectedIndex.info ? (
+                  <p className="office-dashboard__chart-info">
+                    {selectedIndex.info}
+                  </p>
+                ) : null}
+              </div>
+              <div className="office-dashboard__chart-actions" dir="ltr">
+                <button
+                  type="button"
+                  className={`office-dashboard__chart-share${
+                    imageShareStatus === 'copied' ||
+                    imageShareStatus === 'downloaded'
+                      ? ' office-dashboard__chart-share--done'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    void copyChartImage()
+                  }}
+                  disabled={imageShareStatus === 'copying'}
+                  aria-label={
+                    imageShareStatus === 'copying'
+                      ? 'מכין תמונה…'
+                      : imageShareStatus === 'copied'
+                        ? 'התמונה הועתקה'
+                        : imageShareStatus === 'downloaded'
+                          ? 'התמונה הורדה'
+                          : imageShareStatus === 'error'
+                            ? 'ייצוא התמונה נכשל'
+                            : 'שתפו את הגרף'
+                  }
+                  title={
+                    imageShareStatus === 'copied'
                       ? 'התמונה הועתקה'
                       : imageShareStatus === 'downloaded'
                         ? 'התמונה הורדה'
                         : imageShareStatus === 'error'
                           ? 'ייצוא התמונה נכשל'
                           : 'שתפו את הגרף'
-                }
-                title={
-                  imageShareStatus === 'copied'
-                    ? 'התמונה הועתקה'
-                    : imageShareStatus === 'downloaded'
-                      ? 'התמונה הורדה'
-                      : imageShareStatus === 'error'
-                        ? 'ייצוא התמונה נכשל'
-                        : 'שתפו את הגרף'
-                }
-              >
-                {imageShareStatus === 'copied' ||
-                imageShareStatus === 'downloaded' ? (
-                  <span className="office-dashboard__chart-share-status" role="status">
-                    {imageShareStatus === 'copied'
-                      ? 'הועתק'
-                      : 'הורד'}
-                  </span>
-                ) : imageShareStatus === 'copying' ? (
-                  <span className="office-dashboard__chart-share-status" role="status">
-                    …
-                  </span>
-                ) : imageShareStatus === 'error' ? (
-                  <span className="office-dashboard__chart-share-status" role="status">
-                    !
-                  </span>
-                ) : (
-                  <svg
-                    className="office-dashboard__chart-share-icon"
-                    viewBox="0 0 24 24"
-                    width="22"
-                    height="22"
-                    aria-hidden="true"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="18" cy="5" r="3" />
-                    <circle cx="6" cy="12" r="3" />
-                    <circle cx="18" cy="19" r="3" />
-                    <path d="M8.59 13.51 15.42 17.49" />
-                    <path d="M15.41 6.51 8.59 10.49" />
-                  </svg>
-                )}
-              </button>
-              {selectedIndex.source ? (
-                <a
-                  className="office-dashboard__chart-source"
-                  href={selectedIndex.source}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  }
                 >
-                  מקור
-                </a>
-              ) : null}
+                  {imageShareStatus === 'copied' ||
+                  imageShareStatus === 'downloaded' ? (
+                    <span className="office-dashboard__chart-share-status" role="status">
+                      {imageShareStatus === 'copied'
+                        ? 'הועתק'
+                        : 'הורד'}
+                    </span>
+                  ) : imageShareStatus === 'copying' ? (
+                    <span className="office-dashboard__chart-share-status" role="status">
+                      …
+                    </span>
+                  ) : imageShareStatus === 'error' ? (
+                    <span className="office-dashboard__chart-share-status" role="status">
+                      !
+                    </span>
+                  ) : (
+                    <svg
+                      className="office-dashboard__chart-share-icon"
+                      viewBox="0 0 24 24"
+                      width="22"
+                      height="22"
+                      aria-hidden="true"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="18" cy="5" r="3" />
+                      <circle cx="6" cy="12" r="3" />
+                      <circle cx="18" cy="19" r="3" />
+                      <path d="M8.59 13.51 15.42 17.49" />
+                      <path d="M15.41 6.51 8.59 10.49" />
+                    </svg>
+                  )}
+                </button>
+                {selectedIndex.source ? (
+                  <a
+                    className="office-dashboard__chart-source"
+                    href={selectedIndex.source}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    מקור
+                  </a>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <IndexTrendChart
-            index={selectedIndex}
-            highlightBand={eraHighlightBand}
-            uiScale={uiScale}
-            tall={tallChart}
-            onMetricsChange={onChartMetricsChange}
-          />
-          <OfficeErasBar
-            eras={office.ministerHistory}
-            points={selectedIndex.points}
-            chartType={selectedIndex.chartType}
-            uiScale={uiScale}
-            onHoverBand={setEraHighlightBand}
-          />
-        </section>
+            <IndexTrendChart
+              index={selectedIndex}
+              highlightBand={eraHighlightBand}
+              uiScale={uiScale}
+              tall={tallChart}
+              onMetricsChange={onChartMetricsChange}
+            />
+            <OfficeErasBar
+              eras={office.ministerHistory}
+              points={selectedIndex.points}
+              chartType={selectedIndex.chartType}
+              uiScale={uiScale}
+              onHoverBand={setEraHighlightBand}
+            />
+          </section>
+
+          {/*
+            Offscreen desktop layout for PNG share — always 960×460 chart +
+            uiScale 1 so mobile shares match the PC export proportions.
+          */}
+          <section
+            ref={chartExportRef}
+            className="office-dashboard__chart-block office-dashboard__chart-block--export"
+            aria-hidden="true"
+          >
+            <div className="office-dashboard__chart-header">
+              <div>
+                <h3 className="office-dashboard__chart-title">
+                  {selectedIndex.name}
+                </h3>
+                {selectedIndex.info ? (
+                  <p className="office-dashboard__chart-info">
+                    {selectedIndex.info}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <IndexTrendChart
+              index={selectedIndex}
+              uiScale={1}
+              tall={false}
+              fixedLayout
+            />
+            <OfficeErasBar
+              eras={office.ministerHistory}
+              points={selectedIndex.points}
+              chartType={selectedIndex.chartType}
+              uiScale={1}
+            />
+          </section>
+        </>
       ) : (
         <p className="office-dashboard__chart-hint">
           בחרו מדד כדי לראות את הגרף לאורך זמן

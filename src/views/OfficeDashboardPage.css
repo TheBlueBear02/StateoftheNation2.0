@@ -705,6 +705,117 @@
   margin-top: 8px;
 }
 
+/*
+ * Offscreen desktop share canvas: fixed 960px width + uiScale 1 / tall false
+ * so mobile PNG export matches PC proportions. Neutralize mobile page +
+ * viewport media-query overrides that would otherwise shrink eras/chrome.
+ */
+.office-dashboard__chart-block--export {
+  position: fixed;
+  left: -12000px;
+  top: 0;
+  width: 960px;
+  max-width: 960px;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 1;
+  visibility: visible;
+  overflow: visible;
+}
+
+.office-dashboard-page--mobile .office-dashboard__chart-block--export,
+.office-dashboard-page--mobile
+  .office-dashboard__layout
+  .office-dashboard__chart-block--export {
+  width: 960px !important;
+  max-width: 960px !important;
+  min-width: 960px;
+}
+
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-dashboard__chart-header {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-dashboard__chart-title {
+  font-size: clamp(1.25rem, 2.5vw, 1.6rem);
+  overflow-wrap: normal;
+}
+
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-dashboard__chart-info {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar {
+  max-width: 100%;
+  overflow: visible;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__plot,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__plot {
+  height: 62px !important;
+  min-height: 62px !important;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__photo,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__photo {
+  width: 42px !important;
+  height: 42px !important;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__clip,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__clip {
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__name,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__name {
+  font-size: 0.9rem;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__party,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__party {
+  font-size: 0.78rem;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__switches,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__switches {
+  height: 1.35rem;
+  margin-top: 4px;
+}
+
 .office-dashboard__chart-header {
   display: flex;
   flex-wrap: wrap;
