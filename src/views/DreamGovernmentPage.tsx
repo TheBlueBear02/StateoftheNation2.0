@@ -39,6 +39,7 @@ import {
   mockDreamPickStat,
 } from '../lib/dreamGovMockStats'
 import { exportNodeToPng } from '../lib/inlineImagesForExport'
+import { getSiteUrl } from '../lib/runtimeEnv'
 import { sharePngImage } from '../lib/sharePngImage'
 import { supabase } from '../lib/supabase'
 import './DreamGovernmentPage.css'
@@ -219,7 +220,7 @@ export function DreamGovernmentPage() {
       const shareResult = await sharePngImage({
         filename: 'dream-government.png',
         shareTitle: 'ממשלת החלומות · מצב האומה',
-        shareText: 'הרכיבו גם את ממשלת החלומות שלכם',
+        shareText: `הרכיבו גם את ממשלת החלומות שלכם\n${getSiteUrl()}/elections/dream-government`,
         makeBlob: async () => {
           const dataUrl = await exportNodeToPng(node, {
             pixelRatio: 2,

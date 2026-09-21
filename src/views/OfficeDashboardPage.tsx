@@ -19,6 +19,8 @@ import {
   type OfficeDashboardIndex,
   type OfficeDashboardOffice,
 } from '../lib/fetchOfficeDashboard'
+import { getSiteUrl } from '../lib/runtimeEnv'
+import { sharePngImage } from '../lib/sharePngImage'
 import './OfficeDashboardPage.css'
 
 /**
@@ -57,31 +59,6 @@ function useViewportWidth(): number {
   }, [])
 
   return width
-}
-
-async function copyImageToClipboard(blob: Blob): Promise<boolean> {
-  if (
-    typeof navigator === 'undefined' ||
-    !navigator.clipboard ||
-    typeof ClipboardItem === 'undefined'
-  ) {
-    return false
-  }
-  try {
-    await navigator.clipboard.write([
-      new ClipboardItem({ 'image/png': blob }),
-    ])
-    return true
-  } catch {
-    return false
-  }
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement('a')
-  link.download = filename
-  link.href = dataUrl
-  link.click()
 }
 
 function initials(name: string): string {
@@ -411,29 +388,50 @@ function DetailPanel({
     if (!node || imageShareStatus === 'copying') return
 
     setImageShareStatus('copying')
+    const safeName = (selectedIndex?.name || 'chart')
+      .replace(/[^\u0590-\u05FFa-zA-Z0-9-_]+/g, '-')
+      .slice(0, 40)
+    const indexName = selectedIndex?.name || 'מדד ממשלתי'
+    const chartUrl = `${getSiteUrl()}/government/dashboard?${buildDashboardQuery(
+      office.id,
+      selectedIndex?.id ?? null,
+    )}`
+    const shareBody = office.name
+      ? `${office.name} — מדדי משרדי הממשלה`
+      : 'מדדי משרדי הממשלה'
+
     try {
-      const dataUrl = await exportOfficeChartImage(node, {
-        iconUrl: selectedIndex?.icon,
-        iconTone: selectedIndex?.alert
-          ? 'alert'
-          : selectedIndex?.isKpi
-            ? 'kpi'
-            : 'policy',
+      // Same path as dream-government: Safari-safe clipboard Promise,
+      // Android/Samsung prefer Web Share, then open-image / download.
+      const shareResult = await sharePngImage({
+        filename: `office-dashboard-${safeName}.png`,
+        shareTitle: `${indexName} · מצב האומה`,
+        shareText: `${shareBody}\n${chartUrl}`,
+        makeBlob: async () => {
+          const dataUrl = await exportOfficeChartImage(node, {
+            iconUrl: selectedIndex?.icon,
+            iconTone: selectedIndex?.alert
+              ? 'alert'
+              : selectedIndex?.isKpi
+                ? 'kpi'
+                : 'policy',
+          })
+          const response = await fetch(dataUrl)
+          return response.blob()
+        },
       })
-      const response = await fetch(dataUrl)
-      const blob = await response.blob()
-      if (blob.size < 100) {
-        throw new Error('Exported image was empty')
+
+      if (!shareResult.ok) {
+        throw new Error(shareResult.error)
       }
-      const copied = await copyImageToClipboard(blob)
-      if (copied) {
+
+      if (shareResult.method === 'clipboard') {
         setImageShareStatus('copied')
-      } else {
-        const safeName = (selectedIndex?.name || 'chart')
-          .replace(/[^\u0590-\u05FFa-zA-Z0-9-_]+/g, '-')
-          .slice(0, 40)
-        downloadDataUrl(dataUrl, `office-dashboard-${safeName}.png`)
+      } else if (shareResult.method === 'download') {
         setImageShareStatus('downloaded')
+      } else {
+        // Native share sheet opened (or user aborted) — no toast needed.
+        setImageShareStatus('idle')
       }
     } catch (error) {
       console.error('[office-dashboard] chart image export failed', error)

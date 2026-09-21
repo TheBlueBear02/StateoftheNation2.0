@@ -12,6 +12,7 @@ import type {
   DreamDashboardOfficeBoard,
 } from '../../../lib/fetchDreamCabinetDashboard'
 import { exportNodeToPng } from '../../../lib/inlineImagesForExport'
+import { getSiteUrl } from '../../../lib/runtimeEnv'
 import { sharePngImage } from '../../../lib/sharePngImage'
 import { getDreamPickPopularity } from './DreamOfficeSquare'
 
@@ -52,7 +53,7 @@ export function DreamLeadersPoster({
       const shareResult = await sharePngImage({
         filename: 'dream-government-leaders.png',
         shareTitle: 'המובילים בממשלת החלומות · מצב האומה',
-        shareText: 'שלושת המועמדים המובילים בכל משרד',
+        shareText: `שלושת המועמדים המובילים בכל משרד\n${getSiteUrl()}/elections/dream-government`,
         makeBlob: async () => {
           const dataUrl = await exportNodeToPng(node, {
             pixelRatio: 2,
