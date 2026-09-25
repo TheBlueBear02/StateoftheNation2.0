@@ -31,6 +31,17 @@ alter table public.indexes
   add constraint indexes_chart_type_check
   check (chart_type is null or chart_type in ('line', 'bar', 'pie'));
 
+-- ── higher_is_better (good/bad polarity for era compare colors) ──────────────
+-- true  = rise is improvement (green); false = rise is worsening (red).
+-- Default true. One-time-ish backfill: alert metrics → lower-is-better.
+-- Comment out the UPDATE if you have curated overrides and re-apply this file.
+alter table public.indexes
+  add column if not exists higher_is_better boolean not null default true;
+
+update public.indexes
+set higher_is_better = false
+where alert = true;
+
 -- ── Unique for idempotent index_data upserts ─────────────────────────────────
 -- Required by seed_office_dashboard.py upsert on_conflict=index_id,recorded_at
 create unique index if not exists index_data_index_recorded_key

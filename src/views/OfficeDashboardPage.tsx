@@ -93,6 +93,30 @@ function buildDashboardQuery(officeId: number, indexId: number | null): string {
   return params.toString()
 }
 
+function formatMinisterLine(
+  minister: NonNullable<OfficeDashboardOffice['minister']>,
+): string {
+  return [minister.fullName, minister.dutyDesc, minister.partyName]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(' · ')
+}
+
+function IndexLegend() {
+  return (
+    <ul className="office-dashboard__legend" aria-label="מקרא">
+      <li>
+        <span className="office-dashboard__legend-swatch office-dashboard__legend-swatch--kpi" />
+        מדד
+      </li>
+      <li>
+        <span className="office-dashboard__legend-swatch office-dashboard__legend-swatch--alert" />
+        התראה
+      </li>
+    </ul>
+  )
+}
+
 type OfficeClusterProps = {
   office: OfficeDashboardOffice
   selected: boolean
@@ -180,7 +204,6 @@ function DetailPanel({
   onSelectOffice,
   onSelectIndex,
 }: DetailPanelProps) {
-  const minister = office.minister
   const indexes = [...office.kpis, ...office.policies]
   const activeChipRef = useRef<HTMLButtonElement | null>(null)
   const stripTrackRef = useRef<HTMLDivElement | null>(null)
@@ -200,11 +223,14 @@ function DetailPanel({
   const [imageShareStatus, setImageShareStatus] = useState<
     'idle' | 'copying' | 'copied' | 'downloaded' | 'error'
   >('idle')
-  const [eraHighlightBand, setEraHighlightBand] = useState<{
-    leftPct: number
-    widthPct: number
-    color: string | null
-  } | null>(null)
+  const [eraHighlightBands, setEraHighlightBands] = useState<
+    Array<{
+      leftPct: number
+      widthPct: number
+      color: string | null
+    }>
+  >([])
+  const [eraSelectedKeys, setEraSelectedKeys] = useState<string[]>([])
   const [chartMetrics, setChartMetrics] = useState<{
     uiScale: number
     tall: boolean
@@ -371,7 +397,7 @@ function DetailPanel({
   }, [office.id])
 
   useEffect(() => {
-    setEraHighlightBand(null)
+    setEraHighlightBands([])
   }, [selectedIndex?.id, office.id])
 
   useEffect(() => {
@@ -425,6 +451,7 @@ function DetailPanel({
               : selectedIndex?.isKpi
                 ? 'kpi'
                 : 'policy',
+            officeName: office.name,
           })
           const response = await fetch(dataUrl)
           return response.blob()
@@ -472,32 +499,18 @@ function DetailPanel({
           className={`office-dashboard__office-current ${slideClass}`}
           dir="rtl"
         >
-          {minister?.imageUrl ? (
-            <img
-              src={minister.imageUrl}
-              alt=""
-              className="office-dashboard__panel-photo"
-              width={96}
-              height={96}
-            />
-          ) : (
-            <span className="office-dashboard__panel-initials">
-              {initials(minister?.fullName ?? office.name)}
-            </span>
-          )}
           <div className="office-dashboard__office-current-text">
-            <h2 className="office-dashboard__panel-title">{office.name}</h2>
-            {minister ? (
-              <p className="office-dashboard__panel-minister">
-                {minister.fullName}
-                {minister.dutyDesc ? ` · ${minister.dutyDesc}` : ''}
-              </p>
-            ) : null}
-            {office.info ? (
-              <p className="office-dashboard__panel-info office-dashboard__panel-info--inline">
-                {office.info}
-              </p>
-            ) : null}
+            <h1 className="office-dashboard__title">{office.name}</h1>
+            <div className="office-dashboard__office-current-meta" dir="rtl">
+              {office.minister ? (
+                <p className="office-dashboard__subtitle">
+                  {formatMinisterLine(office.minister)}
+                </p>
+              ) : (
+                <span className="office-dashboard__subtitle" />
+              )}
+              <IndexLegend />
+            </div>
           </div>
         </div>
 
@@ -517,7 +530,11 @@ function DetailPanel({
         role="list"
         aria-label="מדדי המשרד"
       >
-        <div className="office-dashboard__index-strip-track" ref={stripTrackRef}>
+        <div
+          key={office.id}
+          className={`office-dashboard__index-strip-track ${slideClass}`}
+          ref={stripTrackRef}
+        >
           <span
             className={`office-dashboard__index-marker${
               indexMarker.visible ? ' office-dashboard__index-marker--visible' : ''
@@ -560,8 +577,8 @@ function DetailPanel({
                     src={index.icon}
                     alt=""
                     className="office-dashboard__index-chip-icon"
-                    width={36}
-                    height={36}
+                        width={28}
+                        height={28}
                     loading="lazy"
                     decoding="async"
                   />
@@ -646,8 +663,8 @@ function DetailPanel({
                     <svg
                       className="office-dashboard__chart-share-icon"
                       viewBox="0 0 24 24"
-                      width="22"
-                      height="22"
+                      width="26"
+                      height="26"
                       aria-hidden="true"
                       fill="none"
                       stroke="currentColor"
@@ -677,7 +694,7 @@ function DetailPanel({
             </div>
             <IndexTrendChart
               index={selectedIndex}
-              highlightBand={eraHighlightBand}
+              highlightBands={eraHighlightBands}
               uiScale={uiScale}
               tall={tallChart}
               onMetricsChange={onChartMetricsChange}
@@ -687,12 +704,16 @@ function DetailPanel({
               points={selectedIndex.points}
               chartType={selectedIndex.chartType}
               uiScale={uiScale}
-              onHoverBand={setEraHighlightBand}
+              higherIsBetter={selectedIndex.higherIsBetter}
+              selectedKeys={eraSelectedKeys}
+              onSelectedKeysChange={setEraSelectedKeys}
+              selectionResetKey={office.id}
+              onHoverBand={setEraHighlightBands}
             />
           </section>
 
           {/*
-            Offscreen desktop layout for PNG share — always 960×460 chart +
+            Offscreen desktop layout for PNG share — always 960×400 chart +
             uiScale 1 so mobile shares match the PC export proportions.
           */}
           <section
@@ -714,6 +735,7 @@ function DetailPanel({
             </div>
             <IndexTrendChart
               index={selectedIndex}
+              highlightBands={eraHighlightBands}
               uiScale={1}
               tall={false}
               fixedLayout
@@ -723,6 +745,9 @@ function DetailPanel({
               points={selectedIndex.points}
               chartType={selectedIndex.chartType}
               uiScale={1}
+              higherIsBetter={selectedIndex.higherIsBetter}
+              selectedKeys={eraSelectedKeys}
+              selectionResetKey={office.id}
             />
           </section>
         </>
@@ -746,17 +771,16 @@ function DetailPanelSkeleton() {
           ‹
         </span>
         <div className="office-dashboard__office-current" dir="rtl">
-          <span className="office-dashboard__panel-photo office-dashboard__skel-block" />
           <div className="office-dashboard__office-current-text">
-            <h2 className="office-dashboard__panel-title office-dashboard__skel-text office-dashboard__skel-text--title">
+            <h1 className="office-dashboard__title office-dashboard__skel-text office-dashboard__skel-text--title">
               &nbsp;
-            </h2>
-            <p className="office-dashboard__panel-minister office-dashboard__skel-text office-dashboard__skel-text--minister">
-              &nbsp;
-            </p>
-            <p className="office-dashboard__panel-info office-dashboard__panel-info--inline office-dashboard__skel-text office-dashboard__skel-text--info">
-              &nbsp;
-            </p>
+            </h1>
+            <div className="office-dashboard__office-current-meta" dir="rtl">
+              <p className="office-dashboard__subtitle office-dashboard__skel-text office-dashboard__skel-text--minister">
+                &nbsp;
+              </p>
+              <IndexLegend />
+            </div>
           </div>
         </div>
         <span className="office-dashboard__office-nav office-dashboard__skel-nav">
@@ -767,10 +791,7 @@ function DetailPanelSkeleton() {
       <div className="office-dashboard__index-strip">
         <div className="office-dashboard__index-strip-track">
           {Array.from({ length: 8 }, (_, i) => (
-            <span
-              key={i}
-              className="office-dashboard__skel-circle"
-            />
+            <span key={i} className="office-dashboard__skel-circle" />
           ))}
         </div>
       </div>
@@ -888,30 +909,6 @@ export function OfficeDashboardPage() {
               { label: 'דשבורד מדדים' },
             ]}
           />
-
-          <header className="office-dashboard__header">
-            <div>
-              <h1 className="office-dashboard__title">דשבורד ממשלה</h1>
-              <p className="office-dashboard__subtitle">
-                מדדי ביצוע ומדיניות במשרדי הממשלה המרכזיים
-              </p>
-            </div>
-
-            <ul className="office-dashboard__legend" aria-label="מקרא">
-              <li>
-                <span className="office-dashboard__legend-swatch office-dashboard__legend-swatch--kpi" />
-                מדד
-              </li>
-              <li>
-                <span className="office-dashboard__legend-swatch office-dashboard__legend-swatch--policy" />
-                מדיניות
-              </li>
-              <li>
-                <span className="office-dashboard__legend-swatch office-dashboard__legend-swatch--alert" />
-                התראה
-              </li>
-            </ul>
-          </header>
 
           {error ? (
             <p className="office-dashboard__error" role="alert">

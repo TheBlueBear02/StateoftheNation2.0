@@ -1,19 +1,11 @@
 .office-dashboard__main {
-  padding-block: clamp(24px, 4vw, 48px);
+  padding-block: clamp(8px, 1.5vw, 14px) clamp(20px, 3.5vw, 40px);
 }
 
 .office-dashboard__inner {
   display: flex;
   flex-direction: column;
-  gap: clamp(16px, 3vw, 28px);
-}
-
-.office-dashboard__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px 24px;
+  gap: clamp(8px, 1.6vw, 14px);
 }
 
 .office-dashboard__title {
@@ -56,10 +48,6 @@
 
 .office-dashboard__legend-swatch--kpi {
   background: radial-gradient(#6ba4fa, #447dd3);
-}
-
-.office-dashboard__legend-swatch--policy {
-  background: radial-gradient(#dddddd, #b8b8b8);
 }
 
 .office-dashboard__legend-swatch--alert {
@@ -160,14 +148,6 @@
   animation: office-dashboard-skel-shine 1.4s ease-in-out infinite;
 }
 
-.office-dashboard__panel--skeleton .office-dashboard__panel-photo {
-  display: block;
-  background: linear-gradient(90deg, #e8e8e8, #f2f2f2, #e8e8e8);
-  background-size: 200% 100%;
-  animation: office-dashboard-skel-shine 1.4s ease-in-out infinite;
-  border-color: #e0e0e0;
-}
-
 .office-dashboard__skel-nav {
   opacity: 0.25;
   cursor: default;
@@ -200,22 +180,10 @@
   max-width: 100%;
 }
 
-.office-dashboard__skel-text--info {
-  width: 28rem;
-  max-width: 100%;
-  /* Kill the 2-line clamp so the grey bar stays a single readable strip. */
-  display: block;
-  -webkit-line-clamp: unset;
-  line-clamp: unset;
-  -webkit-box-orient: unset;
-  height: 0.9rem;
-  margin-top: 0.45rem;
-}
-
 .office-dashboard__skel-circle {
   display: block;
-  width: 64px;
-  height: 64px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   flex-shrink: 0;
   border: 2px solid transparent;
@@ -237,7 +205,7 @@
 .office-dashboard__skel-chart {
   display: block;
   width: 100%;
-  aspect-ratio: 960 / 460;
+  aspect-ratio: 960 / 400;
   min-height: 220px;
   border-radius: 0;
   margin-top: 4px;
@@ -293,12 +261,9 @@
   overflow: hidden;
 }
 
-.office-bubble--kpi {
-  background: radial-gradient(#6ba4fa, #447dd3);
-}
-
+.office-bubble--kpi,
 .office-bubble--policy {
-  background: radial-gradient(#e3e3e3, #c3c3c3);
+  background: radial-gradient(#6ba4fa, #447dd3);
 }
 
 .office-bubble--alert {
@@ -439,7 +404,7 @@
   align-items: stretch;
   gap: 0;
   width: 100%;
-  min-height: 120px;
+  min-height: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -491,63 +456,35 @@
 
 .office-dashboard__office-current-text {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
 
-.office-dashboard__panel-photo,
-.office-dashboard__panel-initials {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  border: 2px solid #c8c8c8;
-  flex-shrink: 0;
-  box-sizing: border-box;
-}
-
-.office-dashboard__panel-photo {
-  object-fit: cover;
-  background: #f0f0f0;
-}
-
-.office-dashboard__panel-initials {
-  display: inline-flex;
+.office-dashboard__office-current-meta {
+  display: flex;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  font-weight: 800;
-  background: #fff;
+  justify-content: space-between;
+  gap: 12px 16px;
+  min-width: 0;
+  width: 100%;
 }
 
-.office-dashboard__panel-title {
+.office-dashboard__office-current-meta .office-dashboard__subtitle {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
-  font-size: clamp(1.2rem, 2.4vw, 1.5rem);
-  font-weight: 800;
-  color: var(--color-text);
 }
 
-.office-dashboard__panel-minister {
+.office-dashboard__office-current-meta .office-dashboard__legend {
+  flex: 0 0 auto;
   margin: 0;
-  font-size: 0.95rem;
-  color: var(--color-text-muted);
 }
 
-.office-dashboard__panel-info {
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--color-text-muted);
-  white-space: pre-line;
-}
-
-.office-dashboard__panel-info--inline {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  font-size: 0.88rem;
-  line-height: 1.4;
+.office-dashboard__office-current-text .office-dashboard__title {
+  font-size: clamp(1.6rem, 3.4vw, 2.35rem);
 }
 
 .office-dashboard__index-strip {
@@ -581,12 +518,12 @@
   flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 12px;
   width: max-content;
   max-width: none;
-  min-height: 88px;
+  min-height: 76px;
   margin-inline: auto;
-  padding: 12px 4px;
+  padding: 10px 4px;
   box-sizing: border-box;
 }
 
@@ -633,17 +570,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   border: 2px solid transparent;
   overflow: hidden;
   background: radial-gradient(#6ba4fa, #447dd3);
   transition: border-color 0.15s ease, transform 0.15s ease;
-}
-
-.office-dashboard__index-chip--policy .office-dashboard__index-chip-circle {
-  background: radial-gradient(#e3e3e3, #c3c3c3);
 }
 
 .office-dashboard__index-chip--alert .office-dashboard__index-chip-circle {
@@ -747,7 +680,7 @@
 .office-dashboard-page--mobile
   .office-dashboard__chart-block--export
   .office-dashboard__chart-title {
-  font-size: clamp(1.25rem, 2.5vw, 1.6rem);
+  font-size: clamp(1.4rem, 2.8vw, 1.85rem);
   overflow-wrap: normal;
 }
 
@@ -757,8 +690,8 @@
   display: block;
   -webkit-line-clamp: unset;
   line-clamp: unset;
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: 1.05rem;
+  line-height: 1.5;
   margin-top: 6px;
 }
 
@@ -774,16 +707,16 @@
 .office-dashboard-page--mobile
   .office-dashboard__chart-block--export
   .office-eras-bar__plot {
-  height: 62px !important;
-  min-height: 62px !important;
+  height: 72px !important;
+  min-height: 72px !important;
 }
 
 .office-dashboard__chart-block--export .office-eras-bar__photo,
 .office-dashboard-page--mobile
   .office-dashboard__chart-block--export
   .office-eras-bar__photo {
-  width: 42px !important;
-  height: 42px !important;
+  width: 52px !important;
+  height: 52px !important;
 }
 
 .office-dashboard__chart-block--export .office-eras-bar__clip,
@@ -816,6 +749,86 @@
   margin-top: 4px;
 }
 
+/* Compare panel: always desktop side-by-side in the PNG shell (viewport media
+   queries would otherwise stack it on phones). */
+.office-dashboard__chart-block--export .office-eras-bar__detail,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__detail {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 12px;
+  padding: 0;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__detail--compare,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__detail--compare {
+  position: relative;
+  gap: 10px;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__detail-half,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__detail-half {
+  flex: 1 1 50%;
+  padding: 16px 18px;
+  gap: 14px;
+  border-top: 5px solid var(--era-accent, var(--color-blue));
+  border-bottom: 0;
+}
+
+.office-dashboard__chart-block--export
+  .office-eras-bar__detail--compare
+  .office-eras-bar__detail-half--older,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__detail--compare
+  .office-eras-bar__detail-half--older {
+  padding-inline-end: 76px;
+  padding-bottom: 16px;
+}
+
+.office-dashboard__chart-block--export
+  .office-eras-bar__detail--compare
+  .office-eras-bar__detail-half--newer,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__detail--compare
+  .office-eras-bar__detail-half--newer {
+  padding-inline-start: 76px;
+  padding-top: 16px;
+  border-top: 5px solid var(--era-accent, var(--color-blue));
+  border-bottom: 0;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__detail-delta-badge,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__detail-delta-badge {
+  width: 132px;
+  height: 132px;
+  padding: 16px;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__detail-avatar,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__detail-avatar {
+  width: 72px;
+  height: 72px;
+}
+
+.office-dashboard__chart-block--export .office-eras-bar__detail-avg,
+.office-dashboard-page--mobile
+  .office-dashboard__chart-block--export
+  .office-eras-bar__detail-avg {
+  font-size: 2.1rem;
+}
+
 .office-dashboard__chart-header {
   display: flex;
   flex-wrap: wrap;
@@ -826,15 +839,15 @@
 
 .office-dashboard__chart-title {
   margin: 0;
-  font-size: clamp(1.25rem, 2.5vw, 1.6rem);
+  font-size: clamp(1.4rem, 2.8vw, 1.85rem);
   font-weight: 800;
   color: var(--color-text);
 }
 
 .office-dashboard__chart-info {
   margin: 6px 0 0;
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: 1.05rem;
+  line-height: 1.5;
   color: var(--color-text-muted);
 }
 
@@ -851,15 +864,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   margin: 0;
-  padding: 6px;
+  padding: 8px;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--color-blue-dark);
   font: inherit;
+  font-size: 1.05rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -878,13 +892,14 @@
 }
 
 .office-dashboard__chart-share-status {
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   font-weight: 700;
   line-height: 1;
 }
 
 .office-dashboard__chart-source {
   color: var(--color-blue-dark);
+  font-size: 1.05rem;
   font-weight: 700;
   text-decoration: none;
 }
@@ -917,11 +932,6 @@
     grid-template-columns: 1fr;
   }
 
-  .office-dashboard__header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .office-dashboard__title {
     font-size: 1.75rem;
   }
@@ -947,11 +957,11 @@
 }
 
 .office-dashboard-page--mobile .office-dashboard__main {
-  padding-block: 16px 28px;
+  padding-block: 6px 20px;
 }
 
 .office-dashboard-page--mobile .office-dashboard__inner {
-  gap: 14px;
+  gap: 8px;
 }
 
 .office-dashboard-page--mobile .office-dashboard__inner.container {
@@ -983,24 +993,17 @@
 }
 
 .office-dashboard-page--mobile .office-dashboard__skel-circle {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
 }
 
 .office-dashboard-page--mobile .office-dashboard__skel-chart {
-  aspect-ratio: 960 / 560;
+  aspect-ratio: 960 / 500;
   min-height: 260px;
 }
 
 .office-dashboard-page--mobile .office-dashboard__skel-eras {
   height: 52px;
-}
-
-.office-dashboard-page--mobile .office-dashboard__header {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  max-width: 100%;
 }
 
 .office-dashboard-page--mobile .office-dashboard__title {
@@ -1043,27 +1046,17 @@
   overflow: hidden;
 }
 
-.office-dashboard-page--mobile .office-dashboard__panel-photo,
-.office-dashboard-page--mobile .office-dashboard__panel-initials {
-  width: 52px;
-  height: 52px;
-}
-
-.office-dashboard-page--mobile .office-dashboard__panel-initials {
-  font-size: 1rem;
-}
-
-.office-dashboard-page--mobile .office-dashboard__panel-title {
-  font-size: 1.05rem;
+.office-dashboard-page--mobile
+  .office-dashboard__office-current-text
+  .office-dashboard__title {
+  font-size: 1.25rem;
   overflow-wrap: anywhere;
 }
 
-.office-dashboard-page--mobile .office-dashboard__panel-minister {
-  font-size: 0.8rem;
-}
-
-.office-dashboard-page--mobile .office-dashboard__panel-info--inline {
-  display: none;
+.office-dashboard-page--mobile
+  .office-dashboard__office-current-text
+  .office-dashboard__subtitle {
+  font-size: 0.85rem;
 }
 
 .office-dashboard-page--mobile .office-dashboard__office-nav {
@@ -1072,45 +1065,39 @@
   font-size: 1.35rem;
 }
 
-/* Index circles: wrap to a second row instead of widening the page. */
+/* Index circles: one horizontal row; swipe/scroll sideways when they overflow. */
 .office-dashboard-page--mobile .office-dashboard__index-strip {
-  display: block;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: flex-start;
   width: 100%;
   max-width: 100%;
-  padding: 0;
-  overflow: visible;
-  scroll-snap-type: none;
+  padding: 0 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .office-dashboard-page--mobile .office-dashboard__index-strip-track {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
-  width: 100%;
-  max-width: 100%;
-  min-height: 0;
+  width: max-content;
+  max-width: none;
+  min-height: 60px;
   margin-inline: 0;
-  padding: 10px 2px;
+  padding: 8px 2px;
   box-sizing: border-box;
 }
 
-.office-dashboard-page--mobile .office-dashboard__index-marker {
-  /* Full-height sliding bar doesn't fit multi-row; use chip ring instead. */
-  display: none;
-}
-
-.office-dashboard-page--mobile
-  .office-dashboard__index-chip--active
-  .office-dashboard__index-chip-circle {
-  border-color: rgba(0, 0, 0, 0.4);
-  box-shadow: inset 0 0 0 3px #c8c8c8;
-}
-
 .office-dashboard-page--mobile .office-dashboard__index-chip-circle {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
 }
 
 .office-dashboard-page--mobile .office-dashboard__chart-block {
@@ -1134,7 +1121,7 @@
 }
 
 .office-dashboard-page--mobile .office-dashboard__chart-title {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -1144,8 +1131,8 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  font-size: 0.8rem;
-  line-height: 1.35;
+  font-size: 0.95rem;
+  line-height: 1.4;
   margin-top: 4px;
 }
 
@@ -1217,13 +1204,13 @@
 }
 
 .office-dashboard-page--mobile .office-eras-bar__plot {
-  height: 44px;
-  min-height: 44px;
+  height: 54px;
+  min-height: 54px;
 }
 
 .office-dashboard-page--mobile .office-eras-bar__photo {
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   max-width: none;
   aspect-ratio: 1 / 1;
 }
@@ -1278,7 +1265,7 @@
   }
 
   .office-dashboard__office-switcher {
-    min-height: 88px;
+    min-height: 0;
   }
 
   .office-dashboard__office-current {
@@ -1290,27 +1277,12 @@
     gap: 12px;
   }
 
-  .office-dashboard__panel-photo,
-  .office-dashboard__panel-initials {
-    width: 64px;
-    height: 64px;
+  .office-dashboard__office-current-text .office-dashboard__title {
+    font-size: 1.35rem;
   }
 
-  .office-dashboard__panel-initials {
-    font-size: 1.1rem;
-  }
-
-  .office-dashboard__panel-title {
-    font-size: 1.1rem;
-  }
-
-  .office-dashboard__panel-minister {
-    font-size: 0.85rem;
-  }
-
-  .office-dashboard__panel-info--inline {
-    -webkit-line-clamp: 3;
-    font-size: 0.8rem;
+  .office-dashboard__office-current-text .office-dashboard__subtitle {
+    font-size: 0.9rem;
   }
 
   .office-dashboard__office-nav {
@@ -1320,14 +1292,14 @@
   }
 
   .office-dashboard__index-strip-track {
-    gap: 10px;
-    min-height: 76px;
-    padding: 10px 2px;
+    gap: 8px;
+    min-height: 64px;
+    padding: 8px 2px;
   }
 
   .office-dashboard__index-chip-circle {
-    width: 56px;
-    height: 56px;
+    width: 46px;
+    height: 46px;
   }
 
   .office-dashboard__chart-header {
@@ -1354,11 +1326,11 @@
   }
 
   .office-dashboard__chart-title {
-    font-size: 1.15rem;
+    font-size: 1.3rem;
   }
 
   .office-dashboard__chart-info {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
   }
 
   .office-dashboard__layout--open .office-cluster__bubbles {
@@ -1378,8 +1350,7 @@
   .office-dashboard__skel-circle,
   .office-dashboard__skel-chart,
   .office-dashboard__skel-eras,
-  .office-dashboard__skel-text,
-  .office-dashboard__panel--skeleton .office-dashboard__panel-photo {
+  .office-dashboard__skel-text {
     animation: none;
   }
 

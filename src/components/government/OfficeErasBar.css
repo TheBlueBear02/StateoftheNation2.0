@@ -2,6 +2,14 @@
   position: relative;
   width: 100%;
   margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.office-eras-bar__track {
+  position: relative;
+  width: 100%;
 }
 
 .office-eras-bar__tooltip-lane {
@@ -12,139 +20,6 @@
   height: 88px;
   pointer-events: none;
   z-index: 6;
-}
-
-.office-eras-bar__plot {
-  position: relative;
-  display: block;
-  height: 62px;
-  min-height: 62px;
-  background: var(--color-white);
-  overflow: visible;
-}
-
-.office-eras-bar__era {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  display: block;
-  padding: 0;
-  box-sizing: border-box;
-  overflow: visible;
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.35);
-  cursor: pointer;
-  z-index: 1;
-}
-
-.office-eras-bar__era--hovered {
-  z-index: 5;
-  filter: brightness(1.05);
-}
-
-.office-eras-bar__era:focus-visible {
-  outline: 2px solid var(--color-blue);
-  outline-offset: 2px;
-}
-
-.office-eras-bar__clip {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  padding: 6px 8px;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-.office-eras-bar__clip--photo-only {
-  justify-content: center;
-  padding-inline: 4px;
-}
-
-.office-eras-bar__era--photo-only .office-eras-bar__photo {
-  margin-inline: auto;
-}
-
-.office-eras-bar__photo {
-  width: 42px;
-  height: 42px;
-  /* Beat global `img { max-width:100%; height:auto }` so circles stay round. */
-  max-width: none;
-  aspect-ratio: 1 / 1;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  flex-shrink: 0;
-  background: #f0f0f0;
-}
-
-.office-eras-bar__photo--placeholder {
-  object-fit: contain;
-  background: #d8d8d8;
-}
-
-.office-eras-bar__meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-  margin-inline-start: auto;
-  text-align: right;
-  direction: rtl;
-}
-
-.office-eras-bar__name {
-  display: block;
-  width: 100%;
-  font-size: 0.92rem;
-  font-weight: 800;
-  color: #fff;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: right;
-  direction: rtl;
-}
-
-.office-eras-bar__party {
-  display: block;
-  width: 100%;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: right;
-  direction: rtl;
-}
-
-.office-eras-bar__switches {
-  position: relative;
-  display: block;
-  height: 1.35rem;
-  margin-top: 4px;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.office-eras-bar__switch {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  font-size: 0.72rem;
-  font-weight: 400;
-  line-height: 1.2;
-  color: var(--color-text-muted, #666);
-  white-space: nowrap;
-  letter-spacing: 0.01em;
 }
 
 .office-eras-bar__tooltip {
@@ -232,38 +107,439 @@
   direction: rtl;
 }
 
+.office-eras-bar__plot {
+  position: relative;
+  display: block;
+  height: 64px;
+  min-height: 64px;
+  /* Gutters (Y-axis / right pad) stay white so only era segments read as the bar */
+  background: var(--color-white, #fff);
+  overflow: hidden;
+  border: 0;
+  box-sizing: border-box;
+}
+
+.office-eras-bar__era {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* Muted top strip, 1px white gap, then muted party fill; fills strengthen on select. */
+  background-color: color-mix(
+    in srgb,
+    var(--era-accent, #4890fd) 38%,
+    #fff
+  );
+  box-shadow:
+    inset 0 4px 0 0
+      color-mix(in srgb, var(--era-accent, #4890fd) 55%, transparent),
+    inset 0 5px 0 0 #fff,
+    inset -1px 0 0 rgba(255, 255, 255, 0.28);
+  cursor: pointer;
+  z-index: 1;
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  transition:
+    background-color 0.15s ease,
+    filter 0.15s ease;
+}
+
+.office-eras-bar__era:hover,
+.office-eras-bar__era--hovered {
+  background-color: color-mix(
+    in srgb,
+    var(--era-accent, #4890fd) 50%,
+    #fff
+  );
+  z-index: 2;
+}
+
+.office-eras-bar__era--selected {
+  z-index: 4;
+  background-color: color-mix(
+    in srgb,
+    var(--era-accent, #4890fd) 82%,
+    #fff
+  );
+  box-shadow:
+    inset 0 4px 0 0
+      color-mix(in srgb, var(--era-accent, #4890fd) 88%, transparent),
+    inset 0 5px 0 0 #fff,
+    inset -1px 0 0 rgba(255, 255, 255, 0.28);
+}
+
+.office-eras-bar__era--selected:hover,
+.office-eras-bar__era--selected.office-eras-bar__era--hovered {
+  background-color: color-mix(
+    in srgb,
+    var(--era-accent, #4890fd) 88%,
+    #fff
+  );
+}
+
+.office-eras-bar__era:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+  z-index: 5;
+}
+
+.office-eras-bar__clip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.office-eras-bar__clip--photo-only {
+  justify-content: center;
+  padding-inline: 4px;
+}
+
+.office-eras-bar__era--photo-only .office-eras-bar__photo {
+  margin-inline: auto;
+}
+
+.office-eras-bar__photo {
+  width: 48px;
+  height: 48px;
+  max-width: none;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+  background: #f0f0f0;
+}
+
+.office-eras-bar__photo--placeholder {
+  object-fit: contain;
+  background: #d8d8d8;
+}
+
+.office-eras-bar__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+  margin-inline-start: auto;
+  text-align: right;
+  direction: rtl;
+}
+
+.office-eras-bar__name {
+  display: block;
+  width: 100%;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  direction: rtl;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.office-eras-bar__party {
+  display: block;
+  width: 100%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  direction: rtl;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.office-eras-bar__switches {
+  position: relative;
+  display: block;
+  height: 1.35rem;
+  margin-top: 4px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.office-eras-bar__switch {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--color-text-muted, #666);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+/* Selected-era detail panel under the bar */
+.office-eras-bar__detail {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 0;
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.office-eras-bar__detail--compare {
+  position: relative;
+  gap: 10px;
+}
+
+.office-eras-bar__detail-half {
+  display: flex;
+  flex: 1 1 50%;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px 18px;
+  border-top: 5px solid var(--era-accent, var(--color-blue));
+  box-sizing: border-box;
+}
+
+.office-eras-bar__detail--compare .office-eras-bar__detail-half--older {
+  padding-inline-end: 76px;
+}
+
+.office-eras-bar__detail--compare .office-eras-bar__detail-half--newer {
+  padding-inline-start: 76px;
+}
+
+.office-eras-bar__detail-half--older {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+.office-eras-bar__detail-half--newer {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.office-eras-bar__detail-half--solo {
+  flex: 1 1 100%;
+  justify-content: space-between;
+}
+
+.office-eras-bar__detail-person {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.office-eras-bar__detail-person--older {
+  flex-direction: row;
+}
+
+.office-eras-bar__detail-person--older .office-eras-bar__detail-person-text {
+  text-align: left;
+  direction: rtl;
+}
+
+.office-eras-bar__detail-person--newer {
+  flex-direction: row-reverse;
+}
+
+.office-eras-bar__detail-avatar {
+  width: 72px;
+  height: 72px;
+  max-width: none;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  background: #f0f0f0;
+  box-sizing: border-box;
+}
+
+.office-eras-bar__detail-avatar--initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--era-accent, var(--color-blue));
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 800;
+  border-color: transparent;
+}
+
+.office-eras-bar__detail-person-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: right;
+  direction: rtl;
+}
+
+.office-eras-bar__detail-name {
+  margin: 0;
+  font-size: clamp(0.92rem, 1.6vw, 1.05rem);
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.office-eras-bar__detail-party {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+}
+
+.office-eras-bar__detail-dates {
+  margin: 0;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+}
+
+.office-eras-bar__detail-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.office-eras-bar__detail-stats--older {
+  /* Physical right toward the center circle (avoid RTL flex flipping flex-end). */
+  align-items: flex-end;
+  text-align: right;
+  direction: ltr;
+  margin-inline-start: auto;
+}
+
+.office-eras-bar__detail-stats--older .office-eras-bar__detail-avg-label {
+  direction: rtl;
+}
+
+.office-eras-bar__detail-stats--newer {
+  align-items: flex-start;
+  text-align: left;
+  direction: ltr;
+  margin-inline-end: auto;
+}
+
+.office-eras-bar__detail-avg-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.office-eras-bar__detail-avg {
+  margin: 0;
+  font-size: clamp(1.75rem, 3.5vw, 2.35rem);
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.office-eras-bar__detail-delta-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 132px;
+  height: 132px;
+  margin: 0;
+  padding: 16px;
+  border-radius: 50%;
+  border: 3px solid #000;
+  background: var(--color-white, #fff);
+  box-shadow: 0 6px 0 0 #000814;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.office-eras-bar__detail-delta-badge-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  max-width: 100%;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  color: #111;
+  direction: rtl;
+}
+
+.office-eras-bar__detail-delta-badge-lead,
+.office-eras-bar__detail-delta-badge-tail {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.office-eras-bar__detail-delta-badge-value {
+  display: block;
+  width: 100%;
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.office-eras-bar__detail-delta-badge--up
+  .office-eras-bar__detail-delta-badge-value {
+  color: var(--color-alert);
+}
+
+.office-eras-bar__detail-delta-badge--down
+  .office-eras-bar__detail-delta-badge-value {
+  color: #1a7f4b;
+}
+
 @media (max-width: 640px) {
   .office-eras-bar__tooltip-lane {
     height: 80px;
-  }
-
-  .office-eras-bar__plot {
-    height: 52px;
-    min-height: 52px;
-  }
-
-  .office-eras-bar__photo {
-    width: 36px;
-    height: 36px;
-    max-width: none;
-    aspect-ratio: 1 / 1;
-  }
-
-  .office-eras-bar__name {
-    font-size: 0.82rem;
-  }
-
-  .office-eras-bar__party {
-    font-size: 0.72rem;
-  }
-
-  .office-eras-bar__switches {
-    height: 1.2rem;
-    margin-top: 3px;
-  }
-
-  .office-eras-bar__switch {
-    font-size: 0.65rem;
   }
 
   .office-eras-bar__tooltip {
@@ -275,11 +551,106 @@
     width: 48px;
     height: 48px;
   }
+
+  .office-eras-bar__plot {
+    height: 54px;
+    min-height: 54px;
+  }
+
+  .office-eras-bar__photo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .office-eras-bar__name {
+    font-size: 0.78rem;
+  }
+
+  .office-eras-bar__party {
+    font-size: 0.68rem;
+  }
+
+  .office-eras-bar__switches {
+    height: 1.2rem;
+    margin-top: 3px;
+  }
+
+  .office-eras-bar__switch {
+    font-size: 0.65rem;
+  }
+
+  .office-eras-bar__detail {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    margin-top: 10px;
+  }
+
+  .office-eras-bar__detail--compare {
+    gap: 12px;
+  }
+
+  .office-eras-bar__detail-half {
+    flex: 1 1 auto;
+    padding: 14px 12px;
+    gap: 12px;
+  }
+
+  .office-eras-bar__detail--compare .office-eras-bar__detail-half--older {
+    padding-inline-end: 12px;
+    padding-bottom: 62px;
+  }
+
+  .office-eras-bar__detail--compare .office-eras-bar__detail-half--newer {
+    padding-inline-start: 12px;
+    padding-top: 62px;
+    border-top: 0;
+    border-bottom: 5px solid var(--era-accent, var(--color-blue));
+  }
+
+  .office-eras-bar__detail-delta-badge {
+    width: 112px;
+    height: 112px;
+    padding: 12px;
+  }
+
+  .office-eras-bar__detail-delta-badge-text {
+    font-size: 0.72rem;
+  }
+
+  .office-eras-bar__detail-delta-badge-value {
+    font-size: 1.05rem;
+  }
+
+  .office-eras-bar__detail-half--solo {
+    justify-content: space-between;
+  }
+
+  .office-eras-bar__detail-stats {
+    order: 0;
+  }
+
+  .office-eras-bar__detail-avatar {
+    width: 60px;
+    height: 60px;
+  }
+
+  .office-eras-bar__detail-name {
+    font-size: 0.92rem;
+  }
+
+  .office-eras-bar__detail-party {
+    font-size: 0.72rem;
+  }
+
+  .office-eras-bar__detail-avg {
+    font-size: 1.85rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .office-eras-bar__era {
     transition: none;
-    filter: none;
   }
 }

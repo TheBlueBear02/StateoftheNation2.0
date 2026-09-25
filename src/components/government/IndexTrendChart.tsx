@@ -7,12 +7,17 @@ import './IndexTrendChart.css'
 
 type IndexTrendChartProps = {
   index: OfficeDashboardIndex
-  /** Vertical band highlight as % of chart width (eras hover). */
+  /** Vertical band highlight(s) as % of chart width (selected eras). */
   highlightBand?: {
     leftPct: number
     widthPct: number
     color?: string | null
   } | null
+  highlightBands?: Array<{
+    leftPct: number
+    widthPct: number
+    color?: string | null
+  }>
   /**
    * Compensates SVG downscaling on narrow viewports so fonts/dots stay legible.
    * 1 on desktop (>=960px); up to 3 on phones. Shared with OfficeErasBar.
@@ -31,9 +36,9 @@ type IndexTrendChartProps = {
 }
 
 export const CHART_WIDTH = 960
-export const CHART_HEIGHT = 460
+export const CHART_HEIGHT = 400
 /** Taller plot on phones/tablets so series + labels have room (kept moderate so chart+eras fit a phone screen). */
-export const CHART_HEIGHT_TALL = 560
+export const CHART_HEIGHT_TALL = 500
 /** Below this width, use tall chart + boosted label scale. */
 export const CHART_MOBILE_MAX_WIDTH = 960
 /** Target on-screen axis label size (CSS px) when width < CHART_MOBILE_MAX_WIDTH. */
@@ -257,13 +262,28 @@ export function estimateChartYAxisLeftMarginForPoints(
   scale: number = 1,
 ): number {
   if (values.length === 0) return MARGIN.left * gutterScaleForUiScale(scale)
-  const rawMin = Math.min(...values)
-  const rawMax = Math.max(...values)
-  const pad = (rawMax - rawMin) * 0.15 || Math.abs(rawMax) * 0.1 || 1
-  const yMin = Math.min(0, rawMin - pad)
-  const yMax = rawMax + pad
+  const { yMin, yMax } = chartYDomain(values)
   const tickCount = scale > 1.2 ? 3 : 4
   return estimateChartYAxisLeftMargin(niceTicks(yMin, yMax, tickCount), scale)
+}
+
+/**
+ * Y domain for the plot. Non-negative series floor at 0 (so bars sit on the
+ * baseline); non-positive series ceiling at 0; mixed series pad both sides.
+ */
+function chartYDomain(values: number[]): { yMin: number; yMax: number } {
+  const rawMin = Math.min(...values)
+  const rawMax = Math.max(...values)
+  const span = rawMax - rawMin
+  const pad = span * 0.15 || Math.abs(rawMax || rawMin) * 0.1 || 1
+
+  if (rawMin >= 0) {
+    return { yMin: 0, yMax: rawMax + pad }
+  }
+  if (rawMax <= 0) {
+    return { yMin: rawMin - pad, yMax: 0 }
+  }
+  return { yMin: rawMin - pad, yMax: rawMax + pad }
 }
 
 function niceTicks(min: number, max: number, count = 4): number[] {
@@ -286,6 +306,7 @@ function clampTooltipLeftPct(leftPct: number): number {
 export function IndexTrendChart({
   index,
   highlightBand = null,
+  highlightBands,
   uiScale: uiScaleProp,
   tall: tallProp,
   fixedLayout = false,
@@ -397,11 +418,7 @@ export function IndexTrendChart({
     }
 
     const values = points.map((p) => p.value)
-    const rawMin = Math.min(...values)
-    const rawMax = Math.max(...values)
-    const pad = (rawMax - rawMin) * 0.15 || Math.abs(rawMax) * 0.1 || 1
-    const yMin = Math.min(0, rawMin - pad)
-    const yMax = rawMax + pad
+    const { yMin, yMax } = chartYDomain(values)
     const tickCount = scale > 1.2 ? 3 : 4
     const yTicks = niceTicks(yMin, yMax, tickCount)
     const left = estimateChartYAxisLeftMargin(yTicks, scale)
@@ -615,17 +632,25 @@ export function IndexTrendChart({
                 />
               )
             })}
-            {highlightBand && highlightBand.widthPct > 0 ? (
-              <rect
-                className="index-trend-chart__era-highlight"
-                x={(highlightBand.leftPct / 100) * WIDTH}
-                y={MARGIN.top}
-                width={(highlightBand.widthPct / 100) * WIDTH}
-                height={plotH}
-                style={{ fill: eraHighlightFill(highlightBand.color) }}
-                pointerEvents="none"
-              />
-            ) : null}
+            {(highlightBands && highlightBands.length > 0
+              ? highlightBands
+              : highlightBand
+                ? [highlightBand]
+                : []
+            )
+              .filter((band) => band.widthPct > 0)
+              .map((band, i) => (
+                <rect
+                  key={`era-hl-${i}-${band.leftPct}-${band.widthPct}`}
+                  className="index-trend-chart__era-highlight"
+                  x={(band.leftPct / 100) * WIDTH}
+                  y={MARGIN.top}
+                  width={(band.widthPct / 100) * WIDTH}
+                  height={plotH}
+                  style={{ fill: eraHighlightFill(band.color) }}
+                  pointerEvents="none"
+                />
+              ))}
           </>
         ) : null}
 

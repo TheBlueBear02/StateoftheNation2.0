@@ -239,6 +239,7 @@ KPI definitions attached to a government office. Each index defines one trackabl
 | `icon` | text | Icon URL/path for the UI (optional; dashboard uses CSS bubble fallbacks) |
 | `is_kpi` | boolean | Whether to show as a headline KPI |
 | `alert` | boolean | Whether to highlight this metric |
+| `higher_is_better` | boolean | Polarity for compare colors: `true` = rise is improvement (green), `false` = rise is worsening (red). Default `true`. |
 | `chart_type` | text | `'line'` \| `'bar'` \| `'pie'`. Default `"line"`. |
 | `source` | text | Data source attribution URL |
 | `is_shown` | boolean | Whether to show on the dashboard |

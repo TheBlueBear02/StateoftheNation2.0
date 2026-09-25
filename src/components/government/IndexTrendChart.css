@@ -11,7 +11,7 @@
   width: 100%;
   height: auto;
   /* Default desktop; inline style overrides when tall mobile viewBox is used. */
-  aspect-ratio: 960 / 460;
+  aspect-ratio: 960 / 400;
   direction: ltr;
 }
 

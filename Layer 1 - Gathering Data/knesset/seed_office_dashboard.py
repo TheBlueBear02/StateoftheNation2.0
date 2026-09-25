@@ -288,6 +288,12 @@ def run(sb: Client, dry_run: bool = False) -> dict:
             "icon": normalize_icon_path(idx.get("icon")),
             "is_kpi": bool(idx.get("is_kpi")),
             "alert": bool(idx.get("alert")),
+            # Source sn.db has no polarity; alert metrics default to lower-is-better.
+            "higher_is_better": (
+                bool(idx["higher_is_better"])
+                if idx.get("higher_is_better") is not None
+                else (not bool(idx.get("alert")))
+            ),
             "chart_type": normalize_chart_type(idx.get("chart_type")),
             "source": (idx.get("source") or None) or None,
             "is_shown": True if idx.get("is_shown") is None else bool(idx.get("is_shown")),
@@ -295,11 +301,12 @@ def run(sb: Client, dry_run: bool = False) -> dict:
 
         if dry_run:
             log.info(
-                "[dry-run] index %r office=%d kpi=%s alert=%s chart=%s",
+                "[dry-run] index %r office=%d kpi=%s alert=%s higher_is_better=%s chart=%s",
                 name,
                 new_office_id,
                 row["is_kpi"],
                 row["alert"],
+                row["higher_is_better"],
                 row["chart_type"],
             )
             continue

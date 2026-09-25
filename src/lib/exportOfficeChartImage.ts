@@ -7,7 +7,7 @@ const SKIP_EXPORT_SELECTORS = [
   '.index-trend-chart__tooltip',
 ]
 
-const EXPORT_PAD_PX = 16
+const EXPORT_PAD_PX = 28
 const SITE_LOGO_SRC = '/header-logo%203.svg'
 
 const CHART_EXPORT_CSS = `
@@ -26,18 +26,76 @@ const CHART_EXPORT_CSS = `
   margin-bottom: 8px;
   direction: ltr;
 }
+.office-dashboard__chart-export-brand {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 0;
+}
 .office-dashboard__chart-export-logo {
   display: block;
-  width: 132px;
+  width: 156px;
   height: auto;
   flex-shrink: 0;
   margin-top: 2px;
+}
+.office-dashboard__chart-export-watermark {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  margin-top: 16px;
+  text-align: left;
+  direction: ltr;
+}
+.office-dashboard__chart-export-watermark-label {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #4a4a4a;
+  white-space: nowrap;
+  text-align: left;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+.office-dashboard__chart-export-watermark-url {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-blue, #4890fd);
+  white-space: nowrap;
+  text-align: left;
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 .office-dashboard__chart-export-titles {
   flex: 1;
   min-width: 0;
   text-align: right;
   direction: rtl;
+}
+.office-dashboard__chart-export-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: center;
+  gap: 2px;
+  min-width: 0;
+}
+.office-dashboard__chart-export-main-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  width: 100%;
 }
 .office-dashboard__chart-export-index {
   display: inline-flex;
@@ -71,10 +129,18 @@ const CHART_EXPORT_CSS = `
   text-align: right;
 }
 .office-dashboard__chart-info {
-  margin: 6px 0 0;
+  margin: 2px 0 0;
   font-size: 1.15rem;
-  line-height: 1.4;
+  line-height: 1.35;
   color: #4a4a4a;
+  text-align: right;
+}
+.office-dashboard__chart-export-office {
+  margin: 0 0 2px;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #6a6a6a;
   text-align: right;
 }
 .index-trend-chart {
@@ -98,11 +164,206 @@ const CHART_EXPORT_CSS = `
   max-width: 100%;
   direction: ltr;
 }
+.office-eras-bar__detail {
+  display: flex;
+  flex-wrap: nowrap;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 0;
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.office-eras-bar__detail--compare {
+  position: relative;
+  gap: 10px;
+}
+.office-eras-bar__detail-half {
+  display: flex;
+  flex: 1 1 50%;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px 18px;
+  border-top: 5px solid var(--era-accent, #4890fd);
+  box-sizing: border-box;
+}
+.office-eras-bar__detail--compare .office-eras-bar__detail-half--older {
+  padding-inline-end: 76px;
+}
+.office-eras-bar__detail--compare .office-eras-bar__detail-half--newer {
+  padding-inline-start: 76px;
+}
+.office-eras-bar__detail-half--older {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+.office-eras-bar__detail-half--newer {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+.office-eras-bar__detail-half--solo {
+  flex: 1 1 100%;
+  justify-content: space-between;
+}
+.office-eras-bar__detail-person {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.office-eras-bar__detail-person--newer {
+  flex-direction: row-reverse;
+}
+.office-eras-bar__detail-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  background: #f0f0f0;
+  box-sizing: border-box;
+}
+.office-eras-bar__detail-avatar--initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--era-accent, #4890fd);
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 800;
+  border-color: transparent;
+}
+.office-eras-bar__detail-person-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: right;
+  direction: rtl;
+}
+.office-eras-bar__detail-person--older .office-eras-bar__detail-person-text {
+  text-align: left;
+  direction: rtl;
+}
+.office-eras-bar__detail-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1a1a1a;
+  line-height: 1.3;
+}
+.office-eras-bar__detail-party,
+.office-eras-bar__detail-dates {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #666;
+  line-height: 1.3;
+}
+.office-eras-bar__detail-dates {
+  margin-top: 2px;
+}
+.office-eras-bar__detail-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.office-eras-bar__detail-stats--older {
+  align-items: flex-end;
+  text-align: right;
+  margin-inline-start: auto;
+}
+.office-eras-bar__detail-stats--newer {
+  align-items: flex-start;
+  text-align: left;
+  margin-inline-end: auto;
+}
+.office-eras-bar__detail-avg-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #666;
+}
+.office-eras-bar__detail-avg {
+  margin: 0;
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: #1a1a1a;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.office-eras-bar__detail-delta-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 132px;
+  height: 132px;
+  margin: 0;
+  padding: 16px;
+  border-radius: 50%;
+  border: 3px solid #000;
+  background: #fff;
+  box-shadow: 0 6px 0 0 #000814;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+}
+.office-eras-bar__detail-delta-badge-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  max-width: 100%;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  color: #111;
+  direction: rtl;
+}
+.office-eras-bar__detail-delta-badge-lead,
+.office-eras-bar__detail-delta-badge-tail {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+.office-eras-bar__detail-delta-badge-value {
+  display: block;
+  width: 100%;
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  text-align: center;
+}
+.office-eras-bar__detail-delta-badge--up
+  .office-eras-bar__detail-delta-badge-value {
+  color: #ee3f33;
+}
+.office-eras-bar__detail-delta-badge--down
+  .office-eras-bar__detail-delta-badge-value {
+  color: #1a7f4b;
+}
 `
 
 export type OfficeChartExportOptions = {
   iconUrl?: string | null
   iconTone?: 'kpi' | 'policy' | 'alert'
+  officeName?: string | null
 }
 
 function decorateExportHeader(
@@ -119,20 +380,50 @@ function decorateExportHeader(
   const exportHeader = document.createElement('div')
   exportHeader.className = 'office-dashboard__chart-export-header'
 
+  const brand = document.createElement('div')
+  brand.className = 'office-dashboard__chart-export-brand'
+
   const logo = document.createElement('img')
   logo.className = 'office-dashboard__chart-export-logo'
   logo.src = SITE_LOGO_SRC
   logo.alt = 'מצב האומה'
-  logo.width = 132
-  logo.height = 44
+  logo.width = 156
+  logo.height = 52
+
+  const watermark = document.createElement('div')
+  watermark.className = 'office-dashboard__chart-export-watermark'
+
+  const watermarkLabel = document.createElement('p')
+  watermarkLabel.className = 'office-dashboard__chart-export-watermark-label'
+  watermarkLabel.textContent = 'לעוד מידע חפשו אתר מצב האומה'
+
+  const watermarkUrl = document.createElement('p')
+  watermarkUrl.className = 'office-dashboard__chart-export-watermark-url'
+  watermarkUrl.textContent = 'stateofthenation.co.il'
+
+  watermark.append(watermarkLabel, watermarkUrl)
+  brand.append(logo, watermark)
+
+  const main = document.createElement('div')
+  main.className = 'office-dashboard__chart-export-main'
+
+  const officeName = options.officeName?.trim()
+  if (officeName) {
+    const officeLine = document.createElement('p')
+    officeLine.className = 'office-dashboard__chart-export-office'
+    officeLine.textContent = officeName
+    main.append(officeLine)
+  }
+
+  const mainRow = document.createElement('div')
+  mainRow.className = 'office-dashboard__chart-export-main-row'
 
   const titles = document.createElement('div')
   titles.className = 'office-dashboard__chart-export-titles'
   if (titleBlock instanceof HTMLElement) {
     titles.append(...Array.from(titleBlock.childNodes))
   }
-
-  exportHeader.append(logo, titles)
+  mainRow.append(titles)
 
   const iconUrl = options.iconUrl?.trim()
   if (iconUrl) {
@@ -146,8 +437,11 @@ function decorateExportHeader(
     icon.width = 36
     icon.height = 36
     circle.append(icon)
-    exportHeader.append(circle)
+    mainRow.append(circle)
   }
+
+  main.append(mainRow)
+  exportHeader.append(brand, main)
 
   header.replaceWith(exportHeader)
 }
@@ -189,7 +483,7 @@ function lockChartSvgSize(
 
   const liveSvg = liveRoot.querySelector('.index-trend-chart__svg')
   let vbWidth = 960
-  let vbHeight = 460
+  let vbHeight = 400
   if (liveSvg instanceof SVGElement) {
     const vb = liveSvg.getAttribute('viewBox')
     if (vb) {
@@ -214,12 +508,14 @@ function lockChartSvgSize(
 }
 
 /**
- * Export the office dashboard chart block (title + info + SVG + eras) to PNG.
+ * Export the office dashboard chart block (title + info + SVG + eras +
+ * selected-era detail / compare panel) to PNG.
  * Keeps chart + eras on the same content width (padding outside), and inlines
  * SVG paint so html-to-image does not fall back to black fills.
  *
  * Prefer capturing `.office-dashboard__chart-block--export` (fixed 960px
- * desktop layout) so mobile shares match PC proportions.
+ * desktop layout, including the side-by-side compare row) so mobile shares
+ * match PC proportions.
  */
 export async function exportOfficeChartImage(
   liveNode: HTMLElement,
@@ -245,7 +541,7 @@ export async function exportOfficeChartImage(
   // Padding is inside the box; widen by 2*pad so content width === live chart width.
   clone.style.width = `${contentWidth + EXPORT_PAD_PX * 2}px`
   clone.style.maxWidth = `${contentWidth + EXPORT_PAD_PX * 2}px`
-  clone.style.padding = `22px ${EXPORT_PAD_PX}px 12px`
+  clone.style.padding = `32px ${EXPORT_PAD_PX}px 24px`
   clone.style.background = '#ffffff'
   clone.style.overflow = 'hidden'
   clone.style.fontFamily = 'var(--font-heebo), Heebo, sans-serif'

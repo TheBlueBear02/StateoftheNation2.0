@@ -83,6 +83,8 @@ export type OfficeDashboardMinister = {
   fullName: string
   imageUrl: string | null
   dutyDesc: string | null
+  /** Current Knesset party / faction short label when known. */
+  partyName: string | null
 }
 
 export type OfficeDashboardMinisterEra = {
@@ -108,6 +110,8 @@ export type OfficeDashboardIndex = {
   icon: string
   isKpi: boolean
   alert: boolean
+  /** Rise vs compared era is an improvement when true (colors the delta badge). */
+  higherIsBetter: boolean
   chartType: IndexChartType
   source: string | null
   points: OfficeDashboardPoint[]
@@ -155,15 +159,12 @@ function normalizeChartType(raw: string | null | undefined): IndexChartType {
   return 'line'
 }
 
-/** Public URL for an index icon; falls back to bag placeholders. */
+/** Public URL for an index icon; falls back to white bag placeholder. */
 export function resolveIndexIconUrl(
   icon: string | null | undefined,
   opts?: { isKpi?: boolean; alert?: boolean; name?: string },
 ): string {
-  const fallback =
-    opts?.isKpi || opts?.alert
-      ? '/images/offices/white_bag.png'
-      : '/images/offices/grey_bag.png'
+  const fallback = '/images/offices/white_bag.png'
 
   const fromName = opts?.name
     ? OFFICE_INDEX_ICON_BY_NAME[opts.name]
@@ -233,6 +234,11 @@ function buildIndex(
     }),
     isKpi: Boolean(row.is_kpi),
     alert: Boolean(row.alert),
+    // Missing/legacy rows default to higher-is-better.
+    higherIsBetter:
+      row.higher_is_better === null || row.higher_is_better === undefined
+        ? true
+        : Boolean(row.higher_is_better),
     chartType: normalizeChartType(row.chart_type),
     source: row.source,
     points,
@@ -301,6 +307,7 @@ function pickMinisterForOffice(
   officeId: number,
   officeName: string,
   refDate: string,
+  memberships: MembershipForEra[],
 ): OfficeDashboardMinister | null {
   const candidates = rows
     .filter(
@@ -318,11 +325,17 @@ function pickMinisterForOffice(
   if (!row) return null
 
   const person = unwrapRelation<KnessetPerson>(row.person)
+  const { factionName } = resolveFactionAtDate(
+    memberships,
+    row.person_id,
+    refDate,
+  )
   return {
     personId: row.person_id,
     fullName: person?.full_name ?? 'שר/ה',
     imageUrl: person?.image_url ?? null,
     dutyDesc: row.duty_desc,
+    partyName: factionName,
   }
 }
 
@@ -673,7 +686,7 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
   const { data: indexRows, error: indexError } = await supabase
     .from('indexes')
     .select(
-      'id, office_id, name, info, icon, is_kpi, alert, chart_type, source, is_shown',
+      'id, office_id, name, info, icon, is_kpi, alert, higher_is_better, chart_type, source, is_shown',
     )
     .in('office_id', officeIds)
     .eq('is_shown', true)
@@ -776,7 +789,12 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
   }
 
   const historyPersonIds = [
-    ...new Set(historyAppts.map((row) => row.person_id).filter(Boolean)),
+    ...new Set(
+      [
+        ...historyAppts.map((row) => row.person_id),
+        ...appointmentRows.map((row) => row.person_id),
+      ].filter(Boolean),
+    ),
   ]
 
   let memberships: MembershipForEra[] = []
@@ -833,6 +851,7 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
           row.id,
           name,
           refDate,
+          memberships,
         ),
         ministerHistory: needle ? (erasByNeedle.get(needle) ?? []) : [],
         indexes: officeIndexes,

@@ -254,6 +254,8 @@ export type IndexRow = {
   icon: string | null
   is_kpi: boolean
   alert: boolean
+  /** When true, a rise vs the compared era is an improvement (green). */
+  higher_is_better: boolean
   chart_type: IndexChartType | string | null
   source: string | null
   is_shown: boolean | null
