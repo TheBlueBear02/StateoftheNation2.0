@@ -616,6 +616,7 @@
     flex: 1 1 auto;
     padding: 14px 12px;
     gap: 12px;
+    border-radius: 0;
   }
 
   .office-eras-bar__detail--compare .office-eras-bar__detail-half--older {
@@ -628,6 +629,14 @@
     padding-top: 62px;
     border-top: 0;
     border-bottom: 5px solid var(--era-accent, var(--color-blue));
+    /* Accent sits on the bottom edge — wash color upward from there. */
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--era-accent, var(--color-blue)) 26%, #fff) 0%,
+      color-mix(in srgb, var(--era-accent, var(--color-blue)) 12%, #fff) 55%,
+      color-mix(in srgb, var(--era-accent, var(--color-blue)) 4%, #fff) 85%,
+      #fff 100%
+    );
   }
 
   .office-eras-bar__detail-delta-badge {
