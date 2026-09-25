@@ -228,6 +228,7 @@ function DetailPanel({
       leftPct: number
       widthPct: number
       color: string | null
+      avg?: number | null
     }>
   >([])
   const [eraSelectedKeys, setEraSelectedKeys] = useState<string[]>([])
@@ -395,10 +396,6 @@ function DetailPanel({
     // New office strip: snap marker without sliding from the previous office.
     markerAnimatedRef.current = false
   }, [office.id])
-
-  useEffect(() => {
-    setEraHighlightBands([])
-  }, [selectedIndex?.id, office.id])
 
   useEffect(() => {
     if (

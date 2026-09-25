@@ -8,6 +8,11 @@ const SKIP_EXPORT_SELECTORS = [
 ]
 
 const EXPORT_PAD_PX = 28
+/** White margin outside the blue share border (CSS px @ 1x). */
+const EXPORT_FRAME_OUTER_PAD_PX = 10
+/** Blue border thickness around the chart card (CSS px @ 1x). */
+const EXPORT_FRAME_BORDER_PX = 4
+const SITE_BLUE = '#4890fd'
 const SITE_LOGO_SRC = '/header-logo%203.svg'
 
 const CHART_EXPORT_CSS = `
@@ -508,6 +513,79 @@ function lockChartSvgSize(
 }
 
 /**
+ * html-to-image often turns SVG feDropShadow into a blank white canvas.
+ * Strip filters from the export clone only (live chart keeps bar shadows).
+ */
+function stripSvgFilters(root: HTMLElement) {
+  root.querySelectorAll('filter').forEach((el) => el.remove())
+  root.querySelectorAll('[filter]').forEach((el) => {
+    el.removeAttribute('filter')
+  })
+}
+
+/**
+ * Wrap a finished PNG in a simple site-blue border with a thin white outer
+ * margin (white → blue → chart). Done in canvas after capture.
+ */
+async function applyBlueBorderFrame(dataUrl: string): Promise<string> {
+  const image = new Image()
+  image.decoding = 'async'
+  image.src = dataUrl
+  await image.decode()
+
+  // Scale frame sizes with the captured pixel density (~2x on retina).
+  const cssWidthGuess = Math.max(image.naturalWidth / 2, 1)
+  const scale = image.naturalWidth / cssWidthGuess
+  const outerPad = Math.max(6, Math.round(EXPORT_FRAME_OUTER_PAD_PX * scale))
+  const border = Math.max(2, Math.round(EXPORT_FRAME_BORDER_PX * scale))
+  const inset = outerPad + border
+
+  const canvas = document.createElement('canvas')
+  canvas.width = image.naturalWidth + inset * 2
+  canvas.height = image.naturalHeight + inset * 2
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return dataUrl
+
+  // White outside the blue border.
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  // Blue border ring.
+  ctx.fillStyle = SITE_BLUE
+  ctx.fillRect(outerPad, outerPad, canvas.width - outerPad * 2, canvas.height - outerPad * 2)
+
+  // Chart card (white behind the image in case of transparency).
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(inset, inset, image.naturalWidth, image.naturalHeight)
+  ctx.drawImage(image, inset, inset)
+
+  return canvas.toDataURL('image/png')
+}
+
+/** True when the PNG is essentially blank (html-to-image failure mode). */
+async function isMostlyWhitePng(dataUrl: string): Promise<boolean> {
+  const image = new Image()
+  image.src = dataUrl
+  await image.decode()
+  const sampleW = Math.min(120, image.naturalWidth)
+  const sampleH = Math.min(120, image.naturalHeight)
+  if (sampleW < 2 || sampleH < 2) return true
+  const canvas = document.createElement('canvas')
+  canvas.width = sampleW
+  canvas.height = sampleH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return false
+  ctx.drawImage(image, 0, 0, sampleW, sampleH)
+  const { data } = ctx.getImageData(0, 0, sampleW, sampleH)
+  let white = 0
+  const total = sampleW * sampleH
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i]! > 250 && data[i + 1]! > 250 && data[i + 2]! > 250) white += 1
+  }
+  return white / total > 0.97
+}
+
+/**
  * Export the office dashboard chart block (title + info + SVG + eras +
  * selected-era detail / compare panel) to PNG.
  * Keeps chart + eras on the same content width (padding outside), and inlines
@@ -515,7 +593,8 @@ function lockChartSvgSize(
  *
  * Prefer capturing `.office-dashboard__chart-block--export` (fixed 960px
  * desktop layout, including the side-by-side compare row) so mobile shares
- * match PC proportions.
+ * match PC proportions. A site-blue border with a thin white outer margin is
+ * composited after capture.
  */
 export async function exportOfficeChartImage(
   liveNode: HTMLElement,
@@ -531,12 +610,14 @@ export async function exportOfficeChartImage(
     : liveWidth || liveNode.offsetWidth || 960
   const clone = liveNode.cloneNode(true) as HTMLElement
   clone.setAttribute('data-export-clone', 'true')
+  // Keep the clone on-screen (nearly invisible). Off-screen fixed nodes
+  // (left: -10000px) often rasterize as a blank white PNG in Chromium.
   clone.style.position = 'fixed'
-  clone.style.left = '-10000px'
+  clone.style.left = '0'
   clone.style.top = '0'
-  clone.style.opacity = '1'
+  clone.style.opacity = '0.01'
   clone.style.pointerEvents = 'none'
-  clone.style.zIndex = '-1'
+  clone.style.zIndex = '2147483646'
   clone.style.boxSizing = 'border-box'
   // Padding is inside the box; widen by 2*pad so content width === live chart width.
   clone.style.width = `${contentWidth + EXPORT_PAD_PX * 2}px`
@@ -548,12 +629,14 @@ export async function exportOfficeChartImage(
   clone.dir = 'rtl'
   // Drop offscreen positioning from the live export shell so the clone lays out.
   clone.classList.remove('office-dashboard__chart-block--export')
-  clone.style.left = '-10000px'
   clone.style.visibility = 'visible'
 
   for (const selector of SKIP_EXPORT_SELECTORS) {
     clone.querySelectorAll(selector).forEach((el) => el.remove())
   }
+
+  // Bar drop-shadows blank html-to-image — remove from the clone only.
+  stripSvgFilters(clone)
 
   decorateExportHeader(clone, options)
 
@@ -566,6 +649,7 @@ export async function exportOfficeChartImage(
   try {
     lockChartSvgSize(clone, contentWidth, liveNode)
     copySvgPaintFromLive(liveNode, clone)
+    stripSvgFilters(clone)
     await inlineImagesForExport(clone)
     await new Promise<void>((resolve) => {
       window.requestAnimationFrame(() => resolve())
@@ -578,13 +662,10 @@ export async function exportOfficeChartImage(
       fontEmbedCSS = ''
     }
 
-    const options = {
-      cacheBust: false,
+    const baseOptions = {
+      cacheBust: true,
       pixelRatio: 2,
       backgroundColor: '#ffffff',
-      skipFonts: false,
-      preferredFontFormat: 'woff2' as const,
-      ...(fontEmbedCSS ? { fontEmbedCSS } : {}),
       style: {
         opacity: '1',
         position: 'static',
@@ -595,10 +676,45 @@ export async function exportOfficeChartImage(
       },
     }
 
+    const attempts = [
+      {
+        ...baseOptions,
+        skipFonts: false,
+        preferredFontFormat: 'woff2' as const,
+        ...(fontEmbedCSS ? { fontEmbedCSS } : {}),
+      },
+      // Font embedding sometimes blanks the canvas — retry without it.
+      {
+        ...baseOptions,
+        skipFonts: true,
+        pixelRatio: 2,
+      },
+      {
+        ...baseOptions,
+        skipFonts: true,
+        pixelRatio: 1,
+      },
+    ]
+
+    let dataUrl = ''
+    for (const attempt of attempts) {
+      try {
+        const next = await toPng(clone, attempt)
+        dataUrl = next
+        if (!(await isMostlyWhitePng(next))) break
+      } catch {
+        // try next attempt
+      }
+    }
+
+    if (!dataUrl || (await isMostlyWhitePng(dataUrl))) {
+      throw new Error('Chart image export produced an empty image')
+    }
+
     try {
-      return await toPng(clone, options)
+      return await applyBlueBorderFrame(dataUrl)
     } catch {
-      return await toPng(clone, { ...options, pixelRatio: 1 })
+      return dataUrl
     }
   } finally {
     clone.remove()

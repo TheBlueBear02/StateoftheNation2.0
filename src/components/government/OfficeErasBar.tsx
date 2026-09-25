@@ -19,6 +19,7 @@ type EraBand = {
   leftPct: number
   widthPct: number
   color: string | null
+  avg?: number | null
 }
 
 type OfficeErasBarProps = {
@@ -43,8 +44,9 @@ type OfficeErasBarProps = {
   onSelectedKeysChange?: (keys: string[]) => void
   /**
    * When this value changes (e.g. office id), selection resets to the
-   * latest visible era. Swapping indexes within the same office keeps the
-   * current picks. Empty selection is otherwise allowed.
+   * latest two visible eras (also the default on first page load). Swapping
+   * indexes within the same office keeps the current picks. Empty selection is
+   * otherwise allowed after the user clears the last era.
    */
   selectionResetKey?: string | number
   /** Fires with the selected era band(s) for chart highlighting. */
@@ -284,6 +286,47 @@ function initials(name: string): string {
   return `${parts[0]!.slice(0, 1)}${parts[parts.length - 1]!.slice(0, 1)}`
 }
 
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+}
+
+function daysInYear(year: number): number {
+  return isLeapYear(year) ? 366 : 365
+}
+
+/** Inclusive calendar-day overlap between an era and a calendar year. */
+function eraOverlapDaysInYear(
+  year: number,
+  era: OfficeDashboardMinisterEra,
+): number {
+  const eraStart = dateToMs(era.startDate)
+  const eraEnd = dateToMs(era.endDate)
+  if (!(eraEnd >= eraStart)) return 0
+  const yearStart = Date.UTC(year, 0, 1)
+  const yearEnd = Date.UTC(year, 11, 31)
+  const overlapStart = Math.max(eraStart, yearStart)
+  const overlapEnd = Math.min(eraEnd, yearEnd)
+  if (overlapEnd < overlapStart) return 0
+  return Math.floor((overlapEnd - overlapStart) / 86_400_000) + 1
+}
+
+/**
+ * Yearly bars are annual totals. Counting a year for a minister who only
+ * served a few December days (or a short January leftover) skews the avg.
+ * Prefer years where the era covers ≥ half the calendar year; if none, fall
+ * back to the year(s) with the longest overlap so short tenures still get a value.
+ */
+function yearCountsForEraAverage(
+  year: number,
+  era: OfficeDashboardMinisterEra,
+  mode: 'majority' | 'any',
+): boolean {
+  const overlap = eraOverlapDaysInYear(year, era)
+  if (overlap <= 0) return false
+  if (mode === 'any') return true
+  return overlap * 2 >= daysInYear(year)
+}
+
 function pointBelongsToEra(
   point: OfficeDashboardPoint,
   era: OfficeDashboardMinisterEra,
@@ -294,9 +337,8 @@ function pointBelongsToEra(
   if (yearOnly) {
     const year = Number(yearFromPoint(point))
     if (!year) return false
-    const yearStart = Date.UTC(year, 0, 1)
-    const yearEnd = Date.UTC(year, 11, 31)
-    return yearEnd >= eraStart && yearStart <= eraEnd
+    // Visual/band membership: any calendar overlap (used elsewhere if needed).
+    return eraOverlapDaysInYear(year, era) > 0
   }
   const t = dateToMs(point.recordedAt)
   return t >= eraStart && t <= eraEnd
@@ -307,9 +349,37 @@ function averageForEra(
   era: OfficeDashboardMinisterEra,
   yearOnly: boolean,
 ): number | null {
-  const values = points
-    .filter((p) => pointBelongsToEra(p, era, yearOnly))
-    .map((p) => p.value)
+  if (!yearOnly) {
+    const values = points
+      .filter((p) => pointBelongsToEra(p, era, false))
+      .map((p) => p.value)
+      .filter((v) => Number.isFinite(v))
+    if (values.length === 0) return null
+    return values.reduce((sum, v) => sum + v, 0) / values.length
+  }
+
+  const yearly = points
+    .map((p) => ({ point: p, year: Number(yearFromPoint(p)) }))
+    .filter((row) => row.year > 0)
+
+  const majority = yearly.filter((row) =>
+    yearCountsForEraAverage(row.year, era, 'majority'),
+  )
+  let chosen = majority
+  if (chosen.length === 0) {
+    // Short tenure: take the year(s) with the most days in office.
+    let bestDays = 0
+    for (const row of yearly) {
+      bestDays = Math.max(bestDays, eraOverlapDaysInYear(row.year, era))
+    }
+    if (bestDays <= 0) return null
+    chosen = yearly.filter(
+      (row) => eraOverlapDaysInYear(row.year, era) === bestDays,
+    )
+  }
+
+  const values = chosen
+    .map((row) => row.point.value)
     .filter((v) => Number.isFinite(v))
   if (values.length === 0) return null
   return values.reduce((sum, v) => sum + v, 0) / values.length
@@ -354,6 +424,11 @@ export function OfficeErasBar({
   const lastTouchRef = useRef(0)
   const prevSelectionResetKeyRef = useRef<string | number | null>(null)
   const hasSeededSelectionRef = useRef(false)
+  /** True only after the user clears the last selected era; office reset clears this. */
+  const userClearedSelectionRef = useRef(false)
+  /** Export shell is controlled for display only — don't write selection back. */
+  const canWriteSelection =
+    !isSelectionControlled || typeof onSelectedKeysChange === 'function'
 
   useLayoutEffect(() => {
     const node = plotRef.current
@@ -457,50 +532,63 @@ export function OfficeErasBar({
     })
   }, [eras, points, chartType, leftMargin])
 
-  // Default / repair selection when the visible set or office/index changes.
+  // Default / repair selection when the visible set or office changes.
   useEffect(() => {
+    if (!canWriteSelection) return
     if (visible.length === 0) {
-      setSelectedKeys([])
+      // Don't clear parent selection while eras are briefly unavailable
+      // (e.g. index swap) — that used to stick the page on "none selected".
       setHoveredKey(null)
       return
     }
-    const latestKey = eraKey(visible[visible.length - 1]!.era)
+    const defaultKeys = visible
+      .slice(-2)
+      .map((item) => eraKey(item.era))
     const resetChanged =
       selectionResetKey !== undefined &&
       prevSelectionResetKeyRef.current !== selectionResetKey
     if (selectionResetKey !== undefined) {
       prevSelectionResetKeyRef.current = selectionResetKey
     }
+    if (resetChanged) {
+      userClearedSelectionRef.current = false
+    }
 
     setSelectedKeys((prev) => {
-      // New office/index (or first seed): focus the latest era.
+      // New office / first seed / page load: focus the latest two eras.
       if (resetChanged || !hasSeededSelectionRef.current) {
         hasSeededSelectionRef.current = true
-        return [latestKey]
+        userClearedSelectionRef.current = false
+        return defaultKeys
       }
       const stillVisible = prev.filter((key) =>
         visible.some((item) => eraKey(item.era) === key),
       )
       if (stillVisible.length > 0) return stillVisible.slice(0, 2)
-      // User cleared all eras — keep empty until they pick again.
-      if (prev.length === 0) return prev
-      return [latestKey]
+      // Keep empty only when the user explicitly cleared selection.
+      if (prev.length === 0 && userClearedSelectionRef.current) return prev
+      return defaultKeys
     })
     setHoveredKey((prev) => {
       if (prev && visible.some((item) => eraKey(item.era) === prev)) return prev
       return null
     })
-  }, [visible, selectionResetKey])
+  }, [visible, selectionResetKey, canWriteSelection])
 
   const toggleSelect = (key: string) => {
     setSelectedKeys((prev) => {
+      let next: string[]
       if (prev.includes(key)) {
         // Allow clearing the last selected era (no selection).
-        return prev.filter((k) => k !== key)
+        next = prev.filter((k) => k !== key)
+      } else if (prev.length < 2) {
+        next = [...prev, key]
+      } else {
+        // Already comparing two — replace the earlier pick.
+        next = [prev[1]!, key]
       }
-      if (prev.length < 2) return [...prev, key]
-      // Already comparing two — replace the earlier pick.
-      return [prev[1]!, key]
+      userClearedSelectionRef.current = next.length === 0
+      return next
     })
   }
 
@@ -544,16 +632,17 @@ export function OfficeErasBar({
       ? newerAvg - olderAvg
       : null
 
-  // Keep chart highlight in sync with selection.
+  // Keep chart highlight + avg lines in sync with selection.
   useEffect(() => {
     onHoverBand?.(
       selectedSorted.map((item) => ({
         leftPct: item.leftPct,
         widthPct: item.widthPct,
         color: item.era.factionColor?.trim() || FALLBACK_COLOR,
+        avg: averageForEra(points, item.era, yearOnly),
       })),
     )
-  }, [selectedSorted, onHoverBand])
+  }, [selectedSorted, onHoverBand, points, yearOnly])
 
   const switchTicks = useMemo((): EraSwitchTick[] => {
     const sorted = [...visible].sort((a, b) => a.leftPct - b.leftPct)
@@ -617,8 +706,8 @@ export function OfficeErasBar({
     <div
       className={`office-eras-bar__detail-stats office-eras-bar__detail-stats--${side}`}
     >
-      <p className="office-eras-bar__detail-avg-label">ממוצע בתקופה</p>
       <p className="office-eras-bar__detail-avg">{formatIndexValue(avg)}</p>
+      <p className="office-eras-bar__detail-avg-label">ממוצע בתקופה</p>
     </div>
   )
 

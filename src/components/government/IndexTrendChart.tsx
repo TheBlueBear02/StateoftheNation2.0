@@ -5,6 +5,14 @@ import type { OfficeDashboardIndex } from '../../lib/fetchOfficeDashboard'
 import { formatIndexValue } from '../../lib/fetchOfficeDashboard'
 import './IndexTrendChart.css'
 
+type EraHighlightBand = {
+  leftPct: number
+  widthPct: number
+  color?: string | null
+  /** Period average for this era; drawn as a dashed line across the band. */
+  avg?: number | null
+}
+
 type IndexTrendChartProps = {
   index: OfficeDashboardIndex
   /** Vertical band highlight(s) as % of chart width (selected eras). */
@@ -12,12 +20,9 @@ type IndexTrendChartProps = {
     leftPct: number
     widthPct: number
     color?: string | null
+    avg?: number | null
   } | null
-  highlightBands?: Array<{
-    leftPct: number
-    widthPct: number
-    color?: string | null
-  }>
+  highlightBands?: EraHighlightBand[]
   /**
    * Compensates SVG downscaling on narrow viewports so fonts/dots stay legible.
    * 1 on desktop (>=960px); up to 3 on phones. Shared with OfficeErasBar.
@@ -120,6 +125,11 @@ const MARGIN = CHART_MARGIN
 const BAR_SLOT_FILL = 0.72
 const ERA_HIGHLIGHT_FALLBACK = '#4890fd'
 const ERA_HIGHLIGHT_OPACITY = 0.22
+
+function eraStrokeColor(color: string | null | undefined): string {
+  const raw = (color || ERA_HIGHLIGHT_FALLBACK).trim()
+  return raw || ERA_HIGHLIGHT_FALLBACK
+}
 
 /** Party color at low opacity for the eras hover band on the chart. */
 function eraHighlightFill(color: string | null | undefined): string {
@@ -303,6 +313,79 @@ function clampTooltipLeftPct(leftPct: number): number {
   return Math.min(92, Math.max(8, leftPct))
 }
 
+/** Bar path with gently rounded corners on the value end (away from zero). */
+function roundedBarPath(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+  roundTop: boolean,
+): string {
+  const r = Math.min(Math.max(0, radius), w / 2, h)
+  if (r <= 0.01) {
+    return `M${x},${y}h${w}v${h}h${-w}Z`
+  }
+  if (roundTop) {
+    return [
+      `M${x},${y + r}`,
+      `Q${x},${y} ${x + r},${y}`,
+      `L${x + w - r},${y}`,
+      `Q${x + w},${y} ${x + w},${y + r}`,
+      `L${x + w},${y + h}`,
+      `L${x},${y + h}`,
+      'Z',
+    ].join('')
+  }
+  return [
+    `M${x},${y}`,
+    `L${x + w},${y}`,
+    `L${x + w},${y + h - r}`,
+    `Q${x + w},${y + h} ${x + w - r},${y + h}`,
+    `L${x + r},${y + h}`,
+    `Q${x},${y + h} ${x},${y + h - r}`,
+    'Z',
+  ].join('')
+}
+
+/**
+ * Open outline for bar stroke: left + value-end + right only
+ * (no baseline edge, so bars sit flush on the axis).
+ */
+function roundedBarStrokePath(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+  roundTop: boolean,
+): string {
+  const r = Math.min(Math.max(0, radius), w / 2, h)
+  if (r <= 0.01) {
+    return roundTop
+      ? `M${x},${y + h}L${x},${y}L${x + w},${y}L${x + w},${y + h}`
+      : `M${x},${y}L${x},${y + h}L${x + w},${y + h}L${x + w},${y}`
+  }
+  if (roundTop) {
+    return [
+      `M${x},${y + h}`,
+      `L${x},${y + r}`,
+      `Q${x},${y} ${x + r},${y}`,
+      `L${x + w - r},${y}`,
+      `Q${x + w},${y} ${x + w},${y + r}`,
+      `L${x + w},${y + h}`,
+    ].join('')
+  }
+  return [
+    `M${x},${y}`,
+    `L${x},${y + h - r}`,
+    `Q${x},${y + h} ${x + r},${y + h}`,
+    `L${x + w - r},${y + h}`,
+    `Q${x + w},${y + h} ${x + w},${y + h - r}`,
+    `L${x + w},${y}`,
+  ].join('')
+}
+
 export function IndexTrendChart({
   index,
   highlightBand = null,
@@ -450,8 +533,19 @@ export function IndexTrendChart({
       const cx = x + barW / 2
       const yVal = toY(p.value)
       const y = Math.min(yVal, zeroY)
-      const h = Math.abs(zeroY - yVal)
-      return { x, y, w: barW, h: Math.max(h, minBarH), cx, cy: yVal }
+      const h = Math.max(Math.abs(zeroY - yVal), minBarH)
+      const roundTop = p.value >= 0
+      const radius = Math.min(10 * scale, barW / 2, h)
+      return {
+        x,
+        y,
+        w: barW,
+        h,
+        cx,
+        cy: yVal,
+        d: roundedBarPath(x, y, barW, h, radius, roundTop),
+        strokeD: roundedBarStrokePath(x, y, barW, h, radius, roundTop),
+      }
     })
 
     const pieSource = points.slice(-8)
@@ -545,6 +639,14 @@ export function IndexTrendChart({
     left,
   } = geometry
 
+  const activeEraBands = (
+    highlightBands && highlightBands.length > 0
+      ? highlightBands
+      : highlightBand
+        ? [highlightBand]
+        : []
+  ).filter((band) => band.widthPct > 0)
+
   const toggleIdx = (i: number) => {
     setHoverIdx((prev) => (prev === i ? null : i))
   }
@@ -612,6 +714,7 @@ export function IndexTrendChart({
         style={{ aspectRatio: `${WIDTH} / ${height}` }}
         onClick={() => setHoverIdx(null)}
       >
+        {/* No SVG drop-shadow filters — html-to-image blanks the share PNG when they are present. */}
         {chartType !== 'pie' ? (
           <>
             {yTicks.map((tick) => {
@@ -632,14 +735,7 @@ export function IndexTrendChart({
                 />
               )
             })}
-            {(highlightBands && highlightBands.length > 0
-              ? highlightBands
-              : highlightBand
-                ? [highlightBand]
-                : []
-            )
-              .filter((band) => band.widthPct > 0)
-              .map((band, i) => (
+            {activeEraBands.map((band, i) => (
                 <rect
                   key={`era-hl-${i}-${band.leftPct}-${band.widthPct}`}
                   className="index-trend-chart__era-highlight"
@@ -655,26 +751,38 @@ export function IndexTrendChart({
         ) : null}
 
         {chartType === 'bar'
-          ? bars.map((bar, i) => (
-              <rect
-                key={i}
-                x={bar.x}
-                y={bar.y}
-                width={bar.w}
-                height={bar.h}
-                fill={hoverIdx === i ? '#3b7ae6' : '#4890fd'}
-                opacity={hoverIdx === i ? 1 : 0.85}
-                className={
-                  hoverIdx === i
-                    ? 'index-trend-chart__bar index-trend-chart__bar--active'
-                    : 'index-trend-chart__bar'
-                }
-                onMouseEnter={() => setHoverFromMouse(i)}
-                onMouseLeave={() => setHoverFromMouse(null)}
-                onPointerUp={(e) => onPointPointerUp(i, e)}
-                onClick={stopClick}
-              />
-            ))
+          ? bars.map((bar, i) => {
+              const fill = hoverIdx === i ? '#3b7ae6' : '#4890fd'
+              const opacity = hoverIdx === i ? 1 : 0.85
+              const strokeW = Math.max(1.5, 1.75 * scale)
+              const className =
+                hoverIdx === i
+                  ? 'index-trend-chart__bar index-trend-chart__bar--active'
+                  : 'index-trend-chart__bar'
+              return (
+                <g
+                  key={i}
+                  className={className}
+                  opacity={opacity}
+                  onMouseEnter={() => setHoverFromMouse(i)}
+                  onMouseLeave={() => setHoverFromMouse(null)}
+                  onPointerUp={(e) => onPointPointerUp(i, e)}
+                  onClick={stopClick}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <path d={bar.d} fill={fill} stroke="none" />
+                  <path
+                    d={bar.strokeD}
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth={strokeW}
+                    strokeLinejoin="round"
+                    strokeLinecap="butt"
+                    pointerEvents="none"
+                  />
+                </g>
+              )
+            })
           : null}
 
         {chartType === 'line' ? (
@@ -740,6 +848,55 @@ export function IndexTrendChart({
         {/* Axis labels after series so they stay above bars/lines. */}
         {chartType !== 'pie' ? (
           <>
+            {activeEraBands.map((band, i) => {
+              if (band.avg == null || !Number.isFinite(band.avg)) return null
+              const yRange = yMax - yMin || 1
+              const yRaw =
+                MARGIN.top + plotH - ((band.avg - yMin) / yRange) * plotH
+              const y = Math.min(
+                MARGIN.top + plotH,
+                Math.max(MARGIN.top, yRaw),
+              )
+              const x1 = (band.leftPct / 100) * WIDTH
+              const x2 = x1 + (band.widthPct / 100) * WIDTH
+              const stroke = eraStrokeColor(band.color)
+              const labelX = (x1 + x2) / 2
+              const labelY = Math.max(MARGIN.top + fontSize * 0.85, y - 6 * scale)
+              return (
+                <g
+                  key={`era-avg-${i}-${band.leftPct}-${band.avg}`}
+                  className="index-trend-chart__era-avg"
+                  pointerEvents="none"
+                >
+                  <line
+                    x1={x1}
+                    y1={y}
+                    x2={x2}
+                    y2={y}
+                    stroke={stroke}
+                    strokeWidth={Math.max(1.5, 2 * scale)}
+                    strokeDasharray={`${7 * scale} ${5 * scale}`}
+                    strokeLinecap="round"
+                  />
+                  <text
+                    x={labelX}
+                    y={labelY}
+                    textAnchor="middle"
+                    dominantBaseline="auto"
+                    direction="ltr"
+                    fill="#111"
+                    stroke="#fff"
+                    strokeWidth={Math.max(2.5, 3 * scale)}
+                    paintOrder="stroke"
+                    fontSize={fontSize}
+                    fontWeight={800}
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {formatIndexValue(band.avg)}
+                  </text>
+                </g>
+              )
+            })}
             {yTicks.map((tick) => {
               const y =
                 MARGIN.top +
