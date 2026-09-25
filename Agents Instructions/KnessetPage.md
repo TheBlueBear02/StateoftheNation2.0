@@ -246,7 +246,8 @@ When `isDev` is true, the **צינור נתונים** panel runs OData sync:
 | 7 | יצירת עדכון | `emit_knesset_run_update` from pending diffs → homepage `site_updates` (editable in UI) |
 
 - **התחל סנכרון מלא** runs stages 1–7 sequentially via `POST /api/knesset/pipeline/stage`
-- Stage 6 no longer emits the ticker itself in the edit UI — it only records membership/appointment field diffs. Stage 7 generates the Hebrew headline and shows an editable textarea (**שמור כותרת** → `POST /api/knesset/site-update`). CLI `sync_all` still emits immediately after positions sync (see [PiplinesPage.md](./PiplinesPage.md))
+- Stage 6 no longer emits the ticker itself in the edit UI — it only records membership/appointment field diffs. Stage 7 generates the Hebrew headline and shows an editable textarea (**שמור כותרת** → `POST /api/knesset/site-update`). CLI / GitHub Actions `load_all_knesset_data.py` (`sync_all`) still emits immediately after positions sync when membership/appointment fields changed (see [PiplinesPage.md](./PiplinesPage.md))
+- Production schedule: weekly Saturday midnight Israel via `.github/workflows/knesset-pipeline.yml` (writes are insert/update-only; unchanged rows skipped; curated faction fields never overwritten)
 - While running, the active stage row is highlighted with a spinner; each stage shows its own elapsed time, and the status line also shows total run time (`usePipelineRunProgress`)
 - Per-stage **הרץ** buttons run a single stage. Standalone stage 7 needs a prior stage 6 that left pending changes
 - Post-sync: **בדוק קישורי סיעות** / **החל קישורי סיעות** (`fix_faction_links_all` logic)

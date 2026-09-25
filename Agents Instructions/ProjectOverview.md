@@ -60,7 +60,7 @@ StateoftheNation2.0/
 │   ├── Elections/           # Candidate enrichment pipeline
 │   ├── knesset/             # Knesset OData sync
 │   └── Polls/               # Wikipedia polls → aggregates
-├── .github/workflows/       # Scheduled polls pipeline
+├── .github/workflows/       # Scheduled polls (daily) + knesset (weekly) pipelines
 ├── next.config.ts
 ├── package.json
 └── .env                     # Secrets (not committed)
@@ -103,9 +103,9 @@ Page UI lives in `src/views/*` (and `src/App.tsx` for home). App Router `page.ts
 
 | Folder | Purpose |
 |--------|---------|
-| `knesset/` | OData sync (`load_all_knesset_data.py`), office KPI seed (`seed_office_dashboard.py`), faction fixes, images |
+| `knesset/` | OData sync (`load_all_knesset_data.py`); weekly GitHub Actions cron; office KPI seed (`seed_office_dashboard.py`), faction fixes, images |
 | `Elections/` | Candidate list pipeline + `run_party_pipeline_api.py` |
-| `Polls/` | Wikipedia scrape → normalize → aggregates; GitHub Actions cron |
+| `Polls/` | Wikipedia scrape → normalize → aggregates; daily GitHub Actions cron |
 | (shared) | `record_pipeline_run.py` (ops log) · `emit_site_updates.py` (homepage ticker) |
 
 These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Local Next Route Handlers spawn Python only when `NODE_ENV=development` or `ENABLE_PIPELINE_API=1`.

@@ -8,14 +8,19 @@ export const knessetPipeline: PipelineDoc = {
   status: 'live',
   docsPath: '/piplines/docs/knesset',
   editPath: '/knesset/edit',
-  schedule: { label: 'לא נקבע עדיין' },
+  schedule: {
+    label: 'כל יום שבת בחצות · 00:00 שעון ישראל',
+    cron: '0 21 * * 5',
+    timezone: 'Asia/Jerusalem',
+  },
   sections: [
     {
       id: 'overview',
       title: 'סקירה',
       paragraphs: [
         'תהליך הסנכרון שולף נתונים מ-Knesset OData API, ממפה שדות לטבלאות היעד, ומעדכן רשומות לפי מפתח ייחודי לכל טבלה.',
-        'התיעוד כאן מתמקד במקור הנתונים, בזרימת העיבוד ובמבנה המידע שמגיע לאתר.',
+        'הכתיבה היא insert לשורות חדשות ועדכון רק כששדות ה-OData השתנו — אין מחיקות ואין כתיבה מחדש לשורות זהות. שדות ידניים (צבע סיעה, קואליציה וכו׳) לא נדרסים.',
+        'הצינור רץ כל יום שבת בחצות שעון ישראל ב-GitHub Actions (21:00 UTC ביום שישי בקיץ).',
       ],
     },
     {
@@ -74,19 +79,16 @@ export const knessetPipeline: PipelineDoc = {
       id: 'run',
       title: 'הרצה',
       paragraphs: [
-        'הסקריפט נמצא ב-Layer 1 - Gathering Data/knesset/. אפשר להריץ סנכרון מלא, סנכרון לטבלה בודדת, או מצב בדיקה לשדות שמגיעים מה-API.',
+        'הסקריפט נמצא ב-Layer 1 - Gathering Data/knesset/. סנכרון מלא רץ אוטומטית פעם בשבוע, ואפשר גם להריץ ידנית סנכרון מלא, טבלה בודדת, או מצב בדיקה לשדות שמגיעים מה-API.',
       ],
-      code: `# סנכרון מלא
-python sync_knesset_data.py
+      code: `# סנכרון מלא (גם מה ש-GitHub Actions מריץ)
+python load_all_knesset_data.py
 
 # טבלה בודדת
-python sync_knesset_data.py --table people
+python load_all_knesset_data.py --table people
 
 # בדיקת שדות מה-API
-python sync_knesset_data.py --discover
-
-# איתור שמות ישויות חסרות (כנסות / ממשלות)
-python sync_knesset_data.py --probe`,
+python load_all_knesset_data.py --discover`,
     },
     {
       id: 'related',
@@ -105,7 +107,7 @@ python sync_knesset_data.py --probe`,
       title: 'עדכון לפס החדשות בדף הבית',
       paragraphs: [
         'שלב 7 בצינור העריכה (יצירת עדכון) קורא לכלי המשותף לעדכוני האתר. שלב 6 משווה חברויות ומינויים לפני ואחרי ושומר שינויים ממתינים; שלב 7 מייצר מהם כותרת עברית לפס החדשות עם קישור לעמוד הכנסת.',
-        'בממשק העריכה אפשר לראות את הכותרת שנוצרה, לערוך אותה ולשמור מחדש. ריצות CLI ממשיכות לפלוט את העדכון אוטומטית בסיום סנכרון החברויות והמינויים.',
+        'בממשק העריכה אפשר לראות את הכותרת שנוצרה, לערוך אותה ולשמור מחדש. ריצות CLI ו-GitHub Actions פולטות את העדכון אוטומטית בסיום סנכרון החברויות והמינויים — רק כשיש diff אמיתי בשדות האלה (לא על הוספת אדם/סיעה בלבד).',
         'בלי שינוי אמיתי או בכשל ביצירת הכותרת — אין כתיבה לפס; הסנכרון עצמו לא נפגע.',
       ],
     },

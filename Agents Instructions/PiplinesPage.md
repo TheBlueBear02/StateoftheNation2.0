@@ -54,7 +54,7 @@ Schedules today:
 | Pipeline | Schedule label |
 |----------|----------------|
 | Polls | כל יום בחצות · 00:00 שעון ישראל (`0 21 * * *` UTC) |
-| Knesset | לא נקבע עדיין |
+| Knesset | כל יום שבת בחצות · 00:00 שעון ישראל (`0 21 * * 5` UTC) |
 | Elections candidates | לא נקבע עדיין |
 
 ## `pipeline_runs`
@@ -62,6 +62,7 @@ Schedules today:
 Anon **read**; service-role **write**. Writers:
 
 - Polls CLI (`run_polls_pipeline.py`) — `source` from `PIPELINE_RUN_SOURCE` (default `cli`; GitHub Actions sets `github-actions`)
+- Knesset CLI (`load_all_knesset_data.py`) — same `PIPELINE_RUN_SOURCE` convention
 - Polls / Knesset UI APIs — `source=ui`
 
 Polls edit UI (`/elections/polls/edit`) also shows a **diagnostics console** fed by `diagnostics` from `run_polls_pipeline_api.py` (rejected staging rows, parse/validation warnings), plus **stage 7** (`יצירת עדכון`) that emits a homepage ticker row and lets you edit/save the headline. Knesset edit UI (`/knesset/edit`) has the same stage-7 pattern: stage 6 records position diffs; stage 7 emits and exposes the editable headline.
@@ -99,7 +100,7 @@ Thin collectors already wired:
 
 Finish sequence for orchestrators: domain work → `record_pipeline_run` → **emit site update only if the run produced new/changed data** (e.g. new polls inserted, knesset position field diffs, new election candidates). Do not call emit on no-op successful runs.
 
-Apply `schema_site_updates.sql` in the Supabase SQL editor. Scheduled polls runs need `OPENAI_API_KEY` as a GitHub Actions secret (missing key skips emit).
+Apply `schema_site_updates.sql` in the Supabase SQL editor. Scheduled polls and knesset runs need `OPENAI_API_KEY` as a GitHub Actions secret (missing key skips emit).
 
 ## Adding a New Pipeline
 

@@ -69,7 +69,7 @@ The central person record. Every MK, minister, and election candidate across all
 | `is_current` | boolean | Whether the person is a current MK — from `KNS_Person.IsCurrent` (OData mirror). Public pages do **not** rely on this; they use membership/appointment date ranges. |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_Person`. Enriched by `enrich_wikidata.py` for election candidates (including `wikidata_id`). Upserted on `knesset_person_id`.
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_Person`. Enriched by `enrich_wikidata.py` for election candidates (including `wikidata_id`). Upserted on `knesset_person_id`.
 
 **Notes:**
 - `knesset_person_id` is null for persons created by the election pipeline (new candidates never in a Knesset). These rows are created by `resolve_candidates.py` with only `full_name` set.
@@ -92,7 +92,7 @@ One row per Knesset term (הכנסת ה-1 through the current Knesset).
 | `is_active` | boolean | True for the current Knesset |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_KnessetDates`. That entity stores individual plenum sessions (multiple rows per Knesset), so the sync script aggregates: `start_date = MIN(PlenumStart)`, `end_date = MAX(PlenumFinish)`, grouped by `KnessetNum`. The entity `KNS_Knesset` does not exist in the live API.
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_KnessetDates`. That entity stores individual plenum sessions (multiple rows per Knesset), so the sync script aggregates: `start_date = MIN(PlenumStart)`, `end_date = MAX(PlenumFinish)`, grouped by `KnessetNum`. The entity `KNS_Knesset` does not exist in the live API.
 
 **Used by:** `knesset_memberships`, `knesset_factions`, `governments`. Frontend Knesset picker dropdown.
 
@@ -117,7 +117,7 @@ Parliamentary factions within a specific Knesset session. A faction is the post-
 | `logo_url` | text | Party logo URL — manually set (faction branding; separate from ballot `election_parties.logo_url`) |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_Faction`. Upserted on `knesset_faction_id`. Fields NOT provided by the OData API and never overwritten by the sync: `color`, `logo_url`, `short_name`, `is_coalition`.
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_Faction`. Upserted on `knesset_faction_id`. Fields NOT provided by the OData API and never overwritten by the sync: `color`, `logo_url`, `short_name`, `is_coalition`.
 
 **Notes:**
 - The sync script uses `FinishDate` (not `EndDate`) from the OData API.
@@ -143,7 +143,7 @@ Records each person's membership as an MK in a specific Knesset, within a specif
 | `committee_role` | text | Committee role — rarely populated |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_PersonToPosition`, filtered to `PositionID IN (43, 61)`:
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_PersonToPosition`, filtered to `PositionID IN (43, 61)`:
 - `43` = חבר הכנסת (male MK) — confirmed from live `KNS_Position` table
 - `61` = חברת הכנסת (female MK) — confirmed from live `KNS_Position` table
 
@@ -172,7 +172,7 @@ One row per Israeli government (ממשלה).
 | `is_active` | boolean | True for the current government |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py`. No `KNS_Government` endpoint exists in the Knesset OData API — government numbers are derived from unique `GovernmentNum` values in `KNS_PersonToPosition`. The loader does not overwrite government metadata, so `knesset_id`, `start_date`, and `end_date` must be curated manually when available. The Government page tolerates missing or misaligned historical dates by falling back from `governments.end_date` to the latest appointment date inside the selected government, and resolves minister faction data from each person's latest known-faction Knesset membership before the government snapshot date rather than relying only on `governments.knesset_id`.
+**Data source:** `load_all_knesset_data.py`. No `KNS_Government` endpoint exists in the Knesset OData API — government numbers are derived from unique `GovernmentNum` values in `KNS_PersonToPosition`. The loader does not overwrite government metadata, so `knesset_id`, `start_date`, and `end_date` must be curated manually when available. The Government page tolerates missing or misaligned historical dates by falling back from `governments.end_date` to the latest appointment date inside the selected government, and resolves minister faction data from each person's latest known-faction Knesset membership before the government snapshot date rather than relying only on `governments.knesset_id`.
 
 ---
 
@@ -194,7 +194,7 @@ Government ministries (משרדי ממשלה).
 | `is_shown` | boolean | Whether to show on the dashboard |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override. Frontend prefers `knesset_category_name`, then `name`.
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override. Frontend prefers `knesset_category_name`, then `name`.
 
 ---
 
@@ -216,7 +216,7 @@ Records each person's ministerial appointment in a specific government.
 | `duty_desc` | text | Role description from OData |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `sync_knesset_data.py` → Knesset OData `KNS_PersonToPosition`, filtered to rows where both `GovernmentNum` and `GovMinistryID` are non-null (ministerial roles).
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_PersonToPosition`, filtered to rows where both `GovernmentNum` and `GovMinistryID` are non-null (ministerial roles).
 
 **Notes:**
 - `end_date` comes from `FinishDate` (not `EndDate`) in the OData API.
@@ -639,14 +639,14 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 
 | Script | Tables updated | Trigger |
 |--------|---------------|---------|
-| `sync_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Weekly (GitHub Actions) |
+| `load_all_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Weekly Saturday midnight Israel (GitHub Actions: `.github/workflows/knesset-pipeline.yml`) |
 | `seed_office_dashboard.py` | `offices.is_shown` / `info` · `indexes` · `index_data` | Manual — migrate curated KPI data from old sn.db |
 | `insert_raw_list.py` | `raw_candidate_lists` | Manual — when a party publishes their list |
 | `run_pipeline.py` | `election_candidates` · `people` (enrichment) | Manual — after each `insert_raw_list.py` run |
 | `run_polls_pipeline.py` | `polls` · `poll_results` · `poll_aggregates` · `raw_poll_rows` | Daily midnight Israel (GitHub Actions) |
 | `link_factions.py` | `election_parties.knesset_faction_id` | Post-election — once per election |
 
-All sync writes are upserts. No script deletes data except `insert_raw_list.py` which removes `processed=false` rows for a party when re-inserting an updated list.
+All Knesset OData sync writes insert new keys and update only when synced fields changed (unchanged rows are skipped). No sync script deletes Knesset rows. The only delete path among sync scripts is `insert_raw_list.py`, which removes `processed=false` rows for a party when re-inserting an updated list.
 
 ---
 

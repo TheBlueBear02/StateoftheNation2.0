@@ -10,17 +10,19 @@ Tables updated:
   offices  · governments · minister_appointments
 
 Usage:
-  python sync_knesset_data.py                        # full sync
-  python sync_knesset_data.py --discover             # all known entities
-  python sync_knesset_data.py --discover KNS_Position  # one entity only
-  python sync_knesset_data.py --table people         # sync one table only
+  python load_all_knesset_data.py                        # full sync
+  python load_all_knesset_data.py --discover             # all known entities
+  python load_all_knesset_data.py --discover KNS_Position  # one entity only
+  python load_all_knesset_data.py --table people         # sync one table only
 
 Requirements:
-  pip install requests supabase python-dotenv
+  pip install -r requirements.txt
 
 Env vars (.env or shell):
   SUPABASE_URL         — Supabase project URL
   SUPABASE_SERVICE_KEY — service role key (NOT the anon key)
+  OPENAI_API_KEY       — optional; homepage ticker after membership/appointment diffs
+  PIPELINE_RUN_SOURCE  — optional; default cli (GitHub Actions sets github-actions)
 
 Field name corrections vs v1 (from live API discovery):
   - KNS_Faction / KNS_PersonToPosition: EndDate → FinishDate
@@ -49,6 +51,7 @@ from emit_site_updates import (  # noqa: E402
     emit_knesset_run_update,
     snapshot_knesset_positions,
 )
+from record_pipeline_run import record_pipeline_run  # noqa: E402
 
 load_dotenv()
 
@@ -289,6 +292,78 @@ def run_probe() -> None:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _empty_write_stats(table: str) -> dict:
+    return {
+        "table": table,
+        "upserted": 0,
+        "inserted": 0,
+        "updated": 0,
+        "skipped": 0,
+    }
+
+
+def _normalize_compare_value(value):
+    """Normalize DB/OData values so format noise does not force false updates."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    text = str(value).strip()
+    if not text:
+        return None
+    # Timestamps / dates from PostgREST → compare on calendar date when present.
+    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+        return text[:10]
+    if text.lower() in ("true", "false"):
+        return text.lower() == "true"
+    return text
+
+
+def _row_fields_equal(incoming: dict, existing: dict, fields: list[str]) -> bool:
+    for field in fields:
+        left = _normalize_compare_value(incoming.get(field))
+        right = _normalize_compare_value(existing.get(field))
+        if left != right:
+            return False
+    return True
+
+
+def load_existing_rows(
+    sb: Client,
+    table: str,
+    conflict_col: str,
+    columns: list[str],
+) -> dict:
+    """
+    Return {conflict_col_value → row dict} for every row in the table.
+    Paginates past Supabase's 1000-row default limit.
+    """
+    select_cols = ", ".join(dict.fromkeys([conflict_col, *columns]))
+    result: dict = {}
+    page_size = 1000
+    offset = 0
+    while True:
+        rows = (
+            sb.table(table)
+            .select(select_cols)
+            .range(offset, offset + page_size - 1)
+            .execute()
+            .data
+        )
+        for row in rows:
+            key = row.get(conflict_col)
+            if key is not None:
+                result[key] = row
+        if len(rows) < page_size:
+            break
+        offset += page_size
+    return result
+
+
 def upsert(
     sb: Client,
     table: str,
@@ -296,43 +371,78 @@ def upsert(
     conflict_col: str,
     existing_keys: set | None = None,
 ) -> dict:
+    """
+    Insert new keys; update existing rows only when synced fields changed;
+    skip identical rows. Never deletes.
+    """
     if not rows:
         log.info("  → %s: nothing to upsert", table)
-        return {
-            "table": table,
-            "upserted": 0,
-            "inserted": 0,
-            "updated": 0,
-        }
+        return _empty_write_stats(table)
 
+    # Union of payload keys (except conflict) — used for compare + update bodies.
+    compare_fields: list[str] = []
+    seen_fields: set[str] = set()
+    for row in rows:
+        for key in row:
+            if key == conflict_col or key in seen_fields:
+                continue
+            seen_fields.add(key)
+            compare_fields.append(key)
+
+    existing_rows = load_existing_rows(sb, table, conflict_col, compare_fields)
     if existing_keys is None:
-        existing_keys = set(load_id_map(sb, table, conflict_col).keys())
+        existing_keys = set(existing_rows.keys())
 
-    inserted = 0
-    updated = 0
+    to_insert: list[dict] = []
+    to_update: list[dict] = []
+    skipped = 0
+
     for row in rows:
         key = row.get(conflict_col)
         if key is None:
             continue
-        if key in existing_keys:
-            updated += 1
-        else:
-            inserted += 1
+        if key not in existing_keys:
+            to_insert.append(row)
+            continue
+        existing = existing_rows.get(key)
+        if existing is None:
+            # Caller marked key as existing (e.g. just written in an earlier
+            # pass) but we have no prior snapshot — conflict-upsert as update.
+            to_update.append(row)
+            continue
+        fields = [f for f in row.keys() if f != conflict_col]
+        if _row_fields_equal(row, existing, fields):
+            skipped += 1
+            continue
+        to_update.append(row)
 
-    for i in range(0, len(rows), 500):
-        sb.table(table).upsert(rows[i:i + 500], on_conflict=conflict_col).execute()
+    for i in range(0, len(to_insert), 500):
+        sb.table(table).insert(to_insert[i:i + 500]).execute()
+
+    # Targeted upsert only for rows whose synced fields actually changed.
+    for i in range(0, len(to_update), 500):
+        sb.table(table).upsert(
+            to_update[i:i + 500],
+            on_conflict=conflict_col,
+        ).execute()
+
+    inserted = len(to_insert)
+    updated = len(to_update)
+    written = inserted + updated
     log.info(
-        "  → %s: upserted %d rows (%d new, %d updated)",
+        "  → %s: wrote %d rows (%d new, %d updated, %d skipped unchanged)",
         table,
-        len(rows),
+        written,
         inserted,
         updated,
+        skipped,
     )
     return {
         "table": table,
-        "upserted": len(rows),
+        "upserted": written,
         "inserted": inserted,
         "updated": updated,
+        "skipped": skipped,
     }
 
 
@@ -525,7 +635,7 @@ def sync_governments(sb: Client) -> dict[int, int]:
     return gov_map
 
 
-def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map: dict, gov_map: dict, office_map: dict) -> None:
+def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map: dict, gov_map: dict, office_map: dict) -> dict:
     """
     Fetches KNS_PersonToPosition ONCE and writes to both:
       - knesset_memberships  (rows where PositionID in MK_POSITION_IDS)
@@ -547,7 +657,7 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
     if not mk_positions:
         log.warning(
             "  ⚠ Zero MK rows found! MK_POSITION_IDS %s may be wrong.\n"
-            "    Run: python sync_knesset_data.py --discover\n"
+            "    Run: python load_all_knesset_data.py --discover\n"
             "    and check KNS_Position output for the correct PositionID for חבר כנסת.",
             MK_POSITION_IDS,
         )
@@ -592,6 +702,12 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
         "knesset_position_id",
         membership_existing,
     )
+    # Keys just written in pass 1 must count as existing for faction_id pass 2,
+    # otherwise partial inserts (position_id + faction_id only) would be attempted.
+    for row in membership_rows:
+        key = row.get("knesset_position_id")
+        if key is not None:
+            membership_existing.add(key)
 
     # Pass 2: upsert faction links only where OData has a value
     faction_stats = {
@@ -599,6 +715,7 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
         "upserted": 0,
         "inserted": 0,
         "updated": 0,
+        "skipped": 0,
     }
     if faction_updates:
         faction_stats = upsert(
@@ -662,24 +779,56 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
 
 # ── Full sync ─────────────────────────────────────────────────────────────────
 
-def sync_all(sb: Client) -> None:
+def sync_all(sb: Client) -> dict:
     start = datetime.now()
     log.info("═══ Knesset OData full sync — %s ═══", start.strftime("%Y-%m-%d %H:%M"))
 
-    knesset_map, _ = sync_knessets(sb)
-    people_map, _ = sync_people(sb)
-    faction_map, _ = sync_factions(sb, knesset_map)
-    office_map, _ = sync_offices(sb)
+    knesset_map, knesset_stats = sync_knessets(sb)
+    people_map, people_stats = sync_people(sb)
+    faction_map, faction_stats = sync_factions(sb, knesset_map)
+    office_map, office_stats = sync_offices(sb)
     gov_map = sync_governments(sb)
     before = snapshot_knesset_positions(sb)
-    sync_positions(sb, people_map, knesset_map, faction_map, gov_map, office_map)
+    position_stats = sync_positions(
+        sb, people_map, knesset_map, faction_map, gov_map, office_map
+    )
     after = snapshot_knesset_positions(sb)
     changes = diff_knesset_positions(before, after)
+    site_update = None
     if changes:
-        emit_knesset_run_update(sb, changes=changes)
+        site_update = emit_knesset_run_update(sb, changes=changes)
+        if site_update:
+            log.info(
+                "site_updates: emitted headline — %s",
+                site_update.get("headline"),
+            )
+        else:
+            log.info(
+                "site_updates: changes found but emit skipped "
+                "(missing OPENAI_API_KEY or API error)"
+            )
+    else:
+        log.info("site_updates: skipped — no membership/appointment field diffs")
 
     elapsed = (datetime.now() - start).seconds
     log.info("═══ Sync complete in %dm %ds ═══", elapsed // 60, elapsed % 60)
+
+    stages = [
+        knesset_stats,
+        people_stats,
+        faction_stats,
+        office_stats,
+        position_stats["knesset_memberships"],
+        position_stats["knesset_memberships_faction_id"],
+        position_stats["minister_appointments"],
+    ]
+    return {
+        "elapsed_seconds": elapsed,
+        "stages": stages,
+        "change_count": len(changes),
+        "site_update_emitted": bool(site_update),
+        "site_update": site_update,
+    }
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -714,34 +863,107 @@ def main():
         return
 
     sb = get_supabase()
+    start = datetime.now()
+    run_error: str | None = None
+    exit_code = 0
+    summary: dict | None = None
+    action = f"table-{args.table}" if args.table else "sync-full"
+    site_update_emitted = False
 
-    if args.table:
-        log.info("Single-table sync: %s", args.table)
-        km = load_id_map(sb, "knessets",        "knesset_number")
-        pm = load_id_map(sb, "people",           "knesset_person_id")
-        fm = load_id_map(sb, "knesset_factions", "knesset_faction_id")
-        gm = load_id_map(sb, "governments",      "government_number")
-        om = load_id_map(sb, "offices",          "knesset_category_id")
+    try:
+        if args.table:
+            log.info("Single-table sync: %s", args.table)
+            km = load_id_map(sb, "knessets",        "knesset_number")
+            pm = load_id_map(sb, "people",           "knesset_person_id")
+            fm = load_id_map(sb, "knesset_factions", "knesset_faction_id")
+            gm = load_id_map(sb, "governments",      "government_number")
+            om = load_id_map(sb, "offices",          "knesset_category_id")
 
-        def sync_positions_with_emit() -> None:
-            before = snapshot_knesset_positions(sb)
-            sync_positions(sb, pm, km, fm, gm, om)
-            after = snapshot_knesset_positions(sb)
-            changes = diff_knesset_positions(before, after)
-            if changes:
-                emit_knesset_run_update(sb, changes=changes)
+            def sync_positions_with_emit() -> dict:
+                before = snapshot_knesset_positions(sb)
+                position_stats = sync_positions(sb, pm, km, fm, gm, om)
+                after = snapshot_knesset_positions(sb)
+                changes = diff_knesset_positions(before, after)
+                emitted = False
+                if changes:
+                    site_update = emit_knesset_run_update(sb, changes=changes)
+                    emitted = bool(site_update)
+                    if site_update:
+                        log.info(
+                            "site_updates: emitted headline — %s",
+                            site_update.get("headline"),
+                        )
+                    else:
+                        log.info(
+                            "site_updates: changes found but emit skipped "
+                            "(missing OPENAI_API_KEY or API error)"
+                        )
+                else:
+                    log.info(
+                        "site_updates: skipped — no membership/appointment field diffs"
+                    )
+                return {
+                    "stages": [
+                        position_stats["knesset_memberships"],
+                        position_stats["knesset_memberships_faction_id"],
+                        position_stats["minister_appointments"],
+                    ],
+                    "change_count": len(changes),
+                    "site_update_emitted": emitted,
+                }
 
-        {
-            "knessets":              lambda: sync_knessets(sb),
-            "people":                lambda: sync_people(sb),
-            "knesset_factions":      lambda: sync_factions(sb, km),
-            "offices":               lambda: sync_offices(sb),
-            "governments":           lambda: sync_governments(sb),
-            "knesset_memberships":   sync_positions_with_emit,
-            "minister_appointments": sync_positions_with_emit,
-        }[args.table]()
+            runners = {
+                "knessets":              lambda: {"stages": [sync_knessets(sb)[1]]},
+                "people":                lambda: {"stages": [sync_people(sb)[1]]},
+                "knesset_factions":      lambda: {
+                    "stages": [sync_factions(sb, km)[1]]
+                },
+                "offices":               lambda: {"stages": [sync_offices(sb)[1]]},
+                "governments":           lambda: {
+                    "stages": [],
+                    "note": (
+                        f"loaded {len(sync_governments(sb))} governments "
+                        "(no OData write)"
+                    ),
+                },
+                "knesset_memberships":   sync_positions_with_emit,
+                "minister_appointments": sync_positions_with_emit,
+            }
+            summary = runners[args.table]()
+            site_update_emitted = bool(summary.get("site_update_emitted"))
+        else:
+            summary = sync_all(sb)
+            site_update_emitted = bool(summary.get("site_update_emitted"))
+    except Exception as exc:
+        exit_code = 1
+        run_error = str(exc)
+        log.exception("Knesset sync failed: %s", exc)
+
+    elapsed = (datetime.now() - start).seconds
+    source = os.environ.get("PIPELINE_RUN_SOURCE", "cli")
+    status = "success" if exit_code == 0 else "error"
+    if site_update_emitted:
+        ticker_note = "site_updates emitted"
+    elif exit_code == 0:
+        ticker_note = "site_updates skipped"
     else:
-        sync_all(sb)
+        ticker_note = "site_updates not attempted"
+    message = (
+        f"Knesset {action} finished in {elapsed}s "
+        f"(exit {exit_code}; {ticker_note})"
+    )
+    record_pipeline_run(
+        sb,
+        pipeline="knesset",
+        action=action,
+        status=status,
+        message=message,
+        error=run_error,
+        summary=summary,
+        source=source,
+        started_at=start,
+    )
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
