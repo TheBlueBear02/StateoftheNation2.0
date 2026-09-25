@@ -53,10 +53,10 @@ async function fetchAllIndexData(
   return { rows, error: null }
 }
 
-/** Curated quadrant order (matches old site desired_order [3,2,5,4]). */
+/** Curated quadrant order — National Security first on open / picker. */
 export const OFFICE_DASHBOARD_DISPLAY_ORDER: string[] = [
-  'תחבורה',
   'ביטחון לאומי',
+  'תחבורה',
   'אוצר',
   'חינוך',
 ]

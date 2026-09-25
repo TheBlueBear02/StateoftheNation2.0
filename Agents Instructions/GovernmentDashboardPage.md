@@ -60,7 +60,7 @@ Shareable chart deep links: `/government/dashboard?office=<officeId>&index=<inde
 
 ### Display order
 
-Client-side via `OFFICE_DASHBOARD_DISPLAY_ORDER` in `fetchOfficeDashboard.ts` (name substring match): תחבורה → ביטחון לאומי → אוצר → חינוך (matches old desired order `[3,2,5,4]`). Display titles prefer `offices.name` over short `knesset_category_name` labels.
+Client-side via `OFFICE_DASHBOARD_DISPLAY_ORDER` in `fetchOfficeDashboard.ts` (name substring match): ביטחון לאומי → תחבורה → אוצר → חינוך (National Security first on open / default selection). Display titles prefer `offices.name` over short `knesset_category_name` labels.
 
 ### Queries
 
