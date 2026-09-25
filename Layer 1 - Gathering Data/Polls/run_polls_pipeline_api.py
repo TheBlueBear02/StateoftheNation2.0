@@ -448,7 +448,8 @@ def run_stage(
             processed = int(stats.get("processed", 0))
             inserted = int(stats.get("inserted", 0))
             updated = int(stats.get("updated", 0))
-            if processed == 0:
+            rejected = int(stats.get("rejected", 0))
+            if processed == 0 and rejected == 0:
                 message = "אין שורות ממתינות לנרמול"
                 extra_lines.append(
                     "INFO  stage 4  normalized 0 polls "
@@ -458,6 +459,12 @@ def run_stage(
                 message = (
                     f"נורמלו {processed} סקרים ({inserted} חדשים, {updated} עודכנו)"
                 )
+                if rejected:
+                    message += f", נדחו {rejected}"
+                    extra_lines.append(
+                        f"WARNING  stage 4  rejected {rejected} raw row(s) "
+                        "(bad seat sum or date parse)"
+                    )
             summary = make_run_summary(
                 [
                     make_stage_summary(

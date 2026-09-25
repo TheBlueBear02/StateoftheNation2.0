@@ -29,7 +29,7 @@ export const elections2026PollsPipeline: PipelineDoc = {
         '1. fetch_wikipedia — MediaWiki parse + revid cache',
         '2. parse_poll_tables — ברירת מחדל: טבלת Seat projections העדכנית בלבד; --backfill לכל הטבלאות/דפים',
         '3. resolve_poll_parties — מיפוי תוויות אנגלית דרך poll_party_aliases',
-        '4. normalize_polls — polls + poll_results, supersede logic',
+        '4. normalize_polls — polls + poll_results; דוחה סקרים רגילים עם סכום מנדטים מחוץ ל־±1 מ־120',
         '5. compute_aggregates — last3 + weighted (30 יום אחרונים)',
         '6. validate_polls — שערים על סקרים אחרונים (או היסטוריה מלאה ב-backfill)',
         '7. יצירת עדכון — כותרת לפס החדשות בדף הבית (site_updates; ניתן לעריכה בממשק)',

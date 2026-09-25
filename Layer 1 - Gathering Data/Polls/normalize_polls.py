@@ -13,6 +13,10 @@ from db import get_election_id, get_supabase, resolve_publisher_id, resolve_poll
 
 log = logging.getLogger(__name__)
 
+# Match validate_polls: |sum − 120| ≤ 1 is soft; anything wider is rejected here
+# so bad Wikipedia rows never land in `polls` and fail nightly CI forever.
+SEAT_SUM_HARD_TOLERANCE = 1
+
 MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
     "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
@@ -257,8 +261,68 @@ def dedupe_polls(sb: Client, election_id: int) -> int:
     return deleted
 
 
+def _merge_resolved_results(
+    resolved_parties: dict[str, int],
+    party_results: dict,
+) -> list[dict]:
+    """Collapse Wikipedia columns that resolve to the same party_id."""
+    by_party: dict[int, dict] = {}
+    for label, party_id in resolved_parties.items():
+        pr = party_results.get(label, {}) if isinstance(party_results, dict) else {}
+        incoming = {
+            "party_id": party_id,
+            "seats": pr.get("seats"),
+            "vote_share": pr.get("vote_share"),
+            "below_threshold": pr.get("below_threshold"),
+        }
+        existing = by_party.get(party_id)
+        if existing is None:
+            by_party[party_id] = incoming
+            continue
+
+        # Multiple Wikipedia columns can resolve to the same party
+        # (e.g. alternate spellings of one label). Sum seats; never let a
+        # below-threshold column wipe a seat count from a sibling column.
+        seats_a = existing.get("seats")
+        seats_b = incoming.get("seats")
+        if seats_a is not None and seats_b is not None:
+            seats = seats_a + seats_b
+        elif seats_a is not None:
+            seats = seats_a
+        else:
+            seats = seats_b
+
+        vote_share = existing.get("vote_share")
+        if vote_share is None:
+            vote_share = incoming.get("vote_share")
+
+        below = None
+        if seats is None:
+            below = bool(
+                existing.get("below_threshold") or incoming.get("below_threshold")
+            ) or None
+
+        by_party[party_id] = {
+            "party_id": party_id,
+            "seats": seats,
+            "vote_share": vote_share,
+            "below_threshold": below,
+        }
+    return list(by_party.values())
+
+
+def _regular_seat_sum_error(results: list[dict], *, is_scenario: bool) -> str | None:
+    """Hard-reject regular polls whose seats are not ~120 (scenarios exempt)."""
+    if is_scenario:
+        return None
+    seat_sum = sum(r.get("seats") or 0 for r in results)
+    if abs(seat_sum - 120) > SEAT_SUM_HARD_TOLERANCE:
+        return f"seat sum is {seat_sum}, expected 120"
+    return None
+
+
 def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
-    """Normalize pending raw rows. Returns counts: processed, inserted, updated."""
+    """Normalize pending raw rows. Returns counts: processed, inserted, updated, rejected."""
     election_id = get_election_id(sb)
     pending = (
         sb.table("raw_poll_rows")
@@ -271,6 +335,7 @@ def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
     processed = 0
     inserted = 0
     updated = 0
+    rejected = 0
     last_end_by_section: dict[str, date] = {}
 
     for row in pending:
@@ -290,6 +355,7 @@ def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
                     "status": "rejected",
                     "error": str(exc),
                 }).eq("id", row["id"]).execute()
+            rejected += 1
             continue
 
         section = row.get("section", "")
@@ -303,6 +369,21 @@ def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
         sample_size = _parse_int(payload.get("sample_raw", ""))
         is_scenario = bool(payload.get("is_scenario", False))
         scenario_desc = payload.get("scenario_desc")
+
+        merged = _merge_resolved_results(
+            payload["resolved_parties"],
+            payload.get("party_results") or {},
+        )
+        seat_err = _regular_seat_sum_error(merged, is_scenario=is_scenario)
+        if seat_err:
+            log.warning("Rejecting raw row %d: %s", row["id"], seat_err)
+            if not dry_run:
+                sb.table("raw_poll_rows").update({
+                    "status": "rejected",
+                    "error": seat_err,
+                }).eq("id", row["id"]).execute()
+            rejected += 1
+            continue
 
         if dry_run:
             pollster_id, pollster_he = None, None
@@ -360,52 +441,7 @@ def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
             poll_id = result.data[0]["id"]
             inserted += 1
 
-        results = []
-        by_party: dict[int, dict] = {}
-        for label, party_id in payload["resolved_parties"].items():
-            pr = payload["party_results"].get(label, {})
-            incoming = {
-                "poll_id": poll_id,
-                "party_id": party_id,
-                "seats": pr.get("seats"),
-                "vote_share": pr.get("vote_share"),
-                "below_threshold": pr.get("below_threshold"),
-            }
-            existing = by_party.get(party_id)
-            if existing is None:
-                by_party[party_id] = incoming
-                continue
-
-            # Multiple Wikipedia columns can resolve to the same party
-            # (e.g. alternate spellings of one label). Sum seats; never let a
-            # below-threshold column wipe a seat count from a sibling column.
-            seats_a = existing.get("seats")
-            seats_b = incoming.get("seats")
-            if seats_a is not None and seats_b is not None:
-                seats = seats_a + seats_b
-            elif seats_a is not None:
-                seats = seats_a
-            else:
-                seats = seats_b
-
-            vote_share = existing.get("vote_share")
-            if vote_share is None:
-                vote_share = incoming.get("vote_share")
-
-            below = None
-            if seats is None:
-                below = bool(
-                    existing.get("below_threshold") or incoming.get("below_threshold")
-                ) or None
-
-            by_party[party_id] = {
-                "poll_id": poll_id,
-                "party_id": party_id,
-                "seats": seats,
-                "vote_share": vote_share,
-                "below_threshold": below,
-            }
-        results = list(by_party.values())
+        results = [{"poll_id": poll_id, **r} for r in merged]
 
         if results:
             sb.table("poll_results").insert(results).execute()
@@ -432,12 +468,18 @@ def run(sb: Client, dry_run: bool = False) -> dict[str, int]:
         dedupe_polls(sb, election_id)
 
     log.info(
-        "Normalized %d poll rows (%d inserted, %d updated)",
+        "Normalized %d poll rows (%d inserted, %d updated, %d rejected)",
         processed,
         inserted,
         updated,
+        rejected,
     )
-    return {"processed": processed, "inserted": inserted, "updated": updated}
+    return {
+        "processed": processed,
+        "inserted": inserted,
+        "updated": updated,
+        "rejected": rejected,
+    }
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 | `fetch_wikipedia.py` | 1 | MediaWiki API, revid cache |
 | `parse_poll_tables.py` | 2 | Seat projections tables → `raw_poll_rows`. Incremental mode takes **all** wikitables under the newest year subsection (e.g. `Seat projections > 2026`); `--backfill` parses every seat + scenario table |
 | `resolve_poll_parties.py` | 3 | `poll_party_aliases` lookup |
-| `normalize_polls.py` | 4 | `polls` + `poll_results` |
+| `normalize_polls.py` | 4 | `polls` + `poll_results`; rejects regular rows with `|seat_sum − 120| > 1` |
 | `compute_aggregates.py` | 5 | `last3` + `weighted` |
 | `validate_polls.py` | 6 | hard gates + ops alerts |
 | (API stage 7) | 7 | `emit_polls_run_update` → homepage `site_updates` headline (editable in UI) |
@@ -36,7 +36,7 @@ Directory: `Layer 1 - Gathering Data/Polls/`
 
 Schema: `schema_polls.sql` (base polls DDL). `pollsters` / `people.wikidata_id` / numeric KPI values are live on Supabase.
 
-Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel). Needs `OPENAI_API_KEY` secret for homepage ticker emission (missing key skips emit). Review-queue alerts create a GitHub issue without a required label (`continue-on-error`). Validation: seat sum ±1 and ops alerts (staleness/volume) log warnings but exit 0 so scheduled runs stay green; harder data errors still fail and roll back that run’s aggregates.
+Scheduling: `.github/workflows/polls-pipeline.yml` — daily at midnight Israel (`0 21 * * *` UTC; winter IST runs at 23:00 Israel). Needs `OPENAI_API_KEY` secret for homepage ticker emission (missing key skips emit). Review-queue alerts create a GitHub issue without a required label (`continue-on-error`). Normalization rejects regular (non-scenario) rows whose seat sum is outside **±1 of 120** (same hard threshold as stage 6) so bad Wikipedia rows never land in `polls`. Validation: seat sum ±1 and ops alerts (staleness/volume) log warnings but exit 0 so scheduled runs stay green; harder data errors still fail and roll back that run’s aggregates.
 
 After a successful non-error CLI run that inserted new polls, the orchestrator calls `emit_polls_run_update` (see [PiplinesPage.md](./PiplinesPage.md)) so the homepage news strip can link to `/elections/polls`. In the edit UI, that emit is **stage 7** (`יצירת עדכון`) instead of an invisible post-hook after stage 4.
 
@@ -103,9 +103,10 @@ Raw-poll historical charts use individual poll results. The aggregate-history ch
 3. Party labels resolved via time-scoped `poll_party_aliases` (never auto-created). **Any unmapped label rejects the whole raw row** — new wiki columns (e.g. Joint List / Amcha Yisrael) will make the GitHub Action look green while `polls` stops growing until aliases are seeded.
 4. **Joint List group headers** on Wikipedia span Hadash–Ta'al / Balad sub-columns — parser uses sub-column names, not the group title (`הרשימה המשותפת`)
 5. Stage 2 inserts only rows whose `(natural_key, content_hash)` is new — does not reset already-processed staging rows to `pending`. Rows with no parseable party seat cells (Wikipedia event annotations) are skipped.
-6. Aggregates recomputed for trailing 30 Jerusalem days
-7. `/elections/polls` client `usePolls(120)` (and SEO JSON-LD via `fetchPolls`) reads `polls` + `poll_results` (+ publishers/pollsters/parties) via anon key. `poll_results` are fetched in poll-id chunks of 40 so PostgREST’s ~1000-row cap does not drop the newest polls (which would empty the last-N bar chart while older complete polls still appear in trend charts). Aggregate-history chart still reads `poll_aggregates` / `party_lineage` client-side via `usePollAggregates`
-8. Stage 6 validates recent regular polls (last 45 days) by default; `--backfill` validates full history
+6. Stage 4 merges sibling columns that resolve to the same party, then **rejects** regular rows with `|seat_sum − 120| > 1` (scenarios exempt). Rejected rows stay in `raw_poll_rows` with an error and never become `polls`.
+7. Aggregates recomputed for trailing 30 Jerusalem days
+8. `/elections/polls` client `usePolls(120)` (and SEO JSON-LD via `fetchPolls`) reads `polls` + `poll_results` (+ publishers/pollsters/parties) via anon key. `poll_results` are fetched in poll-id chunks of 40 so PostgREST’s ~1000-row cap does not drop the newest polls (which would empty the last-N bar chart while older complete polls still appear in trend charts). Aggregate-history chart still reads `poll_aggregates` / `party_lineage` client-side via `usePollAggregates`
+9. Stage 6 validates recent regular polls (last 45 days) by default; `--backfill` validates full history
 
 ## Party Status Filter
 
