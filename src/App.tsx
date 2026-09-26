@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { SiteLayout } from './components/SiteLayout'
 import { ListsGamePromo } from './components/elections/ListsGamePromo'
 import { DreamGovernmentPromo } from './components/elections/DreamGovernmentPromo'
+import { HotIndexesCarousel } from './components/government/HotIndexesCarousel'
 import { useSiteUpdates } from './hooks/useSiteUpdates'
 import { useLatestPollDate } from './hooks/useLatestPollDate'
 
@@ -15,7 +16,7 @@ const HERO_BUTTONS = [
   { label: 'מדדי הממשלה', to: '/government/dashboard' },
 ] as const
 
-/** Homepage teaser for the office KPI dashboard. */
+/** Homepage live hot-indexes carousel (office KPI charts). */
 const SHOW_GOVERNMENT_DASHBOARD = true
 
 const HERO_VIDEO_SRC =
@@ -140,40 +141,9 @@ function App() {
           </aside>
         ) : null}
 
+        {SHOW_GOVERNMENT_DASHBOARD ? <HotIndexesCarousel /> : null}
+
         <DreamGovernmentPromo />
-
-        {SHOW_GOVERNMENT_DASHBOARD ? (
-          <section
-            id="government-dashboard"
-            className="project-section"
-            aria-labelledby="dashboard-title"
-          >
-            <Link href="/government/dashboard" className="project-section__link">
-              <div className="container">
-                <div className="project-section__inner">
-                  <div className="project-section__content">
-                    <h2 id="dashboard-title" className="project-section__title">
-                      מצב האומה: מדדי משרדי הממשלה לאורך זמן
-                    </h2>
-                    <span className="project-section__tag">הממשלה</span>
-                  </div>
-
-                  <div className="project-section__media" aria-hidden="true">
-                    <img
-                      src="/government-offices-homepage.png"
-                      alt=""
-                      className="project-section__image"
-                      width={384}
-                      height={423}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
-                </div>
-              </div>
-            </Link>
-          </section>
-        ) : null}
 
         <section
           id="mandate-polls"

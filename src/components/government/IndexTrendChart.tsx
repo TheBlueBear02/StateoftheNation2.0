@@ -32,6 +32,11 @@ type IndexTrendChartProps = {
   /** Use a taller viewBox on narrow screens for more vertical plot room. */
   tall?: boolean
   /**
+   * Shorter viewBox than the dashboard default (homepage carousel).
+   * Ignored when `tall` is true.
+   */
+  compact?: boolean
+  /**
    * Ignore viewport/self measurement — keep the explicit uiScale/tall props.
    * Used by the offscreen PNG export shell so mobile shares match desktop.
    */
@@ -42,6 +47,8 @@ type IndexTrendChartProps = {
 
 export const CHART_WIDTH = 960
 export const CHART_HEIGHT = 400
+/** Compact homepage / teaser charts — shorter than the dashboard default. */
+export const CHART_HEIGHT_COMPACT = 280
 /** Taller plot on phones/tablets so series + labels have room (kept moderate so chart+eras fit a phone screen). */
 export const CHART_HEIGHT_TALL = 500
 /** Below this width, use tall chart + boosted label scale. */
@@ -123,6 +130,20 @@ const WIDTH = CHART_WIDTH
 const MARGIN = CHART_MARGIN
 
 const BAR_SLOT_FILL = 0.72
+
+/** Corner radius that stays proportional on narrow bars (avoids pill tops). */
+function barCornerRadius(barW: number, barH: number, scale: number): number {
+  const ideal = 10 * scale
+  // Cap at ~22% of width so thin bars stay gently rounded, not semicircles.
+  return Math.min(ideal, barW * 0.22, barH * 0.4)
+}
+
+/** White outline that shrinks with bar width so it doesn't eat the fill. */
+function barStrokeWidth(barW: number, scale: number): number {
+  const ideal = 1.75 * scale
+  // ~12% of width, floored so hairline bars still get a faint edge.
+  return Math.min(ideal, Math.max(0.4, barW * 0.12))
+}
 const ERA_HIGHLIGHT_FALLBACK = '#4890fd'
 const ERA_HIGHLIGHT_OPACITY = 0.22
 
@@ -392,6 +413,7 @@ export function IndexTrendChart({
   highlightBands,
   uiScale: uiScaleProp,
   tall: tallProp,
+  compact = false,
   fixedLayout = false,
   onMetricsChange,
 }: IndexTrendChartProps) {
@@ -466,7 +488,11 @@ export function IndexTrendChart({
     })
   }, [fixedLayout, selfScale, selfTall, effectiveWidth, onMetricsChange])
 
-  const height = tall ? CHART_HEIGHT_TALL : CHART_HEIGHT
+  const height = tall
+    ? CHART_HEIGHT_TALL
+    : compact
+      ? CHART_HEIGHT_COMPACT
+      : CHART_HEIGHT
   // Scaled x-label fonts need a deeper bottom gutter so they sit under the bars.
   const marginBottom =
     scale > 1
@@ -527,6 +553,7 @@ export function IndexTrendChart({
     // Bars stay fully inside the plot so they never cover Y-axis labels.
     const slot = plotW / points.length
     const barW = Math.max(2, slot * BAR_SLOT_FILL)
+    const barStrokeW = barStrokeWidth(barW, scale)
     const zeroY = toY(0)
     const bars = points.map((p, i) => {
       const x = left + i * slot + (slot - barW) / 2
@@ -535,7 +562,7 @@ export function IndexTrendChart({
       const y = Math.min(yVal, zeroY)
       const h = Math.max(Math.abs(zeroY - yVal), minBarH)
       const roundTop = p.value >= 0
-      const radius = Math.min(10 * scale, barW / 2, h)
+      const radius = barCornerRadius(barW, h, scale)
       return {
         x,
         y,
@@ -608,6 +635,7 @@ export function IndexTrendChart({
       linePath,
       areaPath,
       bars,
+      barStrokeW,
       pieSlices,
       yTicks,
       xLabels,
@@ -630,6 +658,7 @@ export function IndexTrendChart({
     linePath,
     areaPath,
     bars,
+    barStrokeW,
     pieSlices,
     yTicks,
     xLabels,
@@ -753,8 +782,6 @@ export function IndexTrendChart({
         {chartType === 'bar'
           ? bars.map((bar, i) => {
               const fill = hoverIdx === i ? '#3b7ae6' : '#4890fd'
-              const opacity = hoverIdx === i ? 1 : 0.85
-              const strokeW = Math.max(1.5, 1.75 * scale)
               const className =
                 hoverIdx === i
                   ? 'index-trend-chart__bar index-trend-chart__bar--active'
@@ -763,7 +790,6 @@ export function IndexTrendChart({
                 <g
                   key={i}
                   className={className}
-                  opacity={opacity}
                   onMouseEnter={() => setHoverFromMouse(i)}
                   onMouseLeave={() => setHoverFromMouse(null)}
                   onPointerUp={(e) => onPointPointerUp(i, e)}
@@ -771,15 +797,17 @@ export function IndexTrendChart({
                   style={{ cursor: 'pointer' }}
                 >
                   <path d={bar.d} fill={fill} stroke="none" />
-                  <path
-                    d={bar.strokeD}
-                    fill="none"
-                    stroke="#fff"
-                    strokeWidth={strokeW}
-                    strokeLinejoin="round"
-                    strokeLinecap="butt"
-                    pointerEvents="none"
-                  />
+                  {barStrokeW > 0.35 ? (
+                    <path
+                      d={bar.strokeD}
+                      fill="none"
+                      stroke="#fff"
+                      strokeWidth={barStrokeW}
+                      strokeLinejoin="round"
+                      strokeLinecap="butt"
+                      pointerEvents="none"
+                    />
+                  ) : null}
                 </g>
               )
             })

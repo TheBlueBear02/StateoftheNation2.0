@@ -44,13 +44,20 @@ type OfficeErasBarProps = {
   onSelectedKeysChange?: (keys: string[]) => void
   /**
    * When this value changes (e.g. office id), selection resets to the
-   * latest two visible eras (also the default on first page load). Swapping
-   * indexes within the same office keeps the current picks. Empty selection is
-   * otherwise allowed after the user clears the last era.
+   * latest two visible eras that each lasted more than 6 months
+   * (skipping shorter tenures and walking further back; also the default
+   * on first page load). Swapping indexes within the same office keeps the
+   * current picks. Empty selection is otherwise allowed after the user
+   * clears the last era.
    */
   selectionResetKey?: string | number
   /** Fires with the selected era band(s) for chart highlighting. */
   onHoverBand?: (bands: EraBand[]) => void
+  /**
+   * When false, hide the selected-era compare / detail panel under the bar
+   * (eras strip itself still renders). Default true.
+   */
+  showCompare?: boolean
 }
 
 type VisibleEra = {
@@ -271,6 +278,29 @@ function eraKey(era: OfficeDashboardMinisterEra): string {
   return `${era.personId}-${era.startDate}`
 }
 
+/** Default compare picks skip tenures shorter than this (~6 calendar months). */
+const MIN_DEFAULT_ERA_MS = 183 * 24 * 60 * 60 * 1000
+
+function eraDurationMs(era: OfficeDashboardMinisterEra): number {
+  return Math.max(0, dateToMs(era.endDate) - dateToMs(era.startDate))
+}
+
+/**
+ * Newest→oldest: take up to two eras longer than 6 months.
+ * If none qualify, fall back to the latest two visible eras.
+ */
+function pickDefaultEraKeys(visible: VisibleEra[]): string[] {
+  const longEnough: string[] = []
+  for (let i = visible.length - 1; i >= 0 && longEnough.length < 2; i--) {
+    const item = visible[i]!
+    if (eraDurationMs(item.era) > MIN_DEFAULT_ERA_MS) {
+      longEnough.push(eraKey(item.era))
+    }
+  }
+  if (longEnough.length > 0) return longEnough
+  return visible.slice(-2).map((item) => eraKey(item.era))
+}
+
 function formatEraAriaLabel(era: OfficeDashboardMinisterEra): string {
   const party = era.factionName?.trim()
   const range = formatEraRangeShort(era)
@@ -390,6 +420,63 @@ const PHOTO_SIZE_DESKTOP_PX = 48
 const PHOTO_SIZE_MOBILE_PX = 40
 const PHOTO_INLINE_PAD_PX = 8
 
+/** Clip padding / gap — keep in sync with OfficeErasBar.css + page mobile overrides. */
+const CLIP_PAD_X_DESKTOP_PX = 16
+const CLIP_GAP_DESKTOP_PX = 8
+const CLIP_PAD_X_MOBILE_PX = 12
+const CLIP_GAP_MOBILE_PX = 6
+
+const ERA_FONT_FAMILY = "Heebo, 'Heebo', system-ui, sans-serif"
+
+let measureCanvas: HTMLCanvasElement | null = null
+
+function remToPx(rem: number): number {
+  if (typeof document === 'undefined') return rem * 16
+  const rootPx = parseFloat(
+    getComputedStyle(document.documentElement).fontSize || '16',
+  )
+  return rem * (Number.isFinite(rootPx) && rootPx > 0 ? rootPx : 16)
+}
+
+function measureEraTextWidth(text: string, font: string): number {
+  if (!text) return 0
+  if (typeof document === 'undefined') {
+    // SSR / pre-measure fallback — approximate Hebrew/Latin bold.
+    return text.length * 9
+  }
+  if (!measureCanvas) measureCanvas = document.createElement('canvas')
+  const ctx = measureCanvas.getContext('2d')
+  if (!ctx) return text.length * 9
+  ctx.font = font
+  return ctx.measureText(text).width
+}
+
+/**
+ * Show name+party only when both labels fit fully in the text column.
+ * Otherwise photo-only (no mid-name / mid-party ellipsis).
+ */
+function eraLabelsFitFully(
+  era: OfficeDashboardMinisterEra,
+  textBudgetPx: number,
+  compact: boolean,
+): boolean {
+  if (textBudgetPx <= 1) return false
+  const namePx = remToPx(compact ? 0.72 : 0.88)
+  const partyPx = remToPx(compact ? 0.65 : 0.75)
+  const nameW = measureEraTextWidth(
+    era.fullName,
+    `800 ${namePx}px ${ERA_FONT_FAMILY}`,
+  )
+  if (nameW > textBudgetPx) return false
+  const party = era.factionName?.trim()
+  if (!party) return true
+  const partyW = measureEraTextWidth(
+    party,
+    `600 ${partyPx}px ${ERA_FONT_FAMILY}`,
+  )
+  return partyW <= textBudgetPx
+}
+
 export function OfficeErasBar({
   eras,
   points,
@@ -400,6 +487,7 @@ export function OfficeErasBar({
   onSelectedKeysChange,
   selectionResetKey,
   onHoverBand,
+  showCompare = true,
 }: OfficeErasBarProps) {
   const isSelectionControlled = selectedKeysProp !== undefined
   const [uncontrolledSelectedKeys, setUncontrolledSelectedKeys] = useState<
@@ -541,9 +629,7 @@ export function OfficeErasBar({
       setHoveredKey(null)
       return
     }
-    const defaultKeys = visible
-      .slice(-2)
-      .map((item) => eraKey(item.era))
+    const defaultKeys = pickDefaultEraKeys(visible)
     const resetChanged =
       selectionResetKey !== undefined &&
       prevSelectionResetKeyRef.current !== selectionResetKey
@@ -555,7 +641,8 @@ export function OfficeErasBar({
     }
 
     setSelectedKeys((prev) => {
-      // New office / first seed / page load: focus the latest two eras.
+      // New office / first seed / page load: focus the latest two eras
+      // that each lasted more than 6 months (skip shorter tenures).
       if (resetChanged || !hasSeededSelectionRef.current) {
         hasSeededSelectionRef.current = true
         userClearedSelectionRef.current = false
@@ -795,13 +882,25 @@ export function OfficeErasBar({
         >
           {visible.map(({ era, leftPct, widthPct }) => {
             const color = era.factionColor?.trim() || FALLBACK_COLOR
-            const showFull = widthPct >= 14
             const segmentPx =
               plotWidthPx > 0 ? (widthPct / 100) * plotWidthPx : 0
             const showPhoto =
               plotWidthPx > 0
                 ? segmentPx >= minPhotoSegmentPx
                 : widthPct >= 7
+            const compactLayout = plotWidthPx > 0 && plotWidthPx < 960
+            const textBudgetPx = showPhoto
+              ? segmentPx -
+                (compactLayout ? CLIP_PAD_X_MOBILE_PX : CLIP_PAD_X_DESKTOP_PX) -
+                photoSizePx -
+                (compactLayout ? CLIP_GAP_MOBILE_PX : CLIP_GAP_DESKTOP_PX)
+              : segmentPx -
+                (compactLayout ? CLIP_PAD_X_MOBILE_PX : CLIP_PAD_X_DESKTOP_PX)
+            // Wait for plot measure; then show labels only if name and party both fit fully.
+            const showFull =
+              plotWidthPx > 0 &&
+              showPhoto &&
+              eraLabelsFitFully(era, textBudgetPx, compactLayout)
             const photoOnly = showPhoto && !showFull
             const key = eraKey(era)
             const isSelected = selectedKeys.includes(key)
@@ -890,7 +989,7 @@ export function OfficeErasBar({
         ) : null}
       </div>
 
-      {newer ? (
+      {showCompare && newer ? (
         <div
           className={`office-eras-bar__detail${
             older ? ' office-eras-bar__detail--compare' : ''
@@ -915,6 +1014,9 @@ export function OfficeErasBar({
               className={`office-eras-bar__detail-delta-badge${deltaTone}`}
               role="status"
               dir="rtl"
+              style={{
+                ['--delta-chars' as string]: String(deltaAbs.length),
+              }}
             >
               <span className="office-eras-bar__detail-delta-badge-text">
                 {avgDelta === 0 ? (

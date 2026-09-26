@@ -16,10 +16,10 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 ├─────────────────────────────────────────────────────────┤
 │  News strip (black, full-bleed) — edge-to-edge ticker   │
 ├─────────────────────────────────────────────────────────┤
-│  Project: ממשלת החלומות (white, full-bleed)            │
-│    └─ .container — tag + title | media                  │
+│  Hot indexes carousel (white, full-bleed)               │
+│    └─ .container — rounded white box + story progress   │
 ├─────────────────────────────────────────────────────────┤
-│  Project: דשבורד מדדים (white, full-bleed)             │
+│  Project: ממשלת החלומות (white, full-bleed)            │
 │    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
 │  Project: סקרי מנדטים (white, full-bleed)              │
@@ -49,8 +49,10 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/components/SiteFooter.tsx` | Shared footer (primary blue); legal links to `/about` and `/terms` only |
 | `src/components/SiteLayout.tsx` | Wraps header, page content, and footer on all routes |
 | `src/components/elections/DreamGovernmentPromo.tsx` | Dream-government teaser linking to `/elections/dream-government` |
+| `src/components/government/HotIndexesCarousel.tsx` | Live “hot indexes” Instagram-style chart carousel |
+| `src/components/government/HotIndexesCarousel.css` | Carousel box, progress bars, arrows, swipe shell |
+| `src/lib/hotOfficeIndexes.ts` | Curated hot-index name list + picker / fallback |
 | `public/dream-government-homepage.png` | Dream-government project section screenshot |
-| `public/government-offices-homepage.png` | Government dashboard project section screenshot |
 | `public/government-building-homepage.svg` | Government structure teaser — civic building illustration |
 | `public/knesset-building-homepage.svg` | Knesset teaser — Knesset building illustration |
 | `src/App.css` | `.container` primitive and section-specific styles |
@@ -131,29 +133,30 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
 - CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
 
-### 4. Dream government project (`#dream-government`)
+### 4. Hot indexes carousel (`#hot-indexes`)
+
+- Controlled by `SHOW_GOVERNMENT_DASHBOARD = true` in `App.tsx`.
+- First content section after the hero / news strip (above Dream Government and the other project teasers).
+- White rounded card (`border-radius: 28px` / `24px` mobile) with soft drop shadow inside `.container`. Chart uses `compact` mode (`CHART_HEIGHT_COMPACT` = 280) so the box stays shorter than the full dashboard.
+- **Story progress:** 5 grey segments centered on top (Instagram-style). The active segment fills over **4s**, then the carousel advances and loops forever. `prefers-reduced-motion: reduce` disables auto-advance (progress stays partial).
+- **Slides:** curated names in `HOT_INDEX_NAMES` (`src/lib/hotOfficeIndexes.ts`); missing names fall back to alert → KPI indexes so the strip still fills to 5.
+- Each slide shows the **office name** above the index **description** (`indexes.info`, fallback to `name`) — same hierarchy as the share PNG — plus dashboard-style **share** and **מקור** actions, the live `IndexTrendChart`, and `OfficeErasBar` with **`showCompare={false}`** (eras strip only — no compare panel).
+- Clicking anywhere on the card opens `/government/dashboard?office=&index=` for the active slide (title underlines on card hover). Share, מקור, and the side arrows keep their own actions; horizontal swipes change slides without navigating.
+- Side arrows (‹ / ›) step slides; on touch, horizontal swipe left = next / right = previous.
+- Data: same `useOfficeDashboard` / Supabase path as `/government/dashboard`. Section hides on fetch error / empty; shows a skeleton while loading.
+- Share reuses `exportOfficeChartImage` + `sharePngImage` (capture node uses dashboard chart-header classnames so the PNG decorator still finds the title).
+
+### 5. Dream government project (`#dream-government`)
 
 - Rendered by `src/components/elections/DreamGovernmentPromo.tsx` (also used on `/elections`).
-- First project teaser on the homepage (white).
+- Project teaser below the hot-indexes carousel (white).
 - News-block layout: title **ממשלת החלומות: בחרו שר לכל משרד מבין המועמדים לכנסת** + category tag **בחירות 2026**.
 - Whole section is a link to `/elections/dream-government`.
 - Media (`.project-section__media`): landscape collage from `public/dream-government-homepage.png` (same full-width media column as the other project teasers).
 
-### 5. Government Dashboard project (`#government-dashboard`)
-
-- Controlled by `SHOW_GOVERNMENT_DASHBOARD = true` in `App.tsx`.
-- Second homepage project teaser (white, same as the other project sections).
-- Same news-block layout: title **מצב האומה: מדדי משרדי הממשלה לאורך זמן** + category tag **הממשלה** below it (no description / meta line).
-- Whole section links to `/government/dashboard` (KPI/policy quadrant; see [GovernmentDashboardPage.md](./GovernmentDashboardPage.md)).
-- `.project-section__inner.container`: ~`0.95fr / 1.2fr` grid (media larger). DOM order is content first, media second — text right, preview left in RTL.
-- ≤900px: same stack as the institutions cards — image above, title + tag below (`flex-direction: column-reverse` so media sits on top without changing DOM order). Desktop layout unchanged.
-- Hover on `.project-section__inner`: light grey background on the whole content box. Hover on title or media: title underline. Whole section remains clickable; focus-visible outline on the link.
-- Tag (`.project-section__tag`): square corners, `--color-blue` fill / white text.
-- Media: static screenshot `public/government-offices-homepage.png` (same pattern as polls/elections teasers — no live Supabase fetch on the homepage).
-
 ### 6. Mandate polls project (`#mandate-polls`)
 
-- White section below the dashboard teaser.
+- White section below Dream Government.
 - News-block layout: title **סקר הסקרים: סקרי המנדטים של כל הערוצים במקום אחד** + category tag **בחירות 2026** + meta line **עודכן לאחרונה {D.M.YYYY}** from the newest non-scenario poll’s `fieldwork_end` (`useLatestPollDate` / `fetchLatestPollFieldworkEnd`). Meta is omitted while loading or if the query fails/empty.
 - Whole section is a link (`.project-section__link`) to `/elections/polls`.
 - Media (`.project-section__media`): screenshot from `public/polls-page-homepage.png`.
@@ -195,7 +198,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 - Homepage project teasers remain static in `App.tsx`.
 - News strip loads generated rows from `site_updates` only (`src/hooks/useSiteUpdates.ts`); empty/error → strip hidden. See [PiplinesPage.md](./PiplinesPage.md) for the mandatory pipeline finish-hook.
-- Government dashboard teaser uses a static PNG (`/government-offices-homepage.png`); the live dashboard still loads from Supabase on `/government/dashboard`.
+- Hot indexes carousel (`#hot-indexes`) loads live office dashboard data via `useOfficeDashboard` / `pickHotOfficeIndexes` (curated names in `HOT_INDEX_NAMES`). The live dashboard still loads from Supabase on `/government/dashboard`.
 - The **בחירות 2026** hero CTA routes to the `/elections` module documented in `Agents Instructions/ElectionsPage.md`.
 - Knesset page uses `useKnessetMembers` hook with Supabase (see `Agents Instructions/KnessetPage.md`).
 
@@ -216,7 +219,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 ## Responsive Behavior
 
-- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Single-project teasers (dream, dashboard, polls, lists) switch to **image above / text below** (`column-reverse` on `.project-section__inner`); desktop stays the side-by-side grid. The government + Knesset pair stays **two columns**. Container padding remains fluid via `clamp()`.
+- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Single-project teasers (dream, polls, lists) switch to **image above / text below** (`column-reverse` on `.project-section__inner`); desktop stays the side-by-side grid. The government + Knesset pair stays **two columns**. Container padding remains fluid via `clamp()`.
 - **≤480px:** Hero buttons become single column; header height, logo, and date text scale down (non-home / desktop-style header).
 
 ## Future Work

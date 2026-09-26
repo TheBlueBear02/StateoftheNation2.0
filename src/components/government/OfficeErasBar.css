@@ -110,11 +110,12 @@
 .office-eras-bar__plot {
   position: relative;
   display: block;
-  height: 64px;
-  min-height: 64px;
+  height: 68px;
+  min-height: 68px;
   /* Gutters (Y-axis / right pad) stay white so only era segments read as the bar */
   background: var(--color-white, #fff);
-  overflow: hidden;
+  /* Visible so compare-style rounded bottoms are not clipped */
+  overflow: visible;
   border: 0;
   box-sizing: border-box;
 }
@@ -127,20 +128,23 @@
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  /* Match compare panel: square top, soft rounded bottom */
+  border-radius: 0 0 28px 28px;
   box-sizing: border-box;
   overflow: hidden;
-  /* Strong top strip + muted party fill; body strengthens on select. */
-  background-color: color-mix(
-    in srgb,
-    var(--era-accent, #4890fd) 38%,
-    #fff
+  /* Quieter wash so selected eras (compare wash) stand out */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--era-accent, #4890fd) 14%, #fff) 0%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 7%, #fff) 55%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 2%, #fff) 85%,
+    #fff 100%
   );
+  /* 5px solid top accent (inset so bar height / photo fit stay intact) */
   box-shadow:
-    inset 0 4px 0 0
-      color-mix(in srgb, var(--era-accent, #4890fd) 88%, transparent),
-    inset 0 5px 0 0 #fff,
-    inset -1px 0 0 rgba(255, 255, 255, 0.28);
+    inset 0 5px 0 0
+      color-mix(in srgb, var(--era-accent, #4890fd) 72%, #fff),
+    inset -2px 0 0 #fff;
   cursor: pointer;
   z-index: 1;
   font: inherit;
@@ -148,39 +152,50 @@
   appearance: none;
   -webkit-appearance: none;
   transition:
-    background-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
     filter 0.15s ease;
 }
 
 .office-eras-bar__era:hover,
 .office-eras-bar__era--hovered {
-  background-color: color-mix(
-    in srgb,
-    var(--era-accent, #4890fd) 50%,
-    #fff
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--era-accent, #4890fd) 20%, #fff) 0%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 10%, #fff) 55%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 3%, #fff) 85%,
+    #fff 100%
   );
+  box-shadow:
+    inset 0 5px 0 0
+      color-mix(in srgb, var(--era-accent, #4890fd) 88%, #fff),
+    inset -2px 0 0 #fff;
   z-index: 2;
 }
 
 .office-eras-bar__era--selected {
   z-index: 4;
-  background-color: color-mix(
-    in srgb,
-    var(--era-accent, #4890fd) 82%,
-    #fff
+  /* Exact same wash + solid accent as .office-eras-bar__detail-half */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--era-accent, #4890fd) 26%, #fff) 0%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 12%, #fff) 55%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 4%, #fff) 85%,
+    #fff 100%
   );
   box-shadow:
-    inset 0 4px 0 0 var(--era-accent, #4890fd),
-    inset 0 5px 0 0 #fff,
-    inset -1px 0 0 rgba(255, 255, 255, 0.28);
+    inset 0 5px 0 0 var(--era-accent, #4890fd),
+    inset -2px 0 0 #fff;
 }
 
 .office-eras-bar__era--selected:hover,
 .office-eras-bar__era--selected.office-eras-bar__era--hovered {
-  background-color: color-mix(
-    in srgb,
-    var(--era-accent, #4890fd) 88%,
-    #fff
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--era-accent, #4890fd) 30%, #fff) 0%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 14%, #fff) 55%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 5%, #fff) 85%,
+    #fff 100%
   );
 }
 
@@ -198,7 +213,8 @@
   width: 100%;
   height: 100%;
   min-width: 0;
-  padding: 6px 8px;
+  /* Top padding clears the 5px inset accent (like compare border-top) */
+  padding: 10px 8px 6px;
   box-sizing: border-box;
   overflow: hidden;
   pointer-events: none;
@@ -220,9 +236,11 @@
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  /* Match compare-panel avatar border */
+  border: 1px solid rgba(0, 0, 0, 0.45);
   flex-shrink: 0;
   background: #f0f0f0;
+  box-sizing: border-box;
 }
 
 .office-eras-bar__photo--placeholder {
@@ -247,14 +265,13 @@
   width: 100%;
   font-size: 0.88rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--color-text);
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: right;
   direction: rtl;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .office-eras-bar__party {
@@ -262,14 +279,13 @@
   width: 100%;
   font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--color-text-muted);
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: right;
   direction: rtl;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .office-eras-bar__switches {
@@ -319,6 +335,8 @@
   align-items: center;
   gap: 14px;
   min-width: 0;
+  /* Lock row height to the avatar so a long name can't push the delta badge down */
+  min-height: calc(72px + 32px);
   padding: 16px 18px;
   border-top: 5px solid var(--era-accent, var(--color-blue));
   border-radius: 0 0 44px 44px;
@@ -416,7 +434,10 @@
   font-weight: 800;
   color: var(--color-text);
   line-height: 1.3;
-  overflow-wrap: anywhere;
+  /* Keep a single line so compare height (and the center badge) stay stable */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .office-eras-bar__detail-party {
@@ -425,6 +446,9 @@
   font-weight: 600;
   color: var(--color-text-muted);
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .office-eras-bar__detail-dates {
@@ -434,6 +458,9 @@
   font-weight: 600;
   color: var(--color-text-muted);
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .office-eras-bar__detail-stats {
@@ -487,8 +514,8 @@
 
 .office-eras-bar__detail-avg {
   margin: 0;
-  font-size: clamp(1.75rem, 3.5vw, 2.35rem);
-  font-weight: 800;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
   color: var(--color-text);
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -541,11 +568,19 @@
 .office-eras-bar__detail-delta-badge-value {
   display: block;
   width: 100%;
-  font-size: 2.15rem;
+  max-width: 100%;
+  /* Scale with digit count so long values (e.g. 44,099.5) stay inside the circle */
+  font-size: clamp(
+    0.95rem,
+    calc(84px / (var(--delta-chars, 5) * 0.62)),
+    2.15rem
+  );
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .office-eras-bar__detail-delta-badge--up
@@ -574,8 +609,8 @@
   }
 
   .office-eras-bar__plot {
-    height: 54px;
-    min-height: 54px;
+    height: 58px;
+    min-height: 58px;
   }
 
   .office-eras-bar__photo {
@@ -617,6 +652,7 @@
     padding: 14px 12px;
     gap: 12px;
     border-radius: 0;
+    min-height: calc(60px + 28px);
   }
 
   .office-eras-bar__detail--compare .office-eras-bar__detail-half--older {
@@ -650,7 +686,11 @@
   }
 
   .office-eras-bar__detail-delta-badge-value {
-    font-size: 1.7rem;
+    font-size: clamp(
+      0.85rem,
+      calc(72px / (var(--delta-chars, 5) * 0.62)),
+      1.7rem
+    );
   }
 
   .office-eras-bar__detail-half--solo {
@@ -675,7 +715,7 @@
   }
 
   .office-eras-bar__detail-avg {
-    font-size: 1.85rem;
+    font-size: 1.6rem;
   }
 }
 

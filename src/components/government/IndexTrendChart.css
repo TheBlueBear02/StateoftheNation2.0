@@ -58,7 +58,7 @@
 
 .index-trend-chart__bar {
   fill: var(--color-blue);
-  opacity: 0.85;
+  opacity: 1;
   cursor: pointer;
 }
 

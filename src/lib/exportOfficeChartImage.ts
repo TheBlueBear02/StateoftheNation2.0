@@ -263,6 +263,9 @@ const CHART_EXPORT_CSS = `
   font-weight: 800;
   color: #1a1a1a;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .office-eras-bar__detail-party,
 .office-eras-bar__detail-dates {
@@ -271,6 +274,9 @@ const CHART_EXPORT_CSS = `
   font-weight: 600;
   color: #666;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .office-eras-bar__detail-dates {
   margin-top: 2px;
@@ -300,8 +306,8 @@ const CHART_EXPORT_CSS = `
 }
 .office-eras-bar__detail-avg {
   margin: 0;
-  font-size: 2.1rem;
-  font-weight: 800;
+  font-size: 1.85rem;
+  font-weight: 700;
   color: #1a1a1a;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -349,11 +355,18 @@ const CHART_EXPORT_CSS = `
 .office-eras-bar__detail-delta-badge-value {
   display: block;
   width: 100%;
-  font-size: 1.25rem;
+  max-width: 100%;
+  font-size: clamp(
+    0.95rem,
+    calc(84px / (var(--delta-chars, 5) * 0.62)),
+    2.15rem
+  );
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .office-eras-bar__detail-delta-badge--up
   .office-eras-bar__detail-delta-badge-value {
