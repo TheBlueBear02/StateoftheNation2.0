@@ -102,21 +102,6 @@ function formatMinisterLine(
     .join(' · ')
 }
 
-function IndexLegend() {
-  return (
-    <ul className="office-dashboard__legend" aria-label="מקרא">
-      <li>
-        <span className="office-dashboard__legend-swatch office-dashboard__legend-swatch--kpi" />
-        מדד
-      </li>
-      <li>
-        <span className="office-dashboard__legend-swatch office-dashboard__legend-swatch--alert" />
-        התראה
-      </li>
-    </ul>
-  )
-}
-
 type OfficeClusterProps = {
   office: OfficeDashboardOffice
   selected: boolean
@@ -506,7 +491,6 @@ function DetailPanel({
               ) : (
                 <span className="office-dashboard__subtitle" />
               )}
-              <IndexLegend />
             </div>
           </div>
         </div>
@@ -776,7 +760,6 @@ function DetailPanelSkeleton() {
               <p className="office-dashboard__subtitle office-dashboard__skel-text office-dashboard__skel-text--minister">
                 &nbsp;
               </p>
-              <IndexLegend />
             </div>
           </div>
         </div>

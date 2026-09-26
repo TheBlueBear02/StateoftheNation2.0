@@ -139,8 +139,8 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - First content section after the hero / news strip (above Dream Government and the other project teasers).
 - White rounded card (`border-radius: 28px` / `24px` mobile) with soft drop shadow inside `.container`. Chart uses `compact` mode (`CHART_HEIGHT_COMPACT` = 280) so the box stays shorter than the full dashboard.
 - **Story progress:** 5 grey segments centered on top (Instagram-style). The active segment fills over **4s**, then the carousel advances and loops forever. `prefers-reduced-motion: reduce` disables auto-advance (progress stays partial).
-- **Slides:** curated names in `HOT_INDEX_NAMES` (`src/lib/hotOfficeIndexes.ts`); missing names fall back to alert → KPI indexes so the strip still fills to 5.
-- Each slide shows the **office name** above the index **description** (`indexes.info`, fallback to `name`) — same hierarchy as the share PNG — plus dashboard-style **share** and **מקור** actions, the live `IndexTrendChart`, and `OfficeErasBar` with **`showCompare={false}`** (eras strip only — no compare panel).
+- **Slides:** curated picks in `HOT_INDEX_PICKS` (`src/lib/hotOfficeIndexes.ts`) — exact `indexes.name` or numeric `indexes.id` (id **11** for Education **תקציב**, since that name is shared). Current picks: רצח בחברה הערבית · הרוגים בתאונות דרכים · החוב הממשלתי · תקציב (id 11). Missing picks fall back to alert → KPI indexes so the strip still fills to 5.
+- Each slide shows the **office name** above the index **description** (`indexes.info`, fallback to `name`) — same hierarchy as the share PNG — plus dashboard-style **share** and **מקור** actions, the live `IndexTrendChart`, and `OfficeErasBar` with **`showCompare={false}`** (eras strip only — no compare panel). Title/office copy is forced **RTL right-aligned** (higher-specificity rules beat leftover `.office-dashboard__chart-header` flex styles if that page’s CSS was loaded earlier in the session).
 - Clicking anywhere on the card opens `/government/dashboard?office=&index=` for the active slide (title underlines on card hover). Share, מקור, and the side arrows keep their own actions; horizontal swipes change slides without navigating.
 - Side arrows (‹ / ›) step slides; on touch, horizontal swipe left = next / right = previous.
 - Data: same `useOfficeDashboard` / Supabase path as `/government/dashboard`. Section hides on fetch error / empty; shows a skeleton while loading.
@@ -198,7 +198,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 - Homepage project teasers remain static in `App.tsx`.
 - News strip loads generated rows from `site_updates` only (`src/hooks/useSiteUpdates.ts`); empty/error → strip hidden. See [PiplinesPage.md](./PiplinesPage.md) for the mandatory pipeline finish-hook.
-- Hot indexes carousel (`#hot-indexes`) loads live office dashboard data via `useOfficeDashboard` / `pickHotOfficeIndexes` (curated names in `HOT_INDEX_NAMES`). The live dashboard still loads from Supabase on `/government/dashboard`.
+- Hot indexes carousel (`#hot-indexes`) loads live office dashboard data via `useOfficeDashboard` / `pickHotOfficeIndexes` (curated `HOT_INDEX_PICKS` by name or id). The live dashboard still loads from Supabase on `/government/dashboard`.
 - The **בחירות 2026** hero CTA routes to the `/elections` module documented in `Agents Instructions/ElectionsPage.md`.
 - Knesset page uses `useKnessetMembers` hook with Supabase (see `Agents Instructions/KnessetPage.md`).
 

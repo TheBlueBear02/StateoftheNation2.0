@@ -7,15 +7,15 @@ import type {
 export const HOT_INDEX_COUNT = 5
 
 /**
- * Curated “hot” index names (exact match against `indexes.name`).
- * Order = carousel order. Edit this list to change what the homepage loops.
+ * Curated hot indexes in carousel order.
+ * - `string` → exact match on `indexes.name` (first office that has it)
+ * - `number` → exact match on `indexes.id` (use when the name is shared, e.g. תקציב)
  */
-export const HOT_INDEX_NAMES: readonly string[] = [
+export const HOT_INDEX_PICKS: readonly (string | number)[] = [
   'רצח בחברה הערבית',
   'הרוגים בתאונות דרכים',
-  'אינפלציה',
-  'זכאים לתעודת בגרות',
-  'אמון במשטרה',
+  'החוב הממשלתי',
+  11, // תקציב — Education ministry (name is not unique across offices)
 ]
 
 export type HotOfficeIndexSlide = {
@@ -24,16 +24,20 @@ export type HotOfficeIndexSlide = {
 }
 
 /**
- * Resolve curated names to live office+index pairs. Falls back to alert KPIs,
- * then remaining KPIs, so the carousel still fills if a name is renamed/missing.
+ * Resolve curated picks to live office+index pairs. Falls back to alert KPIs,
+ * then remaining KPIs, so the carousel still fills if a name/id is missing.
  */
 export function pickHotOfficeIndexes(
   offices: OfficeDashboardOffice[],
   count = HOT_INDEX_COUNT,
 ): HotOfficeIndexSlide[] {
+  const byId = new Map<number, HotOfficeIndexSlide>()
   const byName = new Map<string, HotOfficeIndexSlide>()
   for (const office of offices) {
     for (const index of office.indexes) {
+      if (!byId.has(index.id)) {
+        byId.set(index.id, { office, index })
+      }
       if (!byName.has(index.name)) {
         byName.set(index.name, { office, index })
       }
@@ -43,9 +47,10 @@ export function pickHotOfficeIndexes(
   const picked: HotOfficeIndexSlide[] = []
   const usedIds = new Set<number>()
 
-  for (const name of HOT_INDEX_NAMES) {
+  for (const pick of HOT_INDEX_PICKS) {
     if (picked.length >= count) break
-    const slide = byName.get(name)
+    const slide =
+      typeof pick === 'number' ? byId.get(pick) : byName.get(pick)
     if (!slide || usedIds.has(slide.index.id)) continue
     picked.push(slide)
     usedIds.add(slide.index.id)
