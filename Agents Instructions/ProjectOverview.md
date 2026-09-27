@@ -23,7 +23,7 @@ Central reference for agents working on this repository. Use this file to unders
 | עדכון סקרים (dev) | `/elections/polls/edit` | Live (password-gated, noindex) |
 | עריכת מועמדים (dev) | `/elections/edit` | Live (password-gated, noindex) |
 | סנכרון כנסת (dev) | `/knesset/edit` | Live (password-gated, noindex) |
-| ציר זמן — Timeline | `#timeline` | Planned |
+| ציר זמן — Timeline | `/timeline` | Live |
 
 Live pages fetch data from **Supabase**. Static homepage content (news ticker, hero copy) is hard-coded until APIs are wired.
 
@@ -85,6 +85,7 @@ StateoftheNation2.0/
 | `/government/dashboard` | `src/app/government/dashboard/page.tsx` |
 | `/knesset` | `src/app/knesset/page.tsx` |
 | `/knesset/edit` | `src/app/knesset/edit/page.tsx` |
+| `/timeline` | `src/app/timeline/page.tsx` |
 | `/piplines` | `src/app/piplines/page.tsx` |
 | `/piplines/docs/[[...slug]]` | `src/app/piplines/docs/[[...slug]]/page.tsx` |
 | `/piplines/[slug]` | `src/app/piplines/[slug]/page.tsx` (legacy → docs) |
@@ -124,6 +125,7 @@ These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Loc
 │         ├─ /government → views/GovernmentPage.tsx           │
 │         ├─ /government/dashboard → OfficeDashboardPage.tsx  │
 │         ├─ /knesset    → views/KnessetPage.tsx              │
+│         ├─ /timeline   → views/TimelinePage.tsx (no SiteLayout) │
 │         ├─ /elections… → views/Elections*.tsx               │
 │         ├─ /piplines     → PipelinesDashboardPage.tsx       │
 │         └─ /piplines/docs → PiplinesDocsPage.tsx            │
@@ -187,5 +189,6 @@ npm run lint
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` dashboard + `/piplines/docs` |
 | [ElectionsPage.md](./ElectionsPage.md) | `/elections` module |
 | [PollsPage.md](./PollsPage.md) | `/elections/polls` |
+| [TimelinePage.md](./TimelinePage.md) | `/timeline` |
 
 When adding a new major page or module, create a matching `Agents Instructions/{Feature}.md` and link it from this index.

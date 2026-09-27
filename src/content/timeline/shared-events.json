@@ -1,0 +1,26 @@
+[
+  {
+    "id": "shared-independence-proclamation",
+    "title": "הכרזת העצמאות",
+    "description": "בן-גוריון מכריז על העצמאות; גולדה מאיר נמנית עם החותמים על מגילת העצמאות.",
+    "startDate": "1948-05-14",
+    "location": { "name": "תל אביב", "lat": 32.077, "lng": 34.786 },
+    "personIds": ["ben-gurion", "golda-meir"]
+  },
+  {
+    "id": "shared-six-day",
+    "title": "מלחמת ששת הימים",
+    "description": "רבין כרמטכ\"ל ובגין כשר בממשלת האחדות הלאומית בתקופת מלחמת ששת הימים.",
+    "startDate": "1967-06-05",
+    "endDate": "1967-06-10",
+    "personIds": ["rabin", "begin"]
+  },
+  {
+    "id": "shared-after-yom-kippur",
+    "title": "מעבר השלטון אחרי יום הכיפורים",
+    "description": "גולדה מאיר מתפטרת לאחר מלחמת יום הכיפורים; יצחק רבין מחליף אותה כראש הממשלה.",
+    "startDate": "1974-04",
+    "endDate": "1974-06",
+    "personIds": ["golda-meir", "rabin"]
+  }
+]

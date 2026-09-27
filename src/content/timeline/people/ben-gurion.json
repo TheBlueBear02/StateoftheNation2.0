@@ -1,0 +1,47 @@
+{
+  "id": "ben-gurion",
+  "name": "דוד בן-גוריון",
+  "nameEn": "David Ben-Gurion",
+  "color": "#1e5aa8",
+  "portrait": "/timeline/portraits/ben-gurion.svg",
+  "birthDate": "1886-10-16",
+  "deathDate": "1973-12-01",
+  "events": [
+    {
+      "id": "bg-aliyah",
+      "title": "עלייה לארץ ישראל",
+      "description": "בן-גוריון עולה לארץ ישראל מפולין ומצטרף לתנועת העבודה.",
+      "startDate": "1906",
+      "location": { "name": "יפו" }
+    },
+    {
+      "id": "bg-histadrut",
+      "title": "הקמת ההסתדרות",
+      "description": "בן-גוריון נוטל תפקיד מרכזי בהקמת ההסתדרות הכללית של העובדים.",
+      "startDate": "1920",
+      "location": { "name": "חיפה" }
+    },
+    {
+      "id": "bg-mapai",
+      "title": "הנהגת מפא\"י",
+      "description": "בן-גוריון מתבסס כמנהיג מפלגת מפא\"י ומוביל את היישוב.",
+      "startDate": "1930",
+      "endDate": "1963"
+    },
+    {
+      "id": "bg-pm",
+      "title": "ראש הממשלה הראשון",
+      "description": "כהונה כראש ממשלת ישראל, עם הפסקה קצרה בשנות ה-50.",
+      "startDate": "1948-05-14",
+      "endDate": "1963-06"
+    },
+    {
+      "id": "bg-sde-boker",
+      "title": "מעבר לשדה בוקר",
+      "description": "בן-גוריון פורש זמנית לשדה בוקר ומדגיש את חשיבות הנגב.",
+      "startDate": "1953",
+      "endDate": "1955",
+      "location": { "name": "שדה בוקר" }
+    }
+  ]
+}

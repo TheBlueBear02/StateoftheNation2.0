@@ -1,0 +1,46 @@
+{
+  "id": "begin",
+  "name": "מנחם בגין",
+  "nameEn": "Menachem Begin",
+  "color": "#2d6a4f",
+  "portrait": "/timeline/portraits/begin.svg",
+  "birthDate": "1913-08-16",
+  "deathDate": "1992-03-09",
+  "events": [
+    {
+      "id": "mb-aliyah",
+      "title": "עלייה לארץ ישראל",
+      "description": "בגין מגיע לארץ ישראל לאחר שחרורו ממחנה בברית המועצות.",
+      "startDate": "1942",
+      "location": { "name": "תל אביב" }
+    },
+    {
+      "id": "mb-irgun",
+      "title": "מפקד האצ\"ל",
+      "description": "בגין מפקד על הארגון הצבאי הלאומי במאבק נגד הבריטים.",
+      "startDate": "1943",
+      "endDate": "1948"
+    },
+    {
+      "id": "mb-herut",
+      "title": "הקמת חרות",
+      "description": "בגין מקים את תנועת חרות ומוביל את האופוזיציה בכנסת.",
+      "startDate": "1948",
+      "endDate": "1977"
+    },
+    {
+      "id": "mb-pm",
+      "title": "ראש הממשלה",
+      "description": "בגין מוביל את המהפך הפוליטי של 1977 ומכהן כראש הממשלה.",
+      "startDate": "1977-06",
+      "endDate": "1983-10"
+    },
+    {
+      "id": "mb-nobel",
+      "title": "פרס נובל לשלום",
+      "description": "בגין ואנואר סאדאת זוכים בפרס נובל לשלום לאחר הסכם קמפ דייוויד.",
+      "startDate": "1978-12-10",
+      "location": { "name": "אוסלו" }
+    }
+  ]
+}

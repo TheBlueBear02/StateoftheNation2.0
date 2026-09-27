@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and shared conventions.
 
-Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with project teasers for elections, polls, government dashboard, government structure, and Knesset.
+Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with project teasers for elections, polls, government dashboard, government structure, Knesset, and the history timeline.
 
 ## Page Structure
 
@@ -111,7 +111,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - **Visual (desktop):** muted `<video>` from Supabase Storage (`site-assets/bear-hero-video2.mp4`), plays once (no loop). Poster `/hero-bear-image.svg`. Video stays `opacity: 0` until ready (`onLoadedMetadata` / `onLoadedData` / `onCanPlay` / `onPlaying`, plus a mount-time `readyState` check so cached videos do not miss the event). On load error, falls back to the poster `<img>`. Explicit `play()` on mount/`loadeddata` so autoplay is reliable. File is large (~17MB), so first paint can take a moment. Autoplay + `playsInline` + `preload="auto"`. Sized larger than the grid column (`width: min(110%, 560px)`, `scale(1.12) translateX(28px)` + light `clip-path` inset) with `object-fit: cover` and hero-blue video background so scaled/narrow viewports do not show black letterbox edges on the right/bottom. Overflow visible on `.hero__visual`. Still hidden on mobile via `.hero__visual` (`display: none` at ≤900px).
 - **Title:** `/while-logo-nobg.svg` inside the `h1` (desktop and mobile) — brand mark replaces the text headline; `alt="מצב האומה"`.
 - **Subtitle:** הבית של המידע הפוליטי בישראל
-- **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): 2×2 grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (640px) so buttons read wider.
+- **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): auto-flow grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (640px) so buttons read wider.
 
 | Label | Destination |
 |-------|--------|
@@ -119,8 +119,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 | סקרי מנדטים | `/elections/polls` (route) |
 | ממשלת החלומות | `/elections/dream-government` (route) |
 | מדדי הממשלה | `/government/dashboard` (route) |
+| ציר זמן | `/timeline` (route) |
 
-**בחירות 2026** links to the live Elections page, **סקרי מנדטים** links to weighted poll averages, **ממשלת החלומות** links to the dream-government builder, and **מדדי הממשלה** links to the office KPI dashboard.
+**בחירות 2026** links to the live Elections page, **סקרי מנדטים** links to weighted poll averages, **ממשלת החלומות** links to the dream-government builder, **מדדי הממשלה** links to the office KPI dashboard, and **ציר זמן** links to the full-screen history timeline.
 
 ### 3. News strip (`news-strip`)
 

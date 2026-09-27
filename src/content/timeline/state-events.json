@@ -1,0 +1,58 @@
+[
+  {
+    "id": "state-independence",
+    "title": "הקמת מדינת ישראל",
+    "description": "הכרזת העצמאות ותחילת מלחמת העצמאות.",
+    "startDate": "1948-05-14",
+    "location": { "name": "תל אביב" }
+  },
+  {
+    "id": "state-independence-war",
+    "title": "מלחמת העצמאות",
+    "description": "מלחמת העצמאות והסכמי שביתת הנשק.",
+    "startDate": "1948-05",
+    "endDate": "1949-07"
+  },
+  {
+    "id": "state-sinai",
+    "title": "מבצע קדש",
+    "description": "מבצע סיני / קדש נגד מצרים.",
+    "startDate": "1956-10",
+    "endDate": "1956-11"
+  },
+  {
+    "id": "state-six-day",
+    "title": "מלחמת ששת הימים",
+    "description": "מלחמת ששת הימים וכיבוש יהודה ושומרון, רמת הגולן, סיני ועזה.",
+    "startDate": "1967-06-05",
+    "endDate": "1967-06-10"
+  },
+  {
+    "id": "state-yom-kippur",
+    "title": "מלחמת יום הכיפורים",
+    "description": "מלחמת יום הכיפורים נגד מצרים וסוריה.",
+    "startDate": "1973-10-06",
+    "endDate": "1973-10-25"
+  },
+  {
+    "id": "state-peace-egypt",
+    "title": "הסכם השלום עם מצרים",
+    "description": "חתימת הסכם השלום בין ישראל למצרים בוושינגטון.",
+    "startDate": "1979-03-26",
+    "location": { "name": "וושינגטון" }
+  },
+  {
+    "id": "state-lebanon",
+    "title": "מלחמת לבנון הראשונה",
+    "description": "מבצע שלום הגליל ומלחמת לבנון הראשונה.",
+    "startDate": "1982-06",
+    "endDate": "1985"
+  },
+  {
+    "id": "state-oslo",
+    "title": "הסכמי אוסלו",
+    "description": "חתימת הצהרת העקרונות בין ישראל לאש\"ף.",
+    "startDate": "1993-09-13",
+    "location": { "name": "וושינגטון" }
+  }
+]

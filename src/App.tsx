@@ -14,6 +14,7 @@ const HERO_BUTTONS = [
   { label: 'סקרי מנדטים', to: '/elections/polls' },
   { label: 'ממשלת החלומות', to: '/elections/dream-government' },
   { label: 'מדדי הממשלה', to: '/government/dashboard' },
+  { label: 'ציר זמן', to: '/timeline' },
 ] as const
 
 /** Homepage live hot-indexes carousel (office KPI charts). */

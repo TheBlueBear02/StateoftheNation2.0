@@ -1,0 +1,48 @@
+{
+  "id": "golda-meir",
+  "name": "גולדה מאיר",
+  "nameEn": "Golda Meir",
+  "color": "#c45c26",
+  "portrait": "/timeline/portraits/golda-meir.svg",
+  "birthDate": "1898-05-03",
+  "deathDate": "1978-12-08",
+  "events": [
+    {
+      "id": "gm-aliyah",
+      "title": "עלייה לארץ ישראל",
+      "description": "גולדה מאיר עולה מארצות הברית ומתיישבת בקיבוץ מרחביה.",
+      "startDate": "1921",
+      "location": { "name": "מרחביה" }
+    },
+    {
+      "id": "gm-fundraising",
+      "title": "גיוס כספים בארה\"ב",
+      "description": "מסע גיוס כספים קריטי בארצות הברית ערב מלחמת העצמאות.",
+      "startDate": "1948-01",
+      "endDate": "1948-03",
+      "location": { "name": "ארצות הברית" }
+    },
+    {
+      "id": "gm-ambassador",
+      "title": "שגרירה במוסקבה",
+      "description": "גולדה מאיר מכהנת כשגרירת ישראל הראשונה בברית המועצות.",
+      "startDate": "1948-09",
+      "endDate": "1949",
+      "location": { "name": "מוסקבה" }
+    },
+    {
+      "id": "gm-foreign-minister",
+      "title": "שרת החוץ",
+      "description": "כהונה ארוכה כשרת החוץ של ישראל.",
+      "startDate": "1956",
+      "endDate": "1966"
+    },
+    {
+      "id": "gm-pm",
+      "title": "ראשת הממשלה",
+      "description": "גולדה מאיר מכהנת כראשת ממשלת ישראל, כולל במלחמת יום הכיפורים.",
+      "startDate": "1969-03",
+      "endDate": "1974-06"
+    }
+  ]
+}

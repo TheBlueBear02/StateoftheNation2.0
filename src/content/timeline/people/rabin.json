@@ -1,0 +1,54 @@
+{
+  "id": "rabin",
+  "name": "יצחק רבין",
+  "nameEn": "Yitzhak Rabin",
+  "color": "#6b3fa0",
+  "portrait": "/timeline/portraits/rabin.svg",
+  "birthDate": "1922-03-01",
+  "deathDate": "1995-11-04",
+  "events": [
+    {
+      "id": "yr-palmach",
+      "title": "שירות בפלמ\"ח",
+      "description": "רבין מצטרף לפלמ\"ח ומשתתף במלחמת העצמאות כמפקד.",
+      "startDate": "1941",
+      "endDate": "1949"
+    },
+    {
+      "id": "yr-idf-chief",
+      "title": "רמטכ\"ל צה\"ל",
+      "description": "רבין מכהן כרמטכ\"ל ומוביל את צה\"ל במלחמת ששת הימים.",
+      "startDate": "1964",
+      "endDate": "1968"
+    },
+    {
+      "id": "yr-ambassador",
+      "title": "שגריר בארה\"ב",
+      "description": "רבין מכהן כשגריר ישראל בוושינגטון.",
+      "startDate": "1968",
+      "endDate": "1973",
+      "location": { "name": "וושינגטון" }
+    },
+    {
+      "id": "yr-pm-first",
+      "title": "ראש הממשלה (כהונה ראשונה)",
+      "description": "כהונה ראשונה כראש ממשלה, כולל מבצע אנטבה.",
+      "startDate": "1974-06",
+      "endDate": "1977-06"
+    },
+    {
+      "id": "yr-pm-second",
+      "title": "ראש הממשלה (כהונה שנייה)",
+      "description": "כהונה שנייה כראש ממשלה, כולל תהליך אוסלו.",
+      "startDate": "1992-07",
+      "endDate": "1995-11"
+    },
+    {
+      "id": "yr-assassination",
+      "title": "רצח רבין",
+      "description": "יצחק רבין נרצח בעצרת שלום בכיכר מלכי ישראל בתל אביב.",
+      "startDate": "1995-11-04",
+      "location": { "name": "תל אביב", "lat": 32.08, "lng": 34.781 }
+    }
+  ]
+}

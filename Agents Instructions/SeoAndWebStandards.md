@@ -70,4 +70,4 @@ When adding a content page, prefer matching `BreadcrumbList` JSON-LD to the visi
 3. Do **not** list password-gated tools in the sitemap.
 4. Update the matching Agents Instructions doc and [ProjectOverview.md](./ProjectOverview.md) route table.
 
-Public routes currently include `/government/dashboard` (office KPI dashboard).
+Public routes currently include `/government/dashboard` (office KPI dashboard) and `/timeline` (history timeline; JSON content, no DB).
