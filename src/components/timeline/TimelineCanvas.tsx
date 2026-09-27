@@ -1,50 +1,52 @@
 'use client'
 
-import type { LaidOutEvent } from '@/content/timeline/types'
-import type { TimelineRow } from '@/lib/timeline/layout'
-import { yearToX } from '@/lib/timeline/layout'
+import type { LaidOutEvent, TimelineEra } from '@/content/timeline/types'
+import {
+  ERA_BAND_HEIGHT,
+  ERA_TO_EVENTS_GAP,
+  EVENT_BLOCK_HEIGHT,
+  EVENT_H_GAP_PX,
+  EVENT_LAYER_SLOT,
+  MIN_EVENT_WIDTH_PX,
+  yearToX,
+} from '@/lib/timeline/layout'
 import { yearTicks } from '@/lib/timeline/ticks'
+import { EraBand } from './EraBand'
 import { EventBlock } from './EventBlock'
 
 interface TimelineCanvasProps {
-  rows: TimelineRow[]
+  eras: TimelineEra[]
   events: LaidOutEvent[]
-  rowHeights: number[]
+  layerCount: number
   viewStart: number
   viewEnd: number
   width: number
   height: number
   onSelectEvent: (laid: LaidOutEvent) => void
+  onSelectEra: (era: TimelineEra) => void
 }
 
 export function TimelineCanvas({
-  rows,
+  eras,
   events,
-  rowHeights,
+  layerCount,
   viewStart,
   viewEnd,
   width,
   height,
   onSelectEvent,
+  onSelectEra,
 }: TimelineCanvasProps) {
   const span = viewEnd - viewStart
   const pixelsPerYear = span > 0 && width > 0 ? width / span : 1
   const ticks = yearTicks(viewStart, viewEnd, pixelsPerYear)
-
-  // Cumulative top offsets for rows
-  const rowTops: number[] = []
-  let y = 0
-  for (const h of rowHeights) {
-    rowTops.push(y)
-    y += h
-  }
+  const layers = Math.max(layerCount, 1)
+  const layerSlot = EVENT_LAYER_SLOT
+  const blockHeight = EVENT_BLOCK_HEIGHT
+  const eventsOffsetY = ERA_BAND_HEIGHT + ERA_TO_EVENTS_GAP
 
   return (
-    <div
-      className="timeline-canvas"
-      style={{ width, height }}
-    >
-      {/* Vertical year gridlines */}
+    <div className="timeline-canvas" style={{ width, height }}>
       <div className="timeline-canvas__grid" aria-hidden="true">
         {ticks.map((year) => {
           const x = yearToX(year, viewStart, viewEnd, width)
@@ -58,45 +60,40 @@ export function TimelineCanvas({
         })}
       </div>
 
-      {/* Row backgrounds / separators */}
-      {rows.map((row, i) => (
-        <div
-          key={row.id}
-          className={`timeline-canvas__row timeline-canvas__row--${row.kind}`}
-          style={{
-            top: rowTops[i],
-            height: rowHeights[i],
-            borderColor: row.color,
-          }}
-        />
-      ))}
+      <EraBand
+        eras={eras}
+        viewStart={viewStart}
+        viewEnd={viewEnd}
+        width={width}
+        height={ERA_BAND_HEIGHT}
+        onSelectEra={onSelectEra}
+      />
 
-      {/* Events */}
+      {/* Compact shared layers packed below the era band */}
+      <div className="timeline-canvas__layers" aria-hidden="true">
+        {Array.from({ length: layers }, (_, i) => (
+          <div
+            key={i}
+            className="timeline-canvas__layer"
+            style={{
+              top: eventsOffsetY + i * layerSlot,
+              height: layerSlot,
+            }}
+          />
+        ))}
+      </div>
+
       {events.map((laid) => {
         const left = yearToX(laid.startYear, viewStart, viewEnd, width)
         const right = yearToX(laid.endYear, viewStart, viewEnd, width)
-        const blockWidth = Math.max(right - left, 6)
-
-        const topRow = laid.rowStart
-        const bottomRow = laid.rowEnd
-        const rowTop = rowTops[topRow] ?? 0
-
-        // Sum heights of covered rows
-        let blockHeight = 0
-        for (let r = topRow; r <= bottomRow; r++) {
-          blockHeight += rowHeights[r] ?? 0
-        }
-
-        const maxLanes = Math.max(
-          ...Array.from(
-            { length: bottomRow - topRow + 1 },
-            (_, i) => rows[topRow + i]?.laneCount ?? 1,
-          ),
+        const blockWidth = Math.max(
+          right - left - EVENT_H_GAP_PX,
+          MIN_EVENT_WIDTH_PX,
         )
-        const laneHeight = blockHeight / maxLanes
-        const padding = 4
-        const eventTop = rowTop + laid.lane * laneHeight + padding
-        const eventHeight = Math.max(laneHeight - padding * 2, 10)
+        const eventTop =
+          eventsOffsetY +
+          laid.lane * layerSlot +
+          (layerSlot - blockHeight) / 2
 
         return (
           <EventBlock
@@ -105,7 +102,7 @@ export function TimelineCanvas({
             left={left}
             width={blockWidth}
             top={eventTop}
-            height={eventHeight}
+            height={blockHeight}
             onSelect={onSelectEvent}
           />
         )

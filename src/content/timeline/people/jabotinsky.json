@@ -1,0 +1,69 @@
+{
+  "id": "jabotinsky",
+  "name": "זאב ז'בוטינסקי",
+  "nameEn": "Ze'ev Jabotinsky",
+  "color": "#4a5568",
+  "portrait": "/timeline/portraits/jabotinsky.png",
+  "birthDate": "1880-10-17",
+  "deathDate": "1940-08-04",
+  "events": [
+    {
+      "id": "zj-birth",
+      "title": "לידה",
+      "description": "זאב ז'בוטינסקי נולד באודסה.",
+      "startDate": "1880-10-17",
+      "location": {
+        "name": "אודסה",
+        "lat": 46.482,
+        "lng": 30.723
+      }
+    },
+    {
+      "id": "zj-legion",
+      "title": "הגדודים העבריים",
+      "description": "ז'בוטינסקי פועל להקמת הגדודים העבריים במלחמת העולם הראשונה.",
+      "startDate": "1915",
+      "endDate": "1918"
+    },
+    {
+      "id": "zj-haganah",
+      "title": "הגנת ירושלים",
+      "description": "ז'בוטינסקי משתתף בארגון ההגנה בירושלים בפרעות תר\"פ ונאסר בידי הבריטים.",
+      "startDate": "1920",
+      "location": {
+        "name": "ירושלים",
+        "lat": 31.768,
+        "lng": 35.214
+      }
+    },
+    {
+      "id": "zj-revisionist",
+      "title": "הציונות הרוויזיוניסטית",
+      "description": "ז'בוטינסקי מקים את התנועה הרוויזיוניסטית כחלופה להנהגת ההסתדרות הציונית.",
+      "startDate": "1925",
+      "endDate": "1940"
+    },
+    {
+      "id": "zj-betar",
+      "title": "הקמת בית\"ר",
+      "description": "ז'בוטינסקי מייסד את תנועת הנוער בית\"ר.",
+      "startDate": "1923",
+      "location": {
+        "name": "ריגה",
+        "lat": 56.949,
+        "lng": 24.105
+      }
+    },
+    {
+      "id": "zj-death",
+      "title": "פטירת ז'בוטינסקי",
+      "description": "ז'בוטינסקי נפטר בארצות הברית; עצמותיו הועברו לירושלים ב-1964.",
+      "startDate": "1940-08-04",
+      "location": {
+        "name": "ניו יורק",
+        "lat": 40.713,
+        "lng": -74.006
+      }
+    }
+  ]
+}

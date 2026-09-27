@@ -2,11 +2,22 @@
   "id": "rabin",
   "name": "יצחק רבין",
   "nameEn": "Yitzhak Rabin",
-  "color": "#6b3fa0",
+  "color": "#c45c26",
   "portrait": "/timeline/portraits/rabin.svg",
   "birthDate": "1922-03-01",
   "deathDate": "1995-11-04",
   "events": [
+    {
+      "id": "yr-birth",
+      "title": "לידה",
+      "description": "יצחק רבין נולד בירושלים.",
+      "startDate": "1922-03-01",
+      "location": {
+        "name": "ירושלים",
+        "lat": 31.768,
+        "lng": 35.214
+      }
+    },
     {
       "id": "yr-palmach",
       "title": "שירות בפלמ\"ח",
@@ -27,7 +38,11 @@
       "description": "רבין מכהן כשגריר ישראל בוושינגטון.",
       "startDate": "1968",
       "endDate": "1973",
-      "location": { "name": "וושינגטון" }
+      "location": {
+        "name": "וושינגטון",
+        "lat": 38.907,
+        "lng": -77.037
+      }
     },
     {
       "id": "yr-pm-first",
@@ -48,7 +63,11 @@
       "title": "רצח רבין",
       "description": "יצחק רבין נרצח בעצרת שלום בכיכר מלכי ישראל בתל אביב.",
       "startDate": "1995-11-04",
-      "location": { "name": "תל אביב", "lat": 32.08, "lng": 34.781 }
+      "location": {
+        "name": "תל אביב",
+        "lat": 32.085,
+        "lng": 34.781
+      }
     }
   ]
 }

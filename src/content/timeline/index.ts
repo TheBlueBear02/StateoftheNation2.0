@@ -1,14 +1,19 @@
+import herzl from './people/herzl.json'
+import weizmann from './people/weizmann.json'
+import jabotinsky from './people/jabotinsky.json'
 import benGurion from './people/ben-gurion.json'
 import goldaMeir from './people/golda-meir.json'
 import begin from './people/begin.json'
 import rabin from './people/rabin.json'
 import stateEventsJson from './state-events.json'
 import sharedEventsJson from './shared-events.json'
+import erasJson from './eras.json'
 import type {
   Person,
   SharedEvent,
   TimelineData,
   TimelineDate,
+  TimelineEra,
   TimelineEvent,
 } from './types'
 
@@ -56,6 +61,22 @@ function validateEvent(event: TimelineEvent, label: string): void {
       throw new Error(`endDate before startDate for ${label}`)
     }
   }
+  if (event.location) {
+    const { name, lat, lng } = event.location
+    if (!name) {
+      throw new Error(`location.name required for ${label}`)
+    }
+    const hasLat = typeof lat === 'number'
+    const hasLng = typeof lng === 'number'
+    if (hasLat !== hasLng) {
+      throw new Error(`location needs both lat and lng for ${label}`)
+    }
+    if (hasLat && hasLng) {
+      if (lat! < -90 || lat! > 90 || lng! < -180 || lng! > 180) {
+        throw new Error(`location lat/lng out of range for ${label}`)
+      }
+    }
+  }
 }
 
 function validatePerson(person: Person): void {
@@ -69,10 +90,42 @@ function validatePerson(person: Person): void {
   }
 }
 
+/** Eras must not overlap — only one era at a time. Gaps are allowed. */
+function validateEras(eras: TimelineEra[]): void {
+  const ids = new Set<string>()
+  for (const era of eras) {
+    if (!era.id || !era.name || !era.color || !era.startDate || !era.endDate) {
+      throw new Error(`Incomplete era: ${era.id ?? '(missing id)'}`)
+    }
+    if (ids.has(era.id)) throw new Error(`Duplicate era id: ${era.id}`)
+    ids.add(era.id)
+    assertDate(era.startDate, `era/${era.id}.startDate`)
+    assertDate(era.endDate, `era/${era.id}.endDate`)
+    if (dateSortKey(era.endDate, true) < dateSortKey(era.startDate, false)) {
+      throw new Error(`endDate before startDate for era/${era.id}`)
+    }
+  }
+
+  const sorted = [...eras].sort(
+    (a, b) =>
+      dateSortKey(a.startDate, false) - dateSortKey(b.startDate, false),
+  )
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1]
+    const curr = sorted[i]
+    if (dateSortKey(curr.startDate, false) <= dateSortKey(prev.endDate, true)) {
+      throw new Error(
+        `Eras overlap: ${prev.id} and ${curr.id} (only one era at a time)`,
+      )
+    }
+  }
+}
+
 export function loadTimelineData(): TimelineData {
-  const people = [benGurion, goldaMeir, begin, rabin] as Person[]
+  const people = [herzl, weizmann, jabotinsky, benGurion, goldaMeir, begin, rabin] as Person[]
   const stateEvents = stateEventsJson as TimelineEvent[]
   const sharedEvents = sharedEventsJson as SharedEvent[]
+  const eras = erasJson as TimelineEra[]
 
   for (const person of people) validatePerson(person)
   for (const event of stateEvents) validateEvent(event, `state/${event.id}`)
@@ -82,6 +135,7 @@ export function loadTimelineData(): TimelineData {
       throw new Error(`Shared event ${event.id} needs at least 2 personIds`)
     }
   }
+  validateEras(eras)
 
   const personIds = new Set(people.map((p) => p.id))
   const allEventIds = new Set<string>()
@@ -109,7 +163,19 @@ export function loadTimelineData(): TimelineData {
     }
   }
 
-  return { people, stateEvents, sharedEvents }
+  const sortedEras = [...eras].sort(
+    (a, b) =>
+      dateSortKey(a.startDate, false) - dateSortKey(b.startDate, false),
+  )
+
+  return { people, stateEvents, sharedEvents, eras: sortedEras }
 }
 
-export type { TimelineData, Person, SharedEvent, TimelineEvent, TimelineDate }
+export type {
+  TimelineData,
+  Person,
+  SharedEvent,
+  TimelineEvent,
+  TimelineDate,
+  TimelineEra,
+}

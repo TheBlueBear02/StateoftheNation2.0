@@ -3,9 +3,9 @@ import { loadTimelineData } from '@/content/timeline'
 import { TimelinePage } from '@/views/TimelinePage'
 
 export const metadata: Metadata = {
-  title: 'ציר זמן',
+  title: 'בזכותם | ציר זמן למדינת ישראל',
   description:
-    'ציר זמן של תולדות מדינת ישראל דרך סיפורי החיים של דמויות מפתח ואירועי מדינה.',
+    'ציר זמן למדינת ישראל דרך סיפור חייהם של דמויות מפתח בציונות.',
   alternates: { canonical: '/timeline' },
 }
 

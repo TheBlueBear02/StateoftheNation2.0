@@ -3,23 +3,42 @@
   "name": "דוד בן-גוריון",
   "nameEn": "David Ben-Gurion",
   "color": "#1e5aa8",
-  "portrait": "/timeline/portraits/ben-gurion.svg",
+  "portrait": "/timeline/portraits/ben-gurion.png",
   "birthDate": "1886-10-16",
   "deathDate": "1973-12-01",
   "events": [
+    {
+      "id": "bg-birth",
+      "title": "לידה",
+      "description": "דוד בן-גוריון נולד בפלונסק.",
+      "startDate": "1886-10-16",
+      "location": {
+        "name": "פלונסק",
+        "lat": 52.623,
+        "lng": 20.375
+      }
+    },
     {
       "id": "bg-aliyah",
       "title": "עלייה לארץ ישראל",
       "description": "בן-גוריון עולה לארץ ישראל מפולין ומצטרף לתנועת העבודה.",
       "startDate": "1906",
-      "location": { "name": "יפו" }
+      "location": {
+        "name": "יפו",
+        "lat": 32.053,
+        "lng": 34.752
+      }
     },
     {
       "id": "bg-histadrut",
       "title": "הקמת ההסתדרות",
       "description": "בן-גוריון נוטל תפקיד מרכזי בהקמת ההסתדרות הכללית של העובדים.",
       "startDate": "1920",
-      "location": { "name": "חיפה" }
+      "location": {
+        "name": "חיפה",
+        "lat": 32.794,
+        "lng": 34.989
+      }
     },
     {
       "id": "bg-mapai",
@@ -41,7 +60,11 @@
       "description": "בן-גוריון פורש זמנית לשדה בוקר ומדגיש את חשיבות הנגב.",
       "startDate": "1953",
       "endDate": "1955",
-      "location": { "name": "שדה בוקר" }
+      "location": {
+        "name": "שדה בוקר",
+        "lat": 30.872,
+        "lng": 34.792
+      }
     }
   ]
 }

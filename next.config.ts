@@ -44,6 +44,7 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ['@supabase/supabase-js'],
+  transpilePackages: ['leaflet'],
 }
 
 export default nextConfig

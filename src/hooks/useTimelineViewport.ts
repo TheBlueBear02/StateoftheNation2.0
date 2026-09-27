@@ -8,6 +8,8 @@ export interface TimelineViewport {
   zoomIn: () => void
   zoomOut: () => void
   showAll: () => void
+  /** Zoom the viewport to an exact year range (clamped to data bounds). */
+  zoomToRange: (startYear: number, endYear: number) => void
   isFitted: boolean
 }
 
@@ -101,6 +103,14 @@ export function useTimelineViewport(
   const showAll = useCallback(() => {
     applyView(dataMin, dataMax)
   }, [applyView, dataMin, dataMax])
+
+  const zoomToRange = useCallback(
+    (startYear: number, endYear: number) => {
+      const pad = Math.max((endYear - startYear) * 0.02, MIN_SPAN_YEARS * 0.5)
+      applyView(startYear - pad, endYear + pad)
+    },
+    [applyView],
+  )
 
   useEffect(() => {
     const el = containerRef.current
@@ -228,6 +238,7 @@ export function useTimelineViewport(
     zoomIn,
     zoomOut,
     showAll,
+    zoomToRange,
     isFitted,
   }
 }

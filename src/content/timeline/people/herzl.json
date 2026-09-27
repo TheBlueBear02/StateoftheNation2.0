@@ -1,0 +1,74 @@
+{
+  "id": "herzl",
+  "name": "בנימין זאב הרצל",
+  "nameEn": "Theodor Herzl",
+  "color": "#8b5a2b",
+  "portrait": "/timeline/portraits/herzel.png",
+  "birthDate": "1860-05-02",
+  "deathDate": "1904-07-03",
+  "events": [
+    {
+      "id": "herzl-birth",
+      "title": "לידה",
+      "description": "בנימין זאב הרצל נולד בבודפשט.",
+      "startDate": "1860-05-02",
+      "location": {
+        "name": "בודפשט",
+        "lat": 47.498,
+        "lng": 19.04
+      }
+    },
+    {
+      "id": "herzl-judenstaat",
+      "title": "מדינת היהודים",
+      "description": "הרצל מפרסם את הספר \"מדינת היהודים\" ומציג את הרעיון הציוני המודרני.",
+      "startDate": "1896-02",
+      "location": {
+        "name": "וינה",
+        "lat": 48.208,
+        "lng": 16.374
+      }
+    },
+    {
+      "id": "herzl-congress",
+      "title": "הקונגרס הציוני הראשון",
+      "description": "הרצל מכנס בבאזל את הקונגרס הציוני הראשון ומקים את ההסתדרות הציונית.",
+      "startDate": "1897-08-29",
+      "endDate": "1897-08-31",
+      "location": {
+        "name": "באזל",
+        "lat": 47.56,
+        "lng": 7.589
+      }
+    },
+    {
+      "id": "herzl-wzo",
+      "title": "נשיא ההסתדרות הציונית",
+      "description": "הרצל עומד בראש התנועה הציונית ומוביל דיפלומטיה למען מדינה ליהודים.",
+      "startDate": "1897",
+      "endDate": "1904"
+    },
+    {
+      "id": "herzl-uganda",
+      "title": "תוכנית אוגנדה",
+      "description": "בקונגרס הציוני השישי מועלית תוכנית מזרח אפריקה כמקלט זמני ליהודים.",
+      "startDate": "1903-08",
+      "location": {
+        "name": "באזל",
+        "lat": 47.56,
+        "lng": 7.589
+      }
+    },
+    {
+      "id": "herzl-death",
+      "title": "פטירת הרצל",
+      "description": "הרצל נפטר באוסטריה; עצמותיו הועברו לירושלים ב-1949.",
+      "startDate": "1904-07-03",
+      "location": {
+        "name": "אדלך",
+        "lat": 47.698,
+        "lng": 15.814
+      }
+    }
+  ]
+}

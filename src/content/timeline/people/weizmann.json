@@ -1,0 +1,75 @@
+{
+  "id": "weizmann",
+  "name": "חיים ויצמן",
+  "nameEn": "Chaim Weizmann",
+  "color": "#0d7377",
+  "portrait": "/timeline/portraits/weizmann.png",
+  "birthDate": "1874-11-27",
+  "deathDate": "1952-11-09",
+  "events": [
+    {
+      "id": "cw-birth",
+      "title": "לידה",
+      "description": "חיים ויצמן נולד במוטול.",
+      "startDate": "1874-11-27",
+      "location": {
+        "name": "מוטול",
+        "lat": 52.314,
+        "lng": 25.608
+      }
+    },
+    {
+      "id": "cw-manchester",
+      "title": "הוראה במנצ'סטר",
+      "description": "ויצמן מתיישב באנגליה ופועל ככימאי וכמנהיג ציוני.",
+      "startDate": "1904",
+      "endDate": "1919",
+      "location": {
+        "name": "מנצ'סטר",
+        "lat": 53.48,
+        "lng": -2.243
+      }
+    },
+    {
+      "id": "cw-balfour",
+      "title": "הצהרת בלפור",
+      "description": "ויצמן מוביל את המאמץ הדיפלומטי שהוביל להצהרת בלפור.",
+      "startDate": "1917-11-02",
+      "location": {
+        "name": "לונדון",
+        "lat": 51.507,
+        "lng": -0.128
+      }
+    },
+    {
+      "id": "cw-wzo",
+      "title": "נשיא ההסתדרות הציונית",
+      "description": "ויצמן עומד בראש התנועה הציונית ומוביל את המאבק המדיני על הבית הלאומי.",
+      "startDate": "1920",
+      "endDate": "1946"
+    },
+    {
+      "id": "cw-institute",
+      "title": "מכון ויצמן",
+      "description": "הקמת המכון למדע ברחובות (לימים מכון ויצמן למדע).",
+      "startDate": "1934",
+      "location": {
+        "name": "רחובות",
+        "lat": 31.894,
+        "lng": 34.812
+      }
+    },
+    {
+      "id": "cw-president",
+      "title": "נשיא מדינת ישראל",
+      "description": "ויצמן נבחר לנשיא הראשון של מדינת ישראל.",
+      "startDate": "1949-02-17",
+      "endDate": "1952-11-09",
+      "location": {
+        "name": "רחובות",
+        "lat": 31.894,
+        "lng": 34.812
+      }
+    }
+  ]
+}

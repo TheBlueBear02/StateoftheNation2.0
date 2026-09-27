@@ -2,17 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { LaidOutEvent, TimelineData } from '@/content/timeline/types'
+import type { LaidOutEvent, TimelineData, TimelineEra } from '@/content/timeline/types'
 import { EventModal } from '@/components/timeline/EventModal'
 import { PortraitColumn } from '@/components/timeline/PortraitColumn'
 import { TimelineCanvas } from '@/components/timeline/TimelineCanvas'
 import { YearAxis } from '@/components/timeline/YearAxis'
 import { ZoomControls } from '@/components/timeline/ZoomControls'
 import { useTimelineViewport } from '@/hooks/useTimelineViewport'
+import { eventYearRange } from '@/lib/timeline/dates'
 import {
-  assignLanes,
   buildRows,
   computeDataRange,
+  entitiesInViewport,
+  layoutEvents,
   orderRows,
 } from '@/lib/timeline/layout'
 import './TimelinePage.css'
@@ -20,8 +22,6 @@ import './TimelinePage.css'
 interface TimelinePageProps {
   data: TimelineData
 }
-
-const COLLAPSED_ROW_HEIGHT = 36
 
 export function TimelinePage({ data }: TimelinePageProps) {
   const orderedPeople = useMemo(
@@ -40,7 +40,12 @@ export function TimelinePage({ data }: TimelinePageProps) {
 
   const { minYear, maxYear } = useMemo(
     () =>
-      computeDataRange(data.people, data.stateEvents, data.sharedEvents),
+      computeDataRange(
+        data.people,
+        data.stateEvents,
+        data.sharedEvents,
+        data.eras,
+      ),
     [data],
   )
 
@@ -62,63 +67,64 @@ export function TimelinePage({ data }: TimelinePageProps) {
     return () => ro.disconnect()
   }, [])
 
-  const { rows, events, rowHeights } = useMemo(() => {
-    const baseRows = buildRows(orderedPeople, visiblePersonIds, stateVisible)
-    const laid = assignLanes(
-      baseRows,
+  const inView = useMemo(
+    () =>
+      entitiesInViewport(
+        data.people,
+        data.stateEvents,
+        data.sharedEvents,
+        viewport.viewStart,
+        viewport.viewEnd,
+      ),
+    [
+      data.people,
+      data.stateEvents,
+      data.sharedEvents,
+      viewport.viewStart,
+      viewport.viewEnd,
+    ],
+  )
+
+  const filterRows = useMemo(() => {
+    const rows = buildRows(orderedPeople, visiblePersonIds, stateVisible)
+    return rows.filter((row) => {
+      if (row.kind === 'state') return inView.stateInView
+      return inView.personIds.has(row.id)
+    })
+  }, [orderedPeople, visiblePersonIds, stateVisible, inView])
+
+  const { events, layerCount } = useMemo(() => {
+    const span = viewport.viewEnd - viewport.viewStart
+    const pixelsPerYear =
+      span > 0 && trackSize.width > 0 ? trackSize.width / span : 1
+    return layoutEvents(
       data.people,
       data.stateEvents,
       data.sharedEvents,
       visiblePersonIds,
       stateVisible,
+      pixelsPerYear,
     )
-
-    const collapsedCount = laid.rows.filter((r) => r.collapsed).length
-    const expanded = laid.rows.filter((r) => !r.collapsed)
-    const totalLanes =
-      expanded.reduce((sum, r) => sum + r.laneCount, 0) || 1
-    const available = Math.max(
-      trackSize.height - collapsedCount * COLLAPSED_ROW_HEIGHT,
-      80,
-    )
-
-    const heights = laid.rows.map((r) => {
-      if (r.collapsed) return COLLAPSED_ROW_HEIGHT
-      return Math.max((r.laneCount / totalLanes) * available, 48)
-    })
-
-    const expandedSum = heights
-      .filter((_, i) => !laid.rows[i].collapsed)
-      .reduce((a, b) => a + b, 0)
-    if (expandedSum > 0 && Math.abs(expandedSum - available) > 1) {
-      const scale = available / expandedSum
-      for (let i = 0; i < heights.length; i++) {
-        if (!laid.rows[i].collapsed) heights[i] *= scale
-      }
-    }
-
-    return {
-      rows: laid.rows,
-      events: laid.events,
-      rowHeights: heights,
-    }
   }, [
-    orderedPeople,
-    visiblePersonIds,
-    stateVisible,
     data.people,
     data.stateEvents,
     data.sharedEvents,
-    trackSize.height,
+    visiblePersonIds,
+    stateVisible,
+    viewport.viewStart,
+    viewport.viewEnd,
+    trackSize.width,
   ])
-
-  const canvasHeight = rowHeights.reduce((a, b) => a + b, 0)
 
   const togglePerson = (id: string) => {
     setVisiblePersonIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) {
-        if (next.size === 1 && !stateVisible) return prev
+        const othersInViewOn = [...inView.personIds].some(
+          (pid) => pid !== id && next.has(pid),
+        )
+        const stateStillOn = stateVisible && inView.stateInView
+        if (!othersInViewOn && !stateStillOn) return prev
         next.delete(id)
       } else {
         next.add(id)
@@ -129,30 +135,53 @@ export function TimelinePage({ data }: TimelinePageProps) {
 
   const toggleState = () => {
     setStateVisible((prev) => {
-      if (prev && visiblePersonIds.size === 0) return prev
+      if (prev) {
+        const anyPersonInViewOn = [...inView.personIds].some((pid) =>
+          visiblePersonIds.has(pid),
+        )
+        if (!anyPersonInViewOn) return prev
+      }
       return !prev
     })
   }
 
+  const focusEra = (era: TimelineEra) => {
+    const { startYear, endYear } = eventYearRange(era.startDate, era.endDate)
+    viewport.zoomToRange(startYear, endYear)
+  }
+
   return (
     <div className="timeline-page">
-      <header className="timeline-chrome" data-timeline-no-pan>
-        <Link href="/" className="timeline-chrome__home">
-          ← מצב האומה
-        </Link>
-        <h1 className="timeline-chrome__title">ציר זמן</h1>
+      <header className="timeline-chrome" data-timeline-no-pan dir="ltr">
         <ZoomControls
           onZoomIn={viewport.zoomIn}
           onZoomOut={viewport.zoomOut}
           onShowAll={viewport.showAll}
           isFitted={viewport.isFitted}
         />
+        <div className="timeline-chrome__branding">
+          <h1 className="timeline-chrome__title">
+            בזכותם | ציר זמן למדינת ישראל
+          </h1>
+          <p className="timeline-chrome__subtitle">
+            דרך סיפור חייהם של דמויות מפתח בציונות
+          </p>
+        </div>
+        <Link href="/" className="timeline-chrome__home" aria-label="מצב האומה - דף הבית">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/header-logo%203.svg"
+            alt="מצב האומה"
+            className="timeline-chrome__logo"
+            width={140}
+            height={36}
+          />
+        </Link>
       </header>
 
       <div className="timeline-body" dir="ltr">
         <PortraitColumn
-          rows={rows}
-          rowHeights={rowHeights}
+          rows={filterRows}
           onTogglePerson={togglePerson}
           onToggleState={toggleState}
         />
@@ -165,14 +194,15 @@ export function TimelinePage({ data }: TimelinePageProps) {
             aria-label="ציר הזמן"
           >
             <TimelineCanvas
-              rows={rows}
+              eras={data.eras}
               events={events}
-              rowHeights={rowHeights}
+              layerCount={layerCount}
               viewStart={viewport.viewStart}
               viewEnd={viewport.viewEnd}
               width={trackSize.width}
-              height={canvasHeight}
+              height={trackSize.height}
               onSelectEvent={setSelected}
+              onSelectEra={focusEra}
             />
           </div>
           <YearAxis
@@ -185,7 +215,9 @@ export function TimelinePage({ data }: TimelinePageProps) {
 
       <EventModal
         laid={selected}
+        events={events}
         people={data.people}
+        onSelect={setSelected}
         onClose={() => setSelected(null)}
       />
     </div>

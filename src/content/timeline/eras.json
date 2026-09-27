@@ -1,0 +1,37 @@
+[
+  {
+    "id": "yishuv",
+    "name": "היישוב",
+    "startDate": "1860",
+    "endDate": "1948-05-13",
+    "color": "#5a6b7a"
+  },
+  {
+    "id": "founding",
+    "name": "שנות היסוד",
+    "startDate": "1948-05-14",
+    "endDate": "1967-06-04",
+    "color": "#1e5aa8"
+  },
+  {
+    "id": "post-six-day",
+    "name": "אחרי ששת הימים",
+    "startDate": "1967-06-05",
+    "endDate": "1977-05-16",
+    "color": "#2a7a4b"
+  },
+  {
+    "id": "mahapach",
+    "name": "עידן המהפך",
+    "startDate": "1977-05-17",
+    "endDate": "1992-06-22",
+    "color": "#b85c1e"
+  },
+  {
+    "id": "oslo-era",
+    "name": "תהליך אוסלו",
+    "startDate": "1992-06-23",
+    "endDate": "2000",
+    "color": "#6b3d9e"
+  }
+]
