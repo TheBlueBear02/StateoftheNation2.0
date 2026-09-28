@@ -22,7 +22,11 @@ Show overlapping political biographies on a shared time axis so users can see pe
 | File | Role |
 |------|------|
 | `src/app/timeline/page.tsx` | Route + metadata; loads JSON via `loadTimelineData()` |
+| `src/app/timeline/edit/page.tsx` | Edit route (dev-only 404 in production); loads JSON into `TimelineEditPage` |
+| `src/app/api/timeline/events/route.ts` | Persist upsert/delete into timeline JSON files |
+| `src/app/api/timeline/geocode/route.ts` | Nominatim lookup for city/country → lat/lng |
 | `src/views/TimelinePage.tsx` | Client shell: toggles, viewport, layout |
+| `src/views/TimelineEditPage.tsx` | Edit shell: mutable data, add/edit form, save API |
 | `src/views/TimelinePage.css` | Full-screen styles; event blocks use light rounding + subtle texture |
 | `src/content/timeline/types.ts` | `Person`, `TimelineEvent`, `SharedEvent`, `TimelineEra`, `LaidOutEvent` |
 | `src/content/timeline/people/*.json` | One file per person + their solo events |
@@ -32,9 +36,12 @@ Show overlapping political biographies on a shared time axis so users can see pe
 | `src/content/timeline/index.ts` | Static imports + validation → `loadTimelineData()` |
 | `src/lib/timeline/dates.ts` | Partial dates → fractional years |
 | `src/lib/timeline/layout.ts` | Layout helpers + `EVENT_*` / `ERA_BAND_HEIGHT` constants |
+| `src/lib/timeline/validate.ts` | Shared event/person/era validation |
+| `src/lib/timeline/persistEvent.ts` | Server JSON write helpers for the edit API |
+| `src/lib/timeline/mutateData.ts` | Client-side data patch + `saveTimelineEventApi` |
 | `src/lib/timeline/ticks.ts` | Adaptive year tick step |
 | `src/hooks/useTimelineViewport.ts` | Fit / zoom / pan / pinch / `zoomToRange` |
-| `src/components/timeline/*` | Canvas, EraBand, EventBlock, PortraitColumn, YearAxis, EventModal, EventMap, ZoomControls |
+| `src/components/timeline/*` | Canvas, EraBand, EventBlock, PortraitColumn, YearAxis, EventModal, EventMap, EventEditForm, EventMediaPanel, ZoomControls |
 | `public/timeline/portraits/*.svg` | Placeholder drawn portraits |
 
 ## JSON schema
@@ -62,18 +69,19 @@ Portrait paths are public URLs under `/timeline/portraits/` (PNG or SVG). The le
 | `id` | yes | Unique across all people / state / shared |
 | `title` | yes | Hebrew |
 | `description` | yes | Short Hebrew copy |
-| `image` | no | Path under `/public` |
-| `startDate` | yes | `"1948"`, `"1948-05"`, or `"1948-05-14"` |
+| `image` | no | Path/URL for the modal image panel |
+| `video` | no | Video URL (direct file or YouTube); preferred over `image` when set |
+| `startDate` | yes | Stored as `"1948"`, `"1948-05"`, or `"1948-05-14"`; shown/edited as `1948` / `05.1948` / `14.05.1948` |
 | `endDate` | no | Same formats; omit for point events (min visual width ~0.25 year) |
-| `location` | no | `{ name, lat?, lng? }` — include both `lat`/`lng` (WGS84) to show the modal map |
+| `location` | no | `{ name, country?, lat?, lng? }` — include both `lat`/`lng` (WGS84) to show the modal map |
 
 ### Location
 
 ```json
-"location": { "name": "פלונסק", "lat": 52.623, "lng": 20.375 }
+"location": { "name": "תל אביב", "country": "ישראל", "lat": 32.085, "lng": 34.781 }
 ```
 
-If `lat` or `lng` is set, both are required and validated. The event modal shows a light gray Esri basemap (no API key) via Leaflet, pinned to those coordinates (`EventMap`). Without coords, a dashed map placeholder is shown.
+If `lat` or `lng` is set, both are required and validated. The event modal shows a light gray Esri basemap (no API key) via Leaflet, pinned to those coordinates with a permanent place label (`עיר, מדינה` when `country` is set). Without coords, a dashed map placeholder is shown.
 
 ### Shared event
 
@@ -123,13 +131,24 @@ Same as event plus `personIds: string[]` (at least 2 valid person ids). Rendered
 ## Interaction
 
 - Hover: native `title` tooltip (title + dates).
-- Click event: modal with left image panel (real image or “תמונה” placeholder), right column for person+title, dates, description, and a light gray map under the text (Esri/Leaflet when `location.lat`/`lng` exist; otherwise placeholder).
+- Click event: modal with left media panel (video if `video` is set — YouTube embed or `<video>` — else image or “תמונה” placeholder), right column for person+title, dates, description (`white-space: pre-wrap` so newlines/tabs are kept), and a light gray map under the text (Esri/Leaflet when `location.lat`/`lng` exist; otherwise placeholder).
 - Modal footer: centered text prev/next titles with chevron heads (‹ ›) for that person’s chronological sequence (solo + shared) or state events; ArrowLeft/ArrowRight also navigate; missing side shows a spacer.
 - Desktop (`min-width: 900px`): two-column grid — tall image column left (~42%), text + map column right (~58%); mobile stacks image above content.
 - Click era: zoom timeline to that era only.
 - Modal closes on Esc or backdrop click (fade/scale exit before unmount).
 - Modal open/close: backdrop fade + panel scale/slide. Respects `prefers-reduced-motion`.
 - Portrait click: toggle that person’s (or state’s) events on the shared layers. Portraits only appear when they have events in the current zoom window.
+
+## Edit mode (`/timeline/edit`)
+
+- **Local development only** (`NODE_ENV === 'development'`). On production the route returns 404; write/geocode APIs are blocked the same way.
+- Edit page loads JSON **from disk** each request (`loadTimelineDataFromDisk`) so saves are not lost to webpack-cached imports.
+- Same canvas/chrome as the public timeline, plus **הוסף אירוע** and a link back to `/timeline`.
+- Clicking an event opens `EventEditForm` (title, description, dates, person checkboxes, location, image URL, video URL). **חשב קואורדינטות** geocodes city+country via Nominatim with Hebrew→English country fallbacks (`GET /api/timeline/geocode`) and fills lat/lng.
+- Unsaved form drafts are kept in `localStorage` when the form is closed or fields change; reopening Add / the same event restores them. Successful save/delete clears the draft. New-event person checkboxes default to the last saved selection.
+- 0 people → state event; 1 → person file; 2+ → shared event. Save/Delete call `POST /api/timeline/events` and update local state.
+- API writes JSON under `src/content/timeline/`.
+- Route is `noindex`.
 
 ## SEO
 

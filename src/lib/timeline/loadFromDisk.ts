@@ -1,21 +1,12 @@
-import herzl from './people/herzl.json'
-import weizmann from './people/weizmann.json'
-import jabotinsky from './people/jabotinsky.json'
-import benGurion from './people/ben-gurion.json'
-import goldaMeir from './people/golda-meir.json'
-import begin from './people/begin.json'
-import rabin from './people/rabin.json'
-import stateEventsJson from './state-events.json'
-import sharedEventsJson from './shared-events.json'
-import erasJson from './eras.json'
+import { promises as fs } from 'fs'
+import path from 'path'
 import type {
   Person,
   SharedEvent,
   TimelineData,
-  TimelineDate,
   TimelineEra,
   TimelineEvent,
-} from './types'
+} from '@/content/timeline/types'
 import {
   dateSortKey,
   validateEras,
@@ -24,19 +15,33 @@ import {
   validateTimelineEvent,
 } from '@/lib/timeline/validate'
 
-export function loadTimelineData(): TimelineData {
-  const people = [
-    herzl,
-    weizmann,
-    jabotinsky,
-    benGurion,
-    goldaMeir,
-    begin,
-    rabin,
-  ] as Person[]
-  const stateEvents = stateEventsJson as TimelineEvent[]
-  const sharedEvents = sharedEventsJson as SharedEvent[]
-  const eras = erasJson as TimelineEra[]
+const CONTENT_ROOT = path.join(process.cwd(), 'src', 'content', 'timeline')
+const PEOPLE_DIR = path.join(CONTENT_ROOT, 'people')
+
+/**
+ * Read timeline JSON from disk (not webpack-cached imports).
+ * Used by the edit page so saves are visible after refresh.
+ */
+export async function loadTimelineDataFromDisk(): Promise<TimelineData> {
+  const peopleFiles = (await fs.readdir(PEOPLE_DIR))
+    .filter((f) => f.endsWith('.json'))
+    .sort()
+
+  const people: Person[] = []
+  for (const file of peopleFiles) {
+    const raw = await fs.readFile(path.join(PEOPLE_DIR, file), 'utf8')
+    people.push(JSON.parse(raw) as Person)
+  }
+
+  const stateEvents = JSON.parse(
+    await fs.readFile(path.join(CONTENT_ROOT, 'state-events.json'), 'utf8'),
+  ) as TimelineEvent[]
+  const sharedEvents = JSON.parse(
+    await fs.readFile(path.join(CONTENT_ROOT, 'shared-events.json'), 'utf8'),
+  ) as SharedEvent[]
+  const eras = JSON.parse(
+    await fs.readFile(path.join(CONTENT_ROOT, 'eras.json'), 'utf8'),
+  ) as TimelineEra[]
 
   for (const person of people) validatePerson(person)
   for (const event of stateEvents) validateTimelineEvent(event, `state/${event.id}`)
@@ -47,18 +52,12 @@ export function loadTimelineData(): TimelineData {
 
   const personIds = new Set(people.map((p) => p.id))
   const allEventIds = new Set<string>()
-
   const trackId = (id: string, label: string) => {
     if (allEventIds.has(id)) throw new Error(`Duplicate event id: ${id} (${label})`)
     allEventIds.add(id)
   }
 
-  const personIdSet = new Set<string>()
   for (const person of people) {
-    if (personIdSet.has(person.id)) {
-      throw new Error(`Duplicate person id: ${person.id}`)
-    }
-    personIdSet.add(person.id)
     for (const event of person.events) trackId(event.id, person.id)
   }
   for (const event of stateEvents) trackId(event.id, 'state')
@@ -77,13 +76,4 @@ export function loadTimelineData(): TimelineData {
   )
 
   return { people, stateEvents, sharedEvents, eras: sortedEras }
-}
-
-export type {
-  TimelineData,
-  Person,
-  SharedEvent,
-  TimelineEvent,
-  TimelineDate,
-  TimelineEra,
 }

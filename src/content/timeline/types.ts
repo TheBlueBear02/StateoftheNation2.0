@@ -3,6 +3,8 @@ export type TimelineDate = string
 
 export interface TimelineLocation {
   name: string
+  /** Country in Hebrew — shown next to the place name on the map. */
+  country?: string
   /** WGS84 latitude — with `lng`, enables the modal map. */
   lat?: number
   /** WGS84 longitude — with `lat`, enables the modal map. */
@@ -14,6 +16,8 @@ export interface TimelineEvent {
   title: string
   description: string
   image?: string
+  /** Optional video URL for the modal media panel (preferred over `image` when set). */
+  video?: string
   startDate: TimelineDate
   endDate?: TimelineDate
   location?: TimelineLocation

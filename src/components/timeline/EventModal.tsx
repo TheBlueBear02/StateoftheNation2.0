@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type TransitionEvent } from 'reac
 import dynamic from 'next/dynamic'
 import type { LaidOutEvent, Person } from '@/content/timeline/types'
 import { formatEventDateRange } from '@/lib/timeline/dates'
+import { EventMediaPanel } from '@/components/timeline/EventMediaPanel'
 
 const EventMap = dynamic(
   () => import('@/components/timeline/EventMap').then((m) => m.EventMap),
@@ -144,28 +145,11 @@ export function EventModal({
         </button>
 
         <div className="timeline-modal__main" dir="ltr">
-          <aside className="timeline-modal__media" aria-label="תמונה">
-            {event.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={event.image}
-                alt=""
-                className="timeline-modal__media-img"
-              />
-            ) : (
-              <div
-                className="timeline-modal__media-placeholder"
-                style={{
-                  background:
-                    colors.length === 1
-                      ? colors[0]
-                      : `linear-gradient(135deg, ${colors.join(', ')})`,
-                }}
-              >
-                <span>תמונה</span>
-              </div>
-            )}
-          </aside>
+          <EventMediaPanel
+            image={event.image}
+            video={event.video}
+            colors={colors}
+          />
 
           <div className="timeline-modal__body">
             <div className="timeline-modal__header">
@@ -207,6 +191,7 @@ export function EventModal({
             typeof event.location.lng === 'number' ? (
               <EventMap
                 name={event.location.name}
+                country={event.location.country}
                 lat={event.location.lat}
                 lng={event.location.lng}
               />

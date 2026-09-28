@@ -44,8 +44,36 @@ export function eventYearRange(
 export function formatTimelineDate(date: TimelineDate): string {
   const parts = date.split('-')
   if (parts.length === 1) return parts[0]
-  if (parts.length === 2) return `${parts[1]}/${parts[0]}`
-  return `${parts[2]}/${parts[1]}/${parts[0]}`
+  if (parts.length === 2) return `${parts[1]}.${parts[0]}`
+  return `${parts[2]}.${parts[1]}.${parts[0]}`
+}
+
+/**
+ * Parse a user-facing date (`24.10.2026`, `10.1948`, or `1948`) into storage form
+ * (`2026-10-24`, `1948-10`, `1948`). Also accepts existing ISO-like values.
+ */
+export function parseTimelineDateInput(raw: string): string | null {
+  const value = raw.trim()
+  if (!value) return ''
+
+  if (/^\d{4}(-\d{2}(-\d{2})?)?$/.test(value)) return value
+
+  const dottedDay = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
+  if (dottedDay) {
+    const day = dottedDay[1].padStart(2, '0')
+    const month = dottedDay[2].padStart(2, '0')
+    return `${dottedDay[3]}-${month}-${day}`
+  }
+
+  const dottedMonth = value.match(/^(\d{1,2})\.(\d{4})$/)
+  if (dottedMonth) {
+    const month = dottedMonth[1].padStart(2, '0')
+    return `${dottedMonth[2]}-${month}`
+  }
+
+  if (/^\d{4}$/.test(value)) return value
+
+  return null
 }
 
 export function formatEventDateRange(

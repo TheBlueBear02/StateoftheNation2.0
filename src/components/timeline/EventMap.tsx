@@ -6,11 +6,26 @@ import 'leaflet/dist/leaflet.css'
 
 interface EventMapProps {
   name: string
+  country?: string
   lat: number
   lng: number
 }
 
-export function EventMap({ name, lat, lng }: EventMapProps) {
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+function placeLabel(name: string, country?: string): string {
+  if (country && country !== name) return `${name}, ${country}`
+  return name
+}
+
+export function EventMap({ name, country, lat, lng }: EventMapProps) {
+  const label = placeLabel(name, country)
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<LeafletMap | null>(null)
 
@@ -38,7 +53,7 @@ export function EventMap({ name, lat, lng }: EventMapProps) {
         boxZoom: true,
         keyboard: true,
         touchZoom: true,
-      }).setView([lat, lng], 8)
+      }).setView([lat, lng], 6)
 
       map.zoomControl.setPosition('bottomleft')
 
@@ -51,19 +66,21 @@ export function EventMap({ name, lat, lng }: EventMapProps) {
         },
       ).addTo(map)
 
-      const marker = L.circleMarker([lat, lng], {
-        radius: 7,
-        color: '#1a1a1a',
-        weight: 1.5,
-        fillColor: '#3b7ae6',
-        fillOpacity: 0.9,
-      }).addTo(map)
-
-      marker.bindTooltip(name, {
-        direction: 'top',
-        offset: [0, -8],
-        opacity: 0.95,
+      const icon = L.divIcon({
+        className: 'timeline-modal__map-marker',
+        html: `
+          <span class="timeline-modal__map-marker-label" dir="rtl">${escapeHtml(label)}</span>
+          <span class="timeline-modal__map-marker-dot" aria-hidden="true"></span>
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
       })
+
+      L.marker([lat, lng], {
+        icon,
+        interactive: false,
+        keyboard: false,
+      }).addTo(map)
 
       mapRef.current = map
       requestAnimationFrame(() => map.invalidateSize())
@@ -80,7 +97,7 @@ export function EventMap({ name, lat, lng }: EventMapProps) {
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [lat, lng, name])
+  }, [lat, lng, label])
 
   return (
     <div className="timeline-modal__map timeline-modal__map--live">
@@ -88,7 +105,7 @@ export function EventMap({ name, lat, lng }: EventMapProps) {
         ref={containerRef}
         className="timeline-modal__map-frame"
         role="img"
-        aria-label={`מפה · ${name}`}
+        aria-label={`מפה · ${label}`}
       />
       <a
         className="timeline-modal__map-link"
@@ -96,7 +113,7 @@ export function EventMap({ name, lat, lng }: EventMapProps) {
         target="_blank"
         rel="noreferrer"
       >
-        מפה · {name}
+        מפה · {label}
       </a>
     </div>
   )
