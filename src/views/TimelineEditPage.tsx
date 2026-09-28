@@ -26,6 +26,7 @@ import {
   entitiesInViewport,
   layoutEvents,
   orderRows,
+  peopleWithPngPortraits,
 } from '@/lib/timeline/layout'
 import {
   deleteEventFromData,
@@ -58,13 +59,19 @@ export function TimelineEditPage({ initialData }: TimelineEditPageProps) {
     setData(initialData)
   }, [initialData])
 
+  // Canvas matches public timeline: only people with PNG portraits.
+  const canvasPeople = useMemo(
+    () => peopleWithPngPortraits(data.people),
+    [data.people],
+  )
+
   const orderedPeople = useMemo(
-    () => orderRows(data.people, data.sharedEvents),
-    [data.people, data.sharedEvents],
+    () => orderRows(canvasPeople, data.sharedEvents),
+    [canvasPeople, data.sharedEvents],
   )
 
   const [visiblePersonIds, setVisiblePersonIds] = useState(
-    () => new Set(initialData.people.map((p) => p.id)),
+    () => new Set(peopleWithPngPortraits(initialData.people).map((p) => p.id)),
   )
   const [stateVisible, setStateVisible] = useState(true)
 
@@ -74,12 +81,12 @@ export function TimelineEditPage({ initialData }: TimelineEditPageProps) {
   const { minYear, maxYear } = useMemo(
     () =>
       computeDataRange(
-        data.people,
+        canvasPeople,
         data.stateEvents,
         data.sharedEvents,
         data.eras,
       ),
-    [data],
+    [canvasPeople, data.stateEvents, data.sharedEvents, data.eras],
   )
 
   const viewport = useTimelineViewport(trackRef, minYear, maxYear)
@@ -103,14 +110,14 @@ export function TimelineEditPage({ initialData }: TimelineEditPageProps) {
   const inView = useMemo(
     () =>
       entitiesInViewport(
-        data.people,
+        canvasPeople,
         data.stateEvents,
         data.sharedEvents,
         viewport.viewStart,
         viewport.viewEnd,
       ),
     [
-      data.people,
+      canvasPeople,
       data.stateEvents,
       data.sharedEvents,
       viewport.viewStart,
@@ -131,7 +138,7 @@ export function TimelineEditPage({ initialData }: TimelineEditPageProps) {
     const pixelsPerYear =
       span > 0 && trackSize.width > 0 ? trackSize.width / span : 1
     return layoutEvents(
-      data.people,
+      canvasPeople,
       data.stateEvents,
       data.sharedEvents,
       visiblePersonIds,
@@ -139,7 +146,7 @@ export function TimelineEditPage({ initialData }: TimelineEditPageProps) {
       pixelsPerYear,
     )
   }, [
-    data.people,
+    canvasPeople,
     data.stateEvents,
     data.sharedEvents,
     visiblePersonIds,

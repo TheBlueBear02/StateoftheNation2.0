@@ -12,9 +12,9 @@ Show overlapping political biographies on a shared time axis so users can see pe
 
 - **No `SiteLayout`** — the page is `100vw × 100dvh`, fixed, with its own chrome.
 - **Top chrome:** zoom controls on the **left**, title “בזכותם | ציר זמן למדינת ישראל” + subtitle centered, site logo (links home) on the **right**.
-- **Left column:** portrait / state filters for entities that have at least one event intersecting the **current viewport** (zoom/pan). People with no events in the visible window are omitted from the bar. Click toggles visibility (grayscale when hidden). Toggle state is kept when they leave/re-enter the view.
+- **Left column:** portrait / state filters for entities that have at least one event intersecting the **current viewport** (zoom/pan). Only people with a **PNG** portrait appear (SVG placeholders are hidden entirely, including their solo events). People with no events in the visible window are omitted from the bar. Click toggles visibility (grayscale when hidden). Toggle state is kept when they leave/re-enter the view.
 - **Era band (top of canvas):** a single row of non-overlapping colored era blocks (`name`, `startDate`, `endDate`, `color`). Clicking an era zooms the viewport to that era’s range.
-- **Main canvas (below eras):** a **shared pool of horizontal event layers** (default 16). Any person’s or state’s events can sit on any layer; visual min-width collisions force a different layer.
+- **Main canvas (below eras):** a **shared pool of horizontal event layers** (default 16). Any person’s or state’s events can sit on any layer; visual min-width collisions force a different layer. The track has a faint Tel Aviv 1950s line-drawing background (`/timeline/timeline-bg-telaviv50s.jpg`, 5% opacity, centered).
 - **Bottom axis:** black line with year labels, left → right (`dir="ltr"` on the timeline body; Hebrew text stays RTL).
 
 ## Files
@@ -27,7 +27,7 @@ Show overlapping political biographies on a shared time axis so users can see pe
 | `src/app/api/timeline/geocode/route.ts` | Nominatim lookup for city/country → lat/lng |
 | `src/views/TimelinePage.tsx` | Client shell: toggles, viewport, layout |
 | `src/views/TimelineEditPage.tsx` | Edit shell: mutable data, add/edit form, save API |
-| `src/views/TimelinePage.css` | Full-screen styles; event blocks use light rounding + subtle texture |
+| `src/views/TimelinePage.css` | Full-screen styles; event blocks use light rounding + subtle texture; track uses low-opacity Tel Aviv 1950s sketch bg |
 | `src/content/timeline/types.ts` | `Person`, `TimelineEvent`, `SharedEvent`, `TimelineEra`, `LaidOutEvent` |
 | `src/content/timeline/people/*.json` | One file per person + their solo events |
 | `src/content/timeline/state-events.json` | National events |
@@ -61,7 +61,7 @@ Show overlapping political biographies on a shared time axis so users can see pe
 }
 ```
 
-Portrait paths are public URLs under `/timeline/portraits/` (PNG or SVG). The left sidebar only lists people/state with events in the current viewport.
+Portrait paths are public URLs under `/timeline/portraits/`. The public timeline (`peopleWithPngPortraits`) only shows people whose `portrait` ends in `.png`; SVG placeholders stay in JSON for editing but are omitted from the canvas and portrait bar. The left sidebar only lists people/state with events in the current viewport.
 ### Event
 
 | Field | Required | Notes |
@@ -101,7 +101,7 @@ Same as event plus `personIds: string[]` (at least 2 valid person ids). Rendered
 
 ## How to add content
 
-1. Add a portrait under `public/timeline/portraits/` (PNG or SVG).
+1. Add a **PNG** portrait under `public/timeline/portraits/` (SVG placeholders will not appear on the public timeline).
 2. Create `src/content/timeline/people/{id}.json` and set `"portrait"` to that public path (e.g. `/timeline/portraits/ben-gurion.png`).
 3. Import it in `src/content/timeline/index.ts` and append to the `people` array.
 4. Add state / shared events / eras to the corresponding JSON files.
@@ -118,7 +118,8 @@ Same as event plus `personIds: string[]` (at least 2 valid person ids). Rendered
 - **Portrait order:** birth-year order, with shared-event participants kept near each other when cheap (≤8 people).
 - **Portrait bar (viewport-aware):** only people/state with events overlapping `[viewStart, viewEnd]` appear. Solo and shared events both count. Zooming/panning updates the bar live.
 - **Filters:** hiding a person/state removes their events and re-packs remaining events into layers. Cannot hide the last entity that still has events in the current view.
-- **Event media:** state color `#0038b8` (`STATE_COLOR`) with emblem `STATE_EMBLEM` (`/timeline/israel-logo.png`); person/shared blocks use participant **PNG** portraits only (SVG placeholders are skipped). Media sits on the left when the full title fits, otherwise centered with title hidden. Portraits render as plain images (no circular white frame).
+- **PNG-only people:** `peopleWithPngPortraits` filters the public/edit canvas so people with non-PNG portraits (e.g. Begin, Rabin with `.svg`) and their solo events are hidden. Shared events still appear if at least one remaining PNG participant is visible.
+- **Event media:** state color `#0038b8` (`STATE_COLOR`) with emblem `STATE_EMBLEM` (`/timeline/israel-logo.png`); person/shared blocks use participant **PNG** portraits. Media sits on the left when the full title fits, otherwise centered with title hidden. Portraits render as plain images (no circular white frame).
 
 ## Viewport
 
@@ -158,4 +159,4 @@ Same as event plus `personIds: string[]` (at least 2 valid person ids). Rendered
 
 ## Seed people
 
-Ben-Gurion, Golda Meir, Menachem Begin, Yitzhak Rabin, Theodor Herzl, Chaim Weizmann, Ze'ev Jabotinsky — plus state events (independence, wars, peace agreements), shared events, and eras (היישוב → שנות היסוד → אחרי ששת הימים → עידן המהפך → תהליך אוסלו).
+Ben-Gurion, Golda Meir, Menachem Begin, Yitzhak Rabin, Theodor Herzl, Chaim Weizmann, Ze'ev Jabotinsky — plus state events (independence, wars, peace agreements), shared events, and eras (העלייה הראשונה → … → החמישית → שנות היסוד → אחרי ששת הימים → עידן המהפך → תהליך אוסלו). Gaps are intentional (e.g. WWI between העלייה השנייה and השלישית; 1940–1948 before independence).

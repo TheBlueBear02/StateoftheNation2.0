@@ -16,6 +16,7 @@ import {
   entitiesInViewport,
   layoutEvents,
   orderRows,
+  peopleWithPngPortraits,
 } from '@/lib/timeline/layout'
 import './TimelinePage.css'
 
@@ -24,13 +25,19 @@ interface TimelinePageProps {
 }
 
 export function TimelinePage({ data }: TimelinePageProps) {
+  // Public timeline hides people who only have SVG placeholder portraits.
+  const people = useMemo(
+    () => peopleWithPngPortraits(data.people),
+    [data.people],
+  )
+
   const orderedPeople = useMemo(
-    () => orderRows(data.people, data.sharedEvents),
-    [data.people, data.sharedEvents],
+    () => orderRows(people, data.sharedEvents),
+    [people, data.sharedEvents],
   )
 
   const [visiblePersonIds, setVisiblePersonIds] = useState(
-    () => new Set(data.people.map((p) => p.id)),
+    () => new Set(peopleWithPngPortraits(data.people).map((p) => p.id)),
   )
   const [stateVisible, setStateVisible] = useState(true)
   const [selected, setSelected] = useState<LaidOutEvent | null>(null)
@@ -41,12 +48,12 @@ export function TimelinePage({ data }: TimelinePageProps) {
   const { minYear, maxYear } = useMemo(
     () =>
       computeDataRange(
-        data.people,
+        people,
         data.stateEvents,
         data.sharedEvents,
         data.eras,
       ),
-    [data],
+    [people, data.stateEvents, data.sharedEvents, data.eras],
   )
 
   const viewport = useTimelineViewport(trackRef, minYear, maxYear)
@@ -70,14 +77,14 @@ export function TimelinePage({ data }: TimelinePageProps) {
   const inView = useMemo(
     () =>
       entitiesInViewport(
-        data.people,
+        people,
         data.stateEvents,
         data.sharedEvents,
         viewport.viewStart,
         viewport.viewEnd,
       ),
     [
-      data.people,
+      people,
       data.stateEvents,
       data.sharedEvents,
       viewport.viewStart,
@@ -98,7 +105,7 @@ export function TimelinePage({ data }: TimelinePageProps) {
     const pixelsPerYear =
       span > 0 && trackSize.width > 0 ? trackSize.width / span : 1
     return layoutEvents(
-      data.people,
+      people,
       data.stateEvents,
       data.sharedEvents,
       visiblePersonIds,
@@ -106,7 +113,7 @@ export function TimelinePage({ data }: TimelinePageProps) {
       pixelsPerYear,
     )
   }, [
-    data.people,
+    people,
     data.stateEvents,
     data.sharedEvents,
     visiblePersonIds,
@@ -216,7 +223,7 @@ export function TimelinePage({ data }: TimelinePageProps) {
       <EventModal
         laid={selected}
         events={events}
-        people={data.people}
+        people={people}
         onSelect={setSelected}
         onClose={() => setSelected(null)}
       />

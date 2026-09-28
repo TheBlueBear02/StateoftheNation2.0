@@ -28,6 +28,16 @@ export const MIN_EVENT_WIDTH_PX = 28
 /** Horizontal gap between neighboring event blocks on the same layer (px). */
 export const EVENT_H_GAP_PX = 3
 
+/** True when the portrait public path is a PNG (SVG placeholders are not shown). */
+export function hasPngPortrait(portrait: string): boolean {
+  return /\.png(\?|$)/i.test(portrait)
+}
+
+/** People eligible for the public timeline (must have a PNG portrait). */
+export function peopleWithPngPortraits(people: Person[]): Person[] {
+  return people.filter((p) => hasPngPortrait(p.portrait))
+}
+
 /** Slot height used when stacking layers from the top. */
 export const EVENT_LAYER_SLOT =
   EVENT_BLOCK_HEIGHT + EVENT_LAYER_GAP

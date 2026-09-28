@@ -264,12 +264,23 @@
   background: #ffffff;
 }
 
+.timeline-track::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url('/timeline/timeline-bg-telaviv50s.jpg') center center / cover no-repeat;
+  opacity: 0.05;
+}
+
 .timeline-track:active {
   cursor: grabbing;
 }
 
 .timeline-canvas {
   position: relative;
+  z-index: 1;
   height: 100%;
 }
 
