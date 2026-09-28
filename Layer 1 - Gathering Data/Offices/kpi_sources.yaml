@@ -1,0 +1,674 @@
+# kpi_sources.yaml — automation registry for /government/dashboard indexes
+# Generated 2026-09-28 from office_dashboard_source.db (48 shown indexes).
+# tier: A=official API · A'=unofficial JSON · B=structured file · C=PDF+LLM · D=assisted manual
+# label_rule: yearly_jan1 (YYYY → YYYY-01-01) · month_start (01.MM.YYYY) · month_end (last day)
+# key: stable id from office_dashboard_source.db. The live Supabase index is resolved at runtime by office + name.
+# release: when to look for the NEXT period (after the latest point in index_data).
+#   monthly  → min_lag_days/max_lag_days after the period's month ends
+#   yearly   → window "MM-DD..MM-DD" in the year after the period (may wrap past Dec 31);
+#              year_offset: 0 when the figure is published during its own year
+#   check_every_days → how often to retry inside the window; after max/window end → overdue (weekly retries + alert)
+#   Values are starting guesses; tune them from run history.
+# 'TODO' params = endpoint/series id still to confirm in phase 1.
+
+# ── המשרד לביטחון לאומי ──
+- key: 1
+  name: "פיגועים"
+  office: "המשרד לביטחון לאומי"
+  kind: kpi
+  frequency: monthly
+  coverage: "31.01.2015 → 31.08.2025 (128 pts)"
+  tier: "C"
+  adapter: document:shabak_monthly
+  params: {"field": "attacks_total"}
+  label_rule: month_end
+  release: {min_lag_days: 3, max_lag_days: 30, check_every_days: 2}
+  current_source: "https://www.shabak.gov.il/reports/"
+  notes: "Same document as id 14. Monthly report on shabak.gov.il; may need Playwright."
+
+- key: 2
+  name: "רצח בחברה הערבית"
+  office: "המשרד לביטחון לאומי"
+  kind: kpi
+  frequency: yearly
+  coverage: "2012 → 2024 (13 pts)"
+  tier: "D"
+  adapter: manual_watch:abraham_initiatives
+  params: {"expected_month": 1}
+  label_rule: yearly_jan1
+  release: {window: "01-01..06-30", check_every_days: 14}
+  current_source: "https://abrahaminitiatives.org.il/2025/01/07/%D7%A7%D7%95%D7%A8%D7%91%D7%A0%D7%95%D7%AA-%D7%90%D7%9C%D7%99%D7%9E%D7%95%D7%AA-%D7%95%D7%A4%D7%A9%D7%99%D7%A2%D7%94-%D7%91%D7%97%D7%91%D7%A8%D7%94-%D7%94%D7%A2%D7%A8%D7%91%D7%99%D7%AA-%D7%93%D7%95/"
+  notes: "Annual year-end count; the NGO publishes a running tally too. LLM can pre-fill from the annual press release."
+
+- key: 14
+  name: "נרצחים בפיגועים"
+  office: "המשרד לביטחון לאומי"
+  kind: kpi
+  frequency: monthly
+  coverage: "31.01.2015 → 30.08.2025 (128 pts)"
+  tier: "C"
+  adapter: document:shabak_monthly
+  params: {"field": "killed"}
+  label_rule: month_end
+  release: {min_lag_days: 3, max_lag_days: 30, check_every_days: 2}
+  current_source: "https://www.shabak.gov.il/reports/"
+  notes: "Normalize day-of-month with id 1 (30.08 vs 31.08)."
+
+- key: 18
+  name: "רצח נשים"
+  office: "המשרד לביטחון לאומי"
+  kind: kpi
+  frequency: yearly
+  coverage: "2010 → 2024 (15 pts)"
+  tier: "D"
+  adapter: manual_watch:iwn
+  params: {"expected_month": 1}
+  label_rule: yearly_jan1
+  release: {window: "01-01..06-30", check_every_days: 14}
+  current_source: "https://iwn.org.il/"
+  notes: "Israel Women's Network annual report."
+
+- key: 19
+  name: "תיקים במשטרה"
+  office: "המשרד לביטחון לאומי"
+  kind: kpi
+  frequency: yearly
+  coverage: "2010 → 2023 (14 pts)"
+  tier: "C"
+  adapter: document:police_yearbook
+  params: {"anchor": "תיקים שנפתחו"}
+  label_rule: yearly_jan1
+  release: {window: "05-01..10-31", check_every_days: 7}
+  current_source: "https://fs.knesset.gov.il/globaldocs/MMM/c2434ed6-cbef-ed11-815b-005056aa4246/2_c2434ed6-cbef-ed11-815b-005056aa4246_11_20110.pdf"
+  notes: "Old source was a Knesset research doc; police yearbook has the same series."
+
+- key: 20
+  name: "גניבות רכב"
+  office: "המשרד לביטחון לאומי"
+  kind: kpi
+  frequency: yearly
+  coverage: "2014 → 2023 (10 pts)"
+  tier: "C"
+  adapter: document:police_yearbook
+  params: {"anchor": "גניבות רכב"}
+  label_rule: yearly_jan1
+  release: {window: "05-01..10-31", check_every_days: 7}
+  current_source: "https://www.gov.il/BlobFolder/reports/police_statistical_2023/he/%D7%A9%D7%A0%D7%AA%D7%95%D7%9F%20%D7%A0%D7%92%D7%99%D7%A9%D7%95%D7%AA%20-%20%D7%9E%D7%95%D7%A0%D7%92%D7%A9.pdf"
+
+- key: 38
+  name: "אמון במשטרה"
+  office: "המשרד לביטחון לאומי"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2024 (16 pts)"
+  tier: "D"
+  adapter: manual_watch:idi_democracy_index
+  params: {"expected_month": 1}
+  label_rule: yearly_jan1
+  release: {window: "01-01..06-30", check_every_days: 14}
+  current_source: "https://www.idi.org.il/articles/57165"
+  notes: "IDI Democracy Index, annual PDF; LLM pre-fill possible."
+
+- key: 3
+  name: "חלוקת כלי נשק"
+  office: "המשרד לביטחון לאומי"
+  kind: policy
+  frequency: yearly
+  coverage: "2015 → 2023 (6 pts)"
+  tier: "D"
+  adapter: manual_watch:firearms_licensing
+  params: {}
+  label_rule: yearly_jan1
+  release: {window: "01-01..06-30", check_every_days: 14}
+  current_source: "https://www.meida.org.il/15550#how2"
+  notes: "Sparse (6 pts). No regular publication; Knesset research/FOI answers. Consider dropping or re-sourcing."
+
+- key: 21
+  name: "כוח אדם במשטרה"
+  office: "המשרד לביטחון לאומי"
+  kind: policy
+  frequency: yearly
+  coverage: "2015 → 2023 (9 pts)"
+  tier: "C"
+  adapter: document:police_yearbook
+  params: {"anchor": "מצבת כוח אדם"}
+  label_rule: yearly_jan1
+  release: {window: "05-01..10-31", check_every_days: 7}
+  current_source: "https://www.gov.il/BlobFolder/reports/police_statistical_2023/he/%D7%A9%D7%A0%D7%AA%D7%95%D7%9F%20%D7%A0%D7%92%D7%99%D7%A9%D7%95%D7%AA%20-%20%D7%9E%D7%95%D7%A0%D7%92%D7%A9.pdf"
+
+- key: 22
+  name: "תקציב"
+  office: "המשרד לביטחון לאומי"
+  kind: policy
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "A"
+  adapter: obudget
+  params: {"codes": ["0010"], "field": "net_executed"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..07-31", check_every_days: 7}
+  current_source: "https://next.obudget.org/i/budget/00105101/2025"
+  notes: "FLAG: code 0010 = ministry HQ only (~₪52M). Decide whether to include Police/IPS sections."
+
+- key: 39
+  name: "מעצרים פליליים"
+  office: "המשרד לביטחון לאומי"
+  kind: policy
+  frequency: yearly
+  coverage: "2018 → 2023 (6 pts)"
+  tier: "C"
+  adapter: document:police_yearbook
+  params: {"anchor": "מעצרים"}
+  label_rule: yearly_jan1
+  release: {window: "05-01..10-31", check_every_days: 7}
+  current_source: "https://www.gov.il/BlobFolder/reports/police_statistical_2023/he/%D7%A9%D7%A0%D7%AA%D7%95%D7%9F%20%D7%A0%D7%92%D7%99%D7%A9%D7%95%D7%AA%20-%20%D7%9E%D7%95%D7%A0%D7%92%D7%A9%20(1).pdf"
+
+- key: 40
+  name: "מתנדבי המשטרה"
+  office: "המשרד לביטחון לאומי"
+  kind: policy
+  frequency: yearly
+  coverage: "2014 → 2023 (10 pts)"
+  tier: "C"
+  adapter: document:police_yearbook
+  params: {"anchor": "מתנדבים"}
+  label_rule: yearly_jan1
+  release: {window: "05-01..10-31", check_every_days: 7}
+  current_source: "https://www.gov.il/BlobFolder/reports/police_statistical_2023/he/%D7%A9%D7%A0%D7%AA%D7%95%D7%9F%20%D7%A0%D7%92%D7%99%D7%A9%D7%95%D7%AA%20-%20%D7%9E%D7%95%D7%A0%D7%92%D7%A9%20(1).pdf"
+
+# ── משרד התחבורה והבטיחות בדרכים ──
+- key: 26
+  name: "תאונות דרכים"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: kpi
+  frequency: yearly
+  coverage: "2014 → 2023 (10 pts)"
+  tier: "C"
+  adapter: document:police_yearbook
+  params: {"anchor": "תאונות דרכים"}
+  label_rule: yearly_jan1
+  release: {window: "05-01..10-31", check_every_days: 7}
+  current_source: "https://www.gov.il/BlobFolder/reports/police_statistical_2023/he/%D7%A9%D7%A0%D7%AA%D7%95%D7%9F%20%D7%A0%D7%92%D7%99%D7%A9%D7%95%D7%AA%20-%20%D7%9E%D7%95%D7%A0%D7%92%D7%A9%20(1).pdf"
+  notes: "Alternative: CBS/Road Safety datasets on data.gov.il — check definition matches."
+
+- key: 28
+  name: "מספר כלי רכב"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "B"
+  adapter: document:cbs_motor_vehicles_release
+  params: {"table": "vehicles per 1000"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..12-31", check_every_days: 7}
+  current_source: "https://www.cbs.gov.il/he/mediarelease/DocLib/2024/115/27_24_115b.pdf"
+  notes: "CBS annual release. Could be derived from registry ÷ population, but definitions differ; keep CBS for continuity."
+
+- key: 29
+  name: "כלי רכב חשמליים"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: kpi
+  frequency: yearly
+  coverage: "2020 → 2023 (4 pts)"
+  tier: "A"
+  adapter: datagov
+  params: {"resource_id": "053cea08-09bc-40ec-8f7a-156f0677aff3", "metric": "ev_share_new_registrations", "fuel_field": "sug_delek_nm", "date_field": "moed_aliya_lakvish"}
+  label_rule: yearly_jan1
+  release: {window: "01-05..01-31", check_every_days: 1}
+  current_source: "https://www.gov.il/BlobFolder/reports/tax-reviewvehicle/he/Publications_VehicleReview_vehicle2022-2023.pdf"
+  notes: "FLAG: values look like share of NEW registrations, info text says share of all vehicles. Registry snapshot = current stock only, so historical 'all vehicles' share can't be recomputed from it."
+
+- key: 30
+  name: "נוסעים בנתב\"ג"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: kpi
+  frequency: monthly
+  coverage: "01.01.2015 → 01.06.2025 (126 pts)"
+  tier: "B"
+  adapter: document:iaa_monthly_stats
+  params: {"row": "total passengers"}
+  label_rule: month_start
+  release: {min_lag_days: 3, max_lag_days: 35, check_every_days: 2}
+  current_source: "https://www.iaa.gov.il/about/aeronautical-information/annualreport/"
+  notes: "IAA monthly statistics file (xlsx/pdf)."
+
+- key: 31
+  name: "נסיעות באוטובסים"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: kpi
+  frequency: yearly
+  coverage: "2015 → 2023 (9 pts)"
+  tier: "C"
+  adapter: document:mot_public_transport_summary
+  params: {"anchor": "נסיעות"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..12-31", check_every_days: 7}
+  current_source: "https://www.gov.il/BlobFolder/reports/special_reports/he/%D7%A8%D7%99%D7%9B%D7%95%D7%96%20%D7%A0%D7%AA%D7%95%D7%A0%D7%99%D7%9D%20%D7%9E%D7%A8%D7%9B%D7%96%D7%99%D7%99%D7%9D%20%D7%91%D7%AA%D7%97%D7%91%D7%95%D7%A8%D7%94%20%D7%94%D7%A6%D7%99%D7%91%D7%95%D7%A8%D7%99%D7%AA%20%D7%A2%D7%93%202023.pptx"
+  notes: "Annual MOT pptx/pdf summary; also check data.gov.il ridership datasets."
+
+- key: 34
+  name: "נוסעים ברכבת"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "B"
+  adapter: document:cbs_transport_yearbook
+  params: {"table": "st19_01"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..12-31", check_every_days: 7}
+  current_source: "https://www.cbs.gov.il/he/publications/DocLib/2024/19.ShnatonTransportandRoadSafety/st19_01x.pdf"
+  notes: "CBS yearbook tables usually also exist as xlsx next to the pdf."
+
+- key: 36
+  name: "הרוגים בתאונות דרכים"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: kpi
+  frequency: yearly
+  coverage: "2013 → 2024 (12 pts)"
+  tier: "C"
+  adapter: document:road_safety_annual
+  params: {"anchor": "הרוגים"}
+  label_rule: yearly_jan1
+  release: {window: "01-01..03-31", check_every_days: 3}
+  current_source: "https://www.gov.il/he/pages/2024_summary"
+  notes: "Road Safety Authority annual summary; monthly figures exist if we want a monthly series later."
+
+- key: 24
+  name: "תקציב"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: policy
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "A"
+  adapter: obudget
+  params: {"codes": ["0040"], "field": "net_executed"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..07-31", check_every_days: 7}
+  current_source: "https://next.obudget.org/i/budget/0040/2025?q=%D7%9E%D7%A9%D7%A8%D7%93%20%D7%94%D7%AA%D7%97%D7%91%D7%95%D7%A8%D7%94&dd=all"
+  notes: "FLAG: ministry section only (~₪0.5B)."
+
+- key: 27
+  name: "תקציב התחבורה הציבורית"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: policy
+  frequency: yearly
+  coverage: "2015 → 2023 (9 pts)"
+  tier: "A"
+  adapter: obudget
+  params: {"codes": ["004054"], "field": "net_executed"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..07-31", check_every_days: 7}
+  current_source: "https://next.obudget.org/i/budget/004054/2025?q=%D7%9E%D7%A9%D7%A8%D7%93%20%D7%94%D7%AA%D7%97%D7%91%D7%95%D7%A8%D7%94&dd=all"
+
+- key: 32
+  name: "מחיר הדלק"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: policy
+  frequency: yearly
+  coverage: "2014 → 2025 (12 pts)"
+  tier: "B"
+  adapter: document:fuel_price_monthly
+  params: {"product": "בנזין 95 שירות עצמי", "month": 1}
+  label_rule: yearly_jan1
+  release: {window: "01-01..02-15", year_offset: 0, check_every_days: 3}
+  current_source: "https://migdal-webpages.energy-apps.org/fuelCalculator"
+  notes: "Ministry of Energy sets the price monthly; we take January. Check data.gov.il for a fuel-price dataset first."
+
+- key: 33
+  name: "תקציב בטיחות בדרכים"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: policy
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "A"
+  adapter: obudget
+  params: {"codes": ["004053"], "field": "net_executed"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..07-31", check_every_days: 7}
+  current_source: "https://next.obudget.org/i/budget/004053/2025?q=%D7%9E%D7%A9%D7%A8%D7%93%20%D7%94%D7%AA%D7%97%D7%91%D7%95%D7%A8%D7%94&dd=all"
+
+- key: 37
+  name: "תקציב תשתיות כבישים"
+  office: "משרד התחבורה והבטיחות בדרכים"
+  kind: policy
+  frequency: yearly
+  coverage: "2009 → 2024 (16 pts)"
+  tier: "A"
+  adapter: obudget
+  params: {"codes": ["007951"], "field": "net_executed"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..07-31", check_every_days: 7}
+  current_source: "https://next.obudget.org/i/budget/007951/2025?theme=budgetkey"
+  notes: "Stored in ₪ although info says 'במיליארדים' — fix info or scale."
+
+# ── משרד החינוך ──
+- key: 35
+  name: "זכאים לתעודת בגרות"
+  office: "משרד החינוך"
+  kind: kpi
+  frequency: yearly
+  coverage: "2015 → 2022 (8 pts)"
+  tier: "B"
+  adapter: document:cbs_education_yearbook
+  params: {"table": "st04_19"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..12-31", check_every_days: 7}
+  current_source: "https://www.cbs.gov.il/he/publications/DocLib/2024/4.ShnatonEducation/st04_19.pdf"
+  notes: "Also on shkifut; prefer whichever matches history."
+
+- key: 41
+  name: "מספר תלמידים בכיתה"
+  office: "משרד החינוך"
+  kind: kpi
+  frequency: yearly
+  coverage: "2014 → 2023 (10 pts)"
+  tier: "A'"
+  adapter: shkifut
+  params: {"metric": "avg_class_size", "sector": "ממלכתי"}
+  label_rule: yearly_jan1
+  release: {window: "09-01..12-31", check_every_days: 7}
+  current_source: "https://shkifut.education.gov.il/home"
+  notes: "Unofficial JSON behind shkifut.education.gov.il — spike needed to find endpoints."
+
+- key: 43
+  name: "מספר תלמידים בישראל"
+  office: "משרד החינוך"
+  kind: kpi
+  frequency: yearly
+  coverage: "2014 → 2025 (12 pts)"
+  tier: "A'"
+  adapter: shkifut
+  params: {"metric": "total_students"}
+  label_rule: yearly_jan1
+  release: {window: "09-01..12-31", check_every_days: 7}
+  current_source: "https://shkifut.education.gov.il/home"
+
+- key: 44
+  name: "בוגרי תואר ראשון"
+  office: "משרד החינוך"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "B"
+  adapter: document:cbs_higher_ed
+  params: {"degree": "first"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..12-31", check_every_days: 7}
+  current_source: "https://www.academy.ac.il/SystemFiles2015/SciReport2022_Full.pdf"
+  notes: "CBS higher-education tables / CHE data. Old source: Academy of Sciences report."
+
+- key: 45
+  name: "בוגרי תואר שלישי"
+  office: "משרד החינוך"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "B"
+  adapter: document:cbs_higher_ed
+  params: {"degree": "third"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..12-31", check_every_days: 7}
+  current_source: "https://www.academy.ac.il/SystemFiles2015/SciReport2022_Full.pdf"
+
+- key: 46
+  name: "תלמידים בחינוך החרדי"
+  office: "משרד החינוך"
+  kind: kpi
+  frequency: yearly
+  coverage: "2014 → 2025 (12 pts)"
+  tier: "A'"
+  adapter: shkifut
+  params: {"metric": "haredi_share"}
+  label_rule: yearly_jan1
+  release: {window: "09-01..12-31", check_every_days: 7}
+  current_source: "https://shkifut.education.gov.il/home"
+
+- key: 62
+  name: "נושרים ממערכת החינוך"
+  office: "משרד החינוך"
+  kind: kpi
+  frequency: yearly
+  coverage: "2016 → 2023 (8 pts)"
+  tier: "C"
+  adapter: document:cbs_dropouts
+  params: {"anchor": "נשירה"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..12-31", check_every_days: 7}
+  current_source: "https://www.cbs.gov.il/he/cbsNewBrand/Pages/yearly.aspx"
+
+- key: 25
+  name: "תקציב"
+  office: "משרד החינוך"
+  kind: policy
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "A"
+  adapter: obudget
+  params: {"codes": ["0020"], "field": "net_executed"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..07-31", check_every_days: 7}
+  current_source: "https://next.obudget.org/i/budget/0020/2025?q=%D7%9E%D7%A9%D7%A8%D7%93%20%D7%94%D7%97%D7%99%D7%A0%D7%95%D7%9A&dd=all"
+
+- key: 42
+  name: "עלות לתלמיד"
+  office: "משרד החינוך"
+  kind: policy
+  frequency: yearly
+  coverage: "2014 → 2023 (10 pts)"
+  tier: "A'"
+  adapter: shkifut
+  params: {"metric": "cost_per_student"}
+  label_rule: yearly_jan1
+  release: {window: "09-01..12-31", check_every_days: 7}
+  current_source: "https://shkifut.education.gov.il/home"
+
+- key: 47
+  name: "שכר מורים"
+  office: "משרד החינוך"
+  kind: policy
+  frequency: yearly
+  coverage: "2009 → 2022 (14 pts)"
+  tier: "D"
+  adapter: manual_watch:knesset_research_teacher_pay
+  params: {}
+  label_rule: yearly_jan1
+  release: {window: "01-01..06-30", check_every_days: 14}
+  current_source: "https://fs.knesset.gov.il/globaldocs/MMM/d78e120c-b21f-ee11-8159-005056aac6c3/2_d78e120c-b21f-ee11-8159-005056aac6c3_11_20556.pdf"
+  notes: "Irregular Knesset research docs. Alternative: Ministry teacher-salary publications."
+
+- key: 48
+  name: "חמש יחידות מתמטיקה"
+  office: "משרד החינוך"
+  kind: policy
+  frequency: yearly
+  coverage: "2014 → 2023 (10 pts)"
+  tier: "A'"
+  adapter: shkifut
+  params: {"metric": "bagrut_5u_math_share"}
+  label_rule: yearly_jan1
+  release: {window: "09-01..12-31", check_every_days: 7}
+  current_source: "https://shkifut.education.gov.il/home/educationPicture?bagrut=true"
+
+- key: 49
+  name: "סגל בכיר באוניברסיטאות"
+  office: "משרד החינוך"
+  kind: policy
+  frequency: yearly
+  coverage: "2015 → 2022 (8 pts)"
+  tier: "C"
+  adapter: document:cbs_university_staff
+  params: {"anchor": "סגל אקדמי בכיר"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..12-31", check_every_days: 7}
+  current_source: "https://www.cbs.gov.il/he/mediarelease/DocLib/2023/182/06_23_182b.pdf"
+  notes: "CBS media release, annual."
+
+# ── משרד האוצר ──
+- key: 53
+  name: "אינפלציה"
+  office: "משרד האוצר"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2024 (16 pts)"
+  tier: "A"
+  adapter: cbs_price
+  params: {"id": 120010, "use": "december_percentYear"}
+  label_rule: yearly_jan1
+  release: {window: "01-08..01-20", check_every_days: 1}
+  current_source: "https://www.globes.co.il/portal/indexprice/inflation/?Lang=he"
+  notes: "Verified endpoint. Annual inflation = December YoY."
+
+- key: 54
+  name: "צמיחה"
+  office: "משרד האוצר"
+  kind: kpi
+  frequency: yearly
+  coverage: "2012 → 2024 (13 pts)"
+  tier: "A"
+  adapter: cbs_series
+  params: {"series": "TODO real GDP growth"}
+  label_rule: yearly_jan1
+  release: {window: "01-15..04-30", check_every_days: 3}
+  current_source: "https://public.tableau.com/views/_16733448689630/sheet1?%3Adisplay_count=y&%3Aorigin=viz_share_link&%3AshowVizHome=no"
+  notes: "CBS national accounts; cross_check: BOI."
+
+- key: 56
+  name: "מחירי הדירות"
+  office: "משרד האוצר"
+  kind: kpi
+  frequency: monthly
+  coverage: "01.01.2010 → 01.06.2025 (186 pts)"
+  tier: "A"
+  adapter: cbs_price
+  params: {"id": 40010, "use": "currBase.value", "base": "1993 ממוצע"}
+  label_rule: month_start
+  release: {min_lag_days: 35, max_lag_days: 60, check_every_days: 1}
+  current_source: "https://www.cbs.gov.il/he/mediarelease/Madad/Pages/2025/%D7%A9%D7%99%D7%A0%D7%95%D7%99-%D7%91%D7%9E%D7%97%D7%99%D7%A8%D7%99-%D7%A9%D7%95%D7%A7-%D7%94%D7%93%D7%99%D7%A8%D7%95%D7%AA-%D7%90%D7%A4%D7%A8%D7%99%D7%9C-2025.aspx"
+  notes: "Verified: same 1993 base as site; API has data to 06/2026."
+
+- key: 57
+  name: "שוויון"
+  office: "משרד האוצר"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "C"
+  adapter: document:btl_poverty_report
+  params: {"anchor": "מדד ג'יני"}
+  label_rule: yearly_jan1
+  release: {window: "11-15..02-28", check_every_days: 3}
+  current_source: "https://www.btl.gov.il/Publications/oni_report/Documents/dohaoni2023.pdf"
+  notes: "National Insurance annual poverty report (Dec/Jan). Use disposable-income Gini."
+
+- key: 58
+  name: "שכר ממוצע"
+  office: "משרד האוצר"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2023 (15 pts)"
+  tier: "A"
+  adapter: cbs_series
+  params: {"series": "TODO avg wage per employee post"}
+  label_rule: yearly_jan1
+  release: {window: "01-15..04-30", check_every_days: 3}
+  current_source: ""
+  notes: "Source column is empty today — set it."
+
+- key: 60
+  name: "אחוז אבטלה"
+  office: "משרד האוצר"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2024 (16 pts)"
+  tier: "A"
+  adapter: cbs_series
+  params: {"series": "TODO LFS unemployment rate 15+"}
+  label_rule: yearly_jan1
+  release: {window: "01-15..04-30", check_every_days: 3}
+  current_source: "https://en.wikipedia.org/wiki/Economy_of_Israel"
+  notes: "Source is Wikipedia today; cross_check: BOI."
+
+- key: 61
+  name: "תמ\"ג לנפש"
+  office: "משרד האוצר"
+  kind: kpi
+  frequency: yearly
+  coverage: "2009 → 2024 (16 pts)"
+  tier: "A"
+  adapter: worldbank
+  params: {"indicator": "NY.GDP.PCAP.CD", "country": "IL"}
+  label_rule: yearly_jan1
+  release: {window: "06-01..10-31", check_every_days: 7}
+  current_source: "https://data.worldbank.org/indicator/NY.GDP.PCAP.CD?end=2024&locations=IL"
+  notes: "Annual, ~6 months lag."
+
+- key: 50
+  name: "תקציב"
+  office: "משרד האוצר"
+  kind: policy
+  frequency: yearly
+  coverage: "2009 → 2024 (16 pts)"
+  tier: "A"
+  adapter: obudget
+  params: {"codes": ["0005"], "field": "net_executed"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..07-31", check_every_days: 7}
+  current_source: "https://next.obudget.org/i/budget/0005/2025?q=%D7%9E%D7%A9%D7%A8%D7%93%20%D7%94%D7%90%D7%95%D7%A6%D7%A8&dd=all"
+
+- key: 51
+  name: "עודף/גירעון"
+  office: "משרד האוצר"
+  kind: policy
+  frequency: monthly
+  coverage: "01.01.2009 → 01.07.2025 (199 pts)"
+  tier: "C"
+  adapter: document:mof_monthly_deficit
+  params: {"anchor": "גירעון"}
+  label_rule: month_start
+  release: {min_lag_days: 5, max_lag_days: 20, check_every_days: 1}
+  current_source: "https://public.tableau.com/views/_16733448689630/sheet6?%3Adisplay_count=y&%3Aorigin=viz_share_link&%3AshowVizHome=no"
+  notes: "Accountant General monthly press release. Check if BOI publishes a monthly deficit series (would make it tier A)."
+
+- key: 52
+  name: "יחס חוב תוצר"
+  office: "משרד האוצר"
+  kind: policy
+  frequency: yearly
+  coverage: "2009 → 2024 (16 pts)"
+  tier: "A"
+  adapter: boi_sdmx
+  params: {"series": "TODO debt/GDP"}
+  label_rule: yearly_jan1
+  release: {window: "02-01..06-30", check_every_days: 7}
+  current_source: "https://www.gov.il/BlobFolder/dynamiccollectorresultitem/debt-to-gdp-2023-year/he/debt-to-gdp_debt-to-gdp-2023-year.pdf"
+  notes: "Verify from GH Actions; fallback: Accountant General annual debt report (C)."
+
+- key: 55
+  name: "החוב הממשלתי"
+  office: "משרד האוצר"
+  kind: policy
+  frequency: yearly
+  coverage: "2012 → 2024 (13 pts)"
+  tier: "A"
+  adapter: boi_sdmx
+  params: {"series": "TODO government debt NIS"}
+  label_rule: yearly_jan1
+  release: {window: "02-01..06-30", check_every_days: 7}
+  current_source: "https://www.gov.il/he/pages/press_21012025"
+  notes: "Same as 52."
+
+- key: 59
+  name: "תקציב המדינה"
+  office: "משרד האוצר"
+  kind: policy
+  frequency: yearly
+  coverage: "2010 → 2024 (15 pts)"
+  tier: "A"
+  adapter: obudget
+  params: {"codes": ["00"], "field": "net_executed", "note": "verify which total matches 515.9B/620B (gross vs net, with/without debt repayment)"}
+  label_rule: yearly_jan1
+  release: {window: "03-01..07-31", check_every_days: 7}
+  current_source: "https://public.tableau.com/views/_17478098558190/sheet1?%3Alanguage=en-US&%3Asid=&%3Adisplay_count=n&%3Aorigin=viz_share_link&%3AshowVizHome=no"
+  notes: "Existing values are rounded (620,000,000,000) — likely typed in manually."

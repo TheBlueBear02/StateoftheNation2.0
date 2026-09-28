@@ -25,3 +25,5 @@ out
 *.sln
 *.sw?
 .env
+# Office KPI pipeline run output
+Layer 1 - Gathering Data/Offices/attention.md
