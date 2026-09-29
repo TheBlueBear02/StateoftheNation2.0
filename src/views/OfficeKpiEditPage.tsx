@@ -630,7 +630,7 @@ export function OfficeKpiEditPage() {
           <header className="pipelines-dash__hero">
             <PageBreadcrumb
               items={[
-                { label: 'צינורות נתונים', href: '/piplines' },
+                { label: 'צינורות נתונים', to: '/piplines' },
                 { label: 'מדדי משרדים' },
               ]}
             />

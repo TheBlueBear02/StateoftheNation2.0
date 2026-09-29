@@ -57,7 +57,7 @@ function BoardContent() {
       <header className="gov-pipe-board__hero">
         <PageBreadcrumb
           items={[
-            { label: 'צינורות נתונים', href: '/piplines' },
+            { label: 'צינורות נתונים', to: '/piplines' },
             { label: 'דשבורד הממשלה' },
           ]}
         />
