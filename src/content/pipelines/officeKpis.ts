@@ -8,6 +8,7 @@ export const officeKpisPipeline: PipelineDoc = {
   status: 'live',
   docsPath: '/piplines/docs/office-kpis',
   editPath: '/government/dashboard/edit',
+  statusPath: '/piplines/government-dashboard',
   schedule: {
     label: 'כל לילה ב־02:00 שעון ישראל',
     cron: '0 23 * * *',
@@ -41,6 +42,7 @@ export const officeKpisPipeline: PipelineDoc = {
       paragraphs: [
         'במסך /government/dashboard/edit מוצגות תוצאות ההרצות האחרונות, סיכום סטטוסים, ורשימת כל הערכים שנמצאו — כולל כאלה שממתינים לאישור.',
         'לכל מועמד: מדד, תקופה, ערך חדש, ערך קודם (בתיקון), שיטת שליפה, דגלי אימות, ופעולות אישור / דחייה.',
+        'לוח סטטוס בכל המדדים לפי משרד: /piplines/government-dashboard — מסגרת ירוקה/אדומה לפי עדכניות מול חלון הפרסום, ותג ירוק/אדום אם המדד כבר בצינור האוטומטי.',
       ],
     },
     {

@@ -189,21 +189,21 @@
   label_rule: yearly_jan1
   release: {window: "05-01..10-31", check_every_days: 7}
   current_source: "https://www.gov.il/BlobFolder/reports/police_statistical_2023/he/%D7%A9%D7%A0%D7%AA%D7%95%D7%9F%20%D7%A0%D7%92%D7%99%D7%A9%D7%95%D7%AA%20-%20%D7%9E%D7%95%D7%A0%D7%92%D7%A9%20(1).pdf"
-  notes: "Alternative: CBS/Road Safety datasets on data.gov.il — check definition matches."
+  notes: "Police yearbook definition. CBS accident series (path 20) do not match site history (e.g. 2023 site 8092 vs CBS urban+non-urban splits). Stays document until PUF aggregate or RSA table is wired."
 
 - key: 28
   name: "מספר כלי רכב"
   office: "משרד התחבורה והבטיחות בדרכים"
   kind: kpi
   frequency: yearly
-  coverage: "2009 → 2023 (15 pts)"
-  tier: "B"
-  adapter: document:cbs_motor_vehicles_release
-  params: {"table": "vehicles per 1000"}
+  coverage: "2009 → 2025 (17 pts)"
+  tier: "A"
+  adapter: curated
+  params: {"series": "vehicles_per_1000"}
   label_rule: yearly_jan1
   release: {window: "03-01..12-31", check_every_days: 7}
   current_source: "https://www.cbs.gov.il/he/mediarelease/DocLib/2024/115/27_24_115b.pdf"
-  notes: "CBS annual release. Could be derived from registry ÷ population, but definitions differ; keep CBS for continuity."
+  notes: "Vehicles per 1000 residents from CBS annual motor-vehicles release. curated_series.yaml until a CBS series id for this rate is found (live registry÷population drifts from CBS definition)."
 
 - key: 29
   name: "כלי רכב חשמליים"
@@ -217,7 +217,7 @@
   label_rule: yearly_jan1
   release: {window: "01-05..01-31", check_every_days: 1}
   current_source: "https://www.gov.il/BlobFolder/reports/tax-reviewvehicle/he/Publications_VehicleReview_vehicle2022-2023.pdf"
-  notes: "FLAG: values look like share of NEW registrations, info text says share of all vehicles. Registry snapshot = current stock only, so historical 'all vehicles' share can't be recomputed from it."
+  notes: "Share of NEW first-registrations (moed_aliya_lakvish) with sug_delek_nm=חשמל. Only complete calendar years; values rounded to 1 decimal. index.info updated to match."
 
 - key: 30
   name: "נוסעים בנתב\"ג"
@@ -231,7 +231,7 @@
   label_rule: month_start
   release: {min_lag_days: 3, max_lag_days: 35, check_every_days: 2}
   current_source: "https://www.iaa.gov.il/about/aeronautical-information/annualreport/"
-  notes: "IAA monthly statistics file (xlsx/pdf)."
+  notes: "IAA monthly statistics (xlsx/pdf). CBS airport series are national aggregates / charters — not a clean Ben-Gurion total match for site history. Stays document (Tier B file) for now."
 
 - key: 31
   name: "נסיעות באוטובסים"
@@ -245,7 +245,7 @@
   label_rule: yearly_jan1
   release: {window: "03-01..12-31", check_every_days: 7}
   current_source: "https://www.gov.il/BlobFolder/reports/special_reports/he/%D7%A8%D7%99%D7%9B%D7%95%D7%96%20%D7%A0%D7%AA%D7%95%D7%A0%D7%99%D7%9D%20%D7%9E%D7%A8%D7%9B%D7%96%D7%99%D7%99%D7%9D%20%D7%91%D7%AA%D7%97%D7%91%D7%95%D7%A8%D7%94%20%D7%94%D7%A6%D7%99%D7%91%D7%95%D7%A8%D7%99%D7%AA%20%D7%A2%D7%93%202023.pptx"
-  notes: "Annual MOT pptx/pdf summary; also check data.gov.il ridership datasets."
+  notes: "Annual MOT public-transport summary (pptx). No matching CBS bus-trips series found against site history. Stays document for now."
 
 - key: 34
   name: "נוסעים ברכבת"
@@ -253,13 +253,13 @@
   kind: kpi
   frequency: yearly
   coverage: "2009 → 2023 (15 pts)"
-  tier: "B"
-  adapter: document:cbs_transport_yearbook
-  params: {"table": "st19_01"}
+  tier: "A"
+  adapter: cbs_series
+  params: {"id": 1617, "use": "yearly_sum", "scale": 1000}
   label_rule: yearly_jan1
   release: {window: "03-01..12-31", check_every_days: 7}
-  current_source: "https://www.cbs.gov.il/he/publications/DocLib/2024/19.ShnatonTransportandRoadSafety/st19_01x.pdf"
-  notes: "CBS yearbook tables usually also exist as xlsx next to the pdf."
+  current_source: "https://apis.cbs.gov.il/series/data/list?id=1617&format=json"
+  notes: "CBS series 1617 monthly rail passengers (thousands). Yearly = sum of 12 complete months × 1000. Matches site history exactly for 2022–2023."
 
 - key: 36
   name: "הרוגים בתאונות דרכים"
@@ -267,13 +267,13 @@
   kind: kpi
   frequency: yearly
   coverage: "2013 → 2024 (12 pts)"
-  tier: "C"
-  adapter: document:road_safety_annual
-  params: {"anchor": "הרוגים"}
+  tier: "A"
+  adapter: curated
+  params: {"series": "road_fatalities"}
   label_rule: yearly_jan1
   release: {window: "01-01..03-31", check_every_days: 3}
   current_source: "https://www.gov.il/he/pages/2024_summary"
-  notes: "Road Safety Authority annual summary; monthly figures exist if we want a monthly series later."
+  notes: "Road Safety Authority annual fatalities. CBS path 20 casualty series are older/partial — values live in curated_series.yaml; bump after RSA yearly summary."
 
 - key: 24
   name: "תקציב"
@@ -307,14 +307,14 @@
   office: "משרד התחבורה והבטיחות בדרכים"
   kind: policy
   frequency: yearly
-  coverage: "2014 → 2025 (12 pts)"
-  tier: "B"
-  adapter: document:fuel_price_monthly
-  params: {"product": "בנזין 95 שירות עצמי", "month": 1}
+  coverage: "2014 → 2026 (13 pts)"
+  tier: "A"
+  adapter: curated
+  params: {"series": "fuel_price_jan"}
   label_rule: yearly_jan1
   release: {window: "01-01..02-15", year_offset: 0, check_every_days: 3}
   current_source: "https://migdal-webpages.energy-apps.org/fuelCalculator"
-  notes: "Ministry of Energy sets the price monthly; we take January. Check data.gov.il for a fuel-price dataset first."
+  notes: "January ₪/L for 95-octane self-service (Energy Ministry). year_offset:0 so after publishing year Y it immediately expects Jan Y+1 (window ends mid-Feb). data.gov XLSX is refinery-gate not pump; curated_series.yaml until a pump-price API exists."
 
 - key: 33
   name: "תקציב בטיחות בדרכים"
@@ -560,7 +560,7 @@
   label_rule: yearly_jan1
   release: {window: "11-15..02-28", check_every_days: 3}
   current_source: "https://www.btl.gov.il/Publications/oni_report/Documents/dohaoni2023.pdf"
-  notes: "National Insurance annual poverty report (Dec/Jan). Use disposable-income Gini."
+  notes: "National Insurance annual poverty report (Dec/Jan). Use disposable-income Gini. No machine-readable API — stays document until BTL publishes structured data; document extractor not live yet."
 
 - key: 58
   name: "שכר ממוצע"
@@ -623,13 +623,21 @@
   kind: policy
   frequency: monthly
   coverage: "01.01.2009 → 01.07.2025 (199 pts)"
-  tier: "C"
-  adapter: document:mof_monthly_deficit
-  params: {"anchor": "גירעון"}
+  tier: "A"
+  adapter: boi_sdmx
+  params:
+    {
+      "metric": "rolling_deficit_gdp_pct",
+      "deficit_dataflow": "PS",
+      "deficit_series": "OZAR_A5TZM_M",
+      "gdp_dataflow": "NA",
+      "gdp_series": "GDP_Q_N",
+      "decimals": 1,
+    }
   label_rule: month_start
-  release: {min_lag_days: 5, max_lag_days: 20, check_every_days: 1}
-  current_source: "https://public.tableau.com/views/_16733448689630/sheet6?%3Adisplay_count=y&%3Aorigin=viz_share_link&%3AshowVizHome=no"
-  notes: "Accountant General monthly press release. Check if BOI publishes a monthly deficit series (would make it tier A)."
+  release: {min_lag_days: 5, max_lag_days: 35, check_every_days: 1}
+  current_source: "https://edge.boi.gov.il/FusionDataBrowser/?df=BOI.STATISTICS%3APS(1.0)&locale=he"
+  notes: "Trailing 12-month deficit / trailing 4Q nominal GDP from BOI SDMX (OZAR_A5TZM_M ÷ GDP_Q_N). Matches AG monthly %%GDP within ~0.1pp."
 
 - key: 52
   name: "יחס חוב תוצר"
@@ -638,12 +646,12 @@
   frequency: yearly
   coverage: "2009 → 2024 (16 pts)"
   tier: "A"
-  adapter: boi_sdmx
-  params: {"series": "TODO debt/GDP"}
+  adapter: curated
+  params: {"series": "debt_gdp"}
   label_rule: yearly_jan1
   release: {window: "02-01..06-30", check_every_days: 7}
-  current_source: "https://www.gov.il/BlobFolder/dynamiccollectorresultitem/debt-to-gdp-2023-year/he/debt-to-gdp_debt-to-gdp-2023-year.pdf"
-  notes: "Verify from GH Actions; fallback: Accountant General annual debt report (C)."
+  current_source: "https://www.gov.il/he/pages/press_21012025"
+  notes: "Public debt/GDP from Accountant General. No BOI Edge series yet — values live in curated_series.yaml; bump when AG publishes."
 
 - key: 55
   name: "החוב הממשלתי"
@@ -652,12 +660,12 @@
   frequency: yearly
   coverage: "2012 → 2024 (13 pts)"
   tier: "A"
-  adapter: boi_sdmx
-  params: {"series": "TODO government debt NIS"}
+  adapter: curated
+  params: {"series": "government_debt_nis"}
   label_rule: yearly_jan1
   release: {window: "02-01..06-30", check_every_days: 7}
   current_source: "https://www.gov.il/he/pages/press_21012025"
-  notes: "Same as 52."
+  notes: "Central government debt stock (NIS) from AG. curated_series.yaml until BOI publishes a series."
 
 - key: 59
   name: "תקציב המדינה"

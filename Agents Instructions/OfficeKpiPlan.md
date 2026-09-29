@@ -46,9 +46,9 @@ nightly cron → planner (what's due tonight?) → group by source
 
 ### 3. All API sources
 - [x] obudget adapter (8 budgets, 100% match with history; session warm-up bypasses `Bot detected`)
-- [x] CBS series adapter — growth `64092`, avg wage `615908`, unemployment `493549` (+ fixtures/backtests)
-- [ ] World Bank, BOI, data.gov.il adapters
-- [x] History-reproduction test for cbs_price / cbs_series / obudget
+- [x] CBS series adapter — growth / wage / unemployment + rail yearly_sum (index 34, series 1617)
+- [x] Curated adapter covers AG debt (52/55) and Transport rates without a live series yet (vehicles/1000, fuel Jan, road fatalities)
+- [x] History-reproduction test for cbs_price / cbs_series / obudget / worldbank / datagov / curated
 
 ### 4. Review UI
 - [x] `/government/dashboard/edit`: review queue, freshness table, approve/reject

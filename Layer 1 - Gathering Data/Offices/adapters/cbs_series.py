@@ -1,9 +1,11 @@
 """CBS series API — apis.cbs.gov.il/series/data/list
 
 params (per registry entry):
-  id:   CBS series id (integer)
-  use:  "yearly" (default) — take yearly observations as Jan-1 periods
-        "yearly_avg"       — average monthly/quarterly values into a calendar year
+  id:    CBS series id (integer)
+  use:   "yearly" (default) — take yearly observations as Jan-1 periods
+         "yearly_avg"       — average monthly/quarterly values into a calendar year
+         "yearly_sum"       — sum monthly values into a calendar year (needs 12 months)
+  scale: multiply the collapsed yearly value (default 1). E.g. CBS \"thousands\" → *1000.
 
 Yearly CBS series often stamp TimePeriod as ``YYYY-01`` (not bare ``YYYY``).
 """
@@ -48,9 +50,14 @@ def parse_obs(payload: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, A
     return ser, points
 
 
-def yearly_periods(points: list[dict[str, Any]], *, average: bool) -> list[tuple[date, float, str]]:
+def yearly_periods(
+    points: list[dict[str, Any]],
+    *,
+    mode: str,
+    today: date | None = None,
+) -> list[tuple[date, float, str]]:
     """Collapse CBS observations into (period_start, value, raw_time_period)."""
-    if not average:
+    if mode == "yearly":
         out: list[tuple[date, float, str]] = []
         for pt in points:
             tp = pt["time_period"]
@@ -60,49 +67,75 @@ def yearly_periods(points: list[dict[str, Any]], *, average: bool) -> list[tuple
                 out.append((date(year, 1, 1), pt["value"], tp))
             elif "-" not in tp:
                 out.append((date(year, 1, 1), pt["value"], tp))
-        # Prefer later stamp if duplicates
         by_year: dict[int, tuple[date, float, str]] = {}
         for period, value, tp in out:
             by_year[period.year] = (period, value, tp)
         return [by_year[y] for y in sorted(by_year)]
 
-    buckets: dict[int, list[float]] = defaultdict(list)
-    raw: dict[int, list[str]] = defaultdict(list)
+    buckets: dict[int, list[tuple[str, float]]] = defaultdict(list)
     for pt in points:
         tp = pt["time_period"]
+        if "-" not in tp or len(tp) < 7:
+            continue
         year = int(tp[:4])
-        buckets[year].append(pt["value"])
-        raw[year].append(tp)
-    return [
-        (date(y, 1, 1), sum(vals) / len(vals), f"avg({min(raw[y])}..{max(raw[y])},n={len(vals)})")
-        for y, vals in sorted(buckets.items())
-        if vals
-    ]
+        buckets[year].append((tp, pt["value"]))
+
+    out_rows: list[tuple[date, float, str]] = []
+    for y, items in sorted(buckets.items()):
+        if mode == "yearly_sum":
+            # Only complete calendar years (12 distinct months). Skip in-progress year.
+            months = {tp[5:7] for tp, _ in items if len(tp) >= 7}
+            if len(months) < 12:
+                continue
+            if today is not None and y >= today.year:
+                continue
+            total = sum(v for _, v in items)
+            tps = [tp for tp, _ in items]
+            out_rows.append((date(y, 1, 1), total, f"sum({min(tps)}..{max(tps)},n={len(items)})"))
+        elif mode == "yearly_avg":
+            vals = [v for _, v in items]
+            tps = [tp for tp, _ in items]
+            out_rows.append(
+                (date(y, 1, 1), sum(vals) / len(vals), f"avg({min(tps)}..{max(tps)},n={len(vals)})")
+            )
+        else:
+            raise AdapterError(f"cbs_series: unknown mode {mode!r}")
+    return out_rows
 
 
-def to_observations(task: FetchTask, ser: dict[str, Any], points: list[dict[str, Any]]) -> list[Observation]:
+def to_observations(
+    task: FetchTask,
+    ser: dict[str, Any],
+    points: list[dict[str, Any]],
+    *,
+    today: date,
+) -> list[Observation]:
     p = task.entry.params
     use = p.get("use", "yearly")
-    if use not in ("yearly", "yearly_avg"):
+    if use not in ("yearly", "yearly_avg", "yearly_sum"):
         raise AdapterError(f"cbs_series: unknown use {use!r}")
+    scale = float(p.get("scale", 1))
     series_id = int(p["id"])
     source = f"{URL}?id={series_id}&format=json"
-    rows = yearly_periods(points, average=(use == "yearly_avg"))
+    rows = yearly_periods(points, mode=use, today=today)
     out: list[Observation] = []
     for period, value, raw_tp in rows:
         if period < task.since:
             continue
+        scaled = float(value) * scale
         out.append(
             Observation(
                 key=task.entry.key,
                 period=period,
-                value=float(value),
-                raw_value=str(value),
+                value=scaled,
+                raw_value=str(value) if scale == 1 else f"{value}*{scale}",
                 source_url=source,
                 method="api",
                 evidence={
                     "cbs_series_id": series_id,
                     "time_period": raw_tp,
+                    "scale": scale,
+                    "use": use,
                     "time": (ser.get("time") or {}).get("name"),
                     "unit": (ser.get("unit") or {}).get("name"),
                     "data": (ser.get("data") or {}).get("name"),
@@ -124,15 +157,16 @@ class CbsSeriesAdapter:
             by_id.setdefault(int(t.entry.params["id"]), []).append(t)
         for series_id, group in by_id.items():
             earliest = min(t.since for t in group)
-            # yearly lookback + buffer; monthly_avg needs ~12× more points
-            uses_avg = any(t.entry.params.get("use") == "yearly_avg" for t in group)
+            uses_monthly = any(
+                t.entry.params.get("use") in ("yearly_avg", "yearly_sum") for t in group
+            )
             span = max(3, periods_between(earliest, today, "yearly") + 2)
-            last = min(MAX_POINTS, span * (14 if uses_avg else 2))
+            last = min(MAX_POINTS, span * (14 if uses_monthly else 2))
             payload = fetch_series(series_id, last)
             ser, points = parse_obs(payload)
             if not points:
                 log.warning("cbs_series %s: empty series payload", series_id)
                 continue
             for t in group:
-                out.extend(to_observations(t, ser, points))
+                out.extend(to_observations(t, ser, points, today=today))
         return out

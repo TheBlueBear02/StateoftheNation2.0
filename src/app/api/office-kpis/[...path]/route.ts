@@ -1,5 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
+import { OFFICE_KPI_REGISTRY } from '@/content/officeKpiRegistry'
+import {
+  isCurrentThroughExpected,
+  officesMatch,
+  type Frequency,
+} from '@/lib/officeKpiPeriods'
 import {
   assertPipelineEnabled,
   getServiceEnv,
@@ -7,6 +13,8 @@ import {
   jsonOk,
   requirePipelineSecret,
 } from '@/server/apiCommon'
+
+const OFFICE_DISPLAY_ORDER = ['ביטחון לאומי', 'תחבורה', 'אוצר', 'חינוך'] as const
 
 export const maxDuration = 60
 
@@ -315,6 +323,175 @@ async function handleFreshness(client: SupabaseClient) {
   return jsonOk({ ok: true, items })
 }
 
+async function handleBoard(client: SupabaseClient) {
+  const { data: offices, error: officeError } = await client
+    .from('offices')
+    .select('id, name, knesset_category_name, is_shown')
+    .eq('is_shown', true)
+  if (officeError) return jsonError(officeError.message, 500)
+
+  const officeRows = offices ?? []
+  const officeIds = officeRows.map((o) => o.id as number)
+  if (officeIds.length === 0) {
+    return jsonOk({ ok: true, asOf: new Date().toISOString(), offices: [] })
+  }
+
+  const { data: indexes, error: indexError } = await client
+    .from('indexes')
+    .select('id, office_id, name, is_kpi, is_shown')
+    .in('office_id', officeIds)
+    .eq('is_shown', true)
+  if (indexError) return jsonError(indexError.message, 500)
+
+  const indexRows = indexes ?? []
+  const indexIds = indexRows.map((i) => i.id as number)
+
+  const latestByIndex = new Map<
+    number,
+    { recordedAt: string; label: string; value: number }
+  >()
+  if (indexIds.length > 0) {
+    // Newest point per index — fetch descending and keep first hit.
+    const { data: points, error: pointsError } = await client
+      .from('index_data')
+      .select('index_id, recorded_at, label, value')
+      .in('index_id', indexIds)
+      .order('recorded_at', { ascending: false })
+      .limit(5000)
+    if (pointsError) return jsonError(pointsError.message, 500)
+    for (const row of points ?? []) {
+      const id = row.index_id as number
+      if (latestByIndex.has(id)) continue
+      latestByIndex.set(id, {
+        recordedAt: String(row.recorded_at),
+        label: String(row.label),
+        value: Number(row.value),
+      })
+    }
+  }
+
+  const officeNameById = new Map<number, string>()
+  for (const o of officeRows) {
+    officeNameById.set(o.id as number, String(o.name))
+  }
+
+  const today = new Date()
+  type BoardIndex = {
+    indexId: number
+    registryKey: number | null
+    name: string
+    kind: 'kpi' | 'policy'
+    frequency: Frequency | null
+    adapterFamily: string | null
+    tier: string | null
+    automated: boolean
+    upToDate: boolean
+    latestLabel: string | null
+    latestRecordedAt: string | null
+    targetPeriod: string | null
+    windowEnd: string | null
+  }
+
+  const byOffice = new Map<
+    number,
+    { officeId: number; officeName: string; indexes: BoardIndex[] }
+  >()
+
+  for (const idx of indexRows) {
+    const officeId = idx.office_id as number
+    const officeName = officeNameById.get(officeId) ?? ''
+    const registry = OFFICE_KPI_REGISTRY.find(
+      (e) => e.name === idx.name && officesMatch(e.office, officeName),
+    )
+    const latest = latestByIndex.get(idx.id as number) ?? null
+    const frequency = (registry?.frequency ?? null) as Frequency | null
+    let upToDate = false
+    let targetPeriod: string | null = null
+    let windowEnd: string | null = null
+    if (registry && latest && frequency) {
+      const status = isCurrentThroughExpected(
+        latest.recordedAt.slice(0, 10),
+        frequency,
+        registry.release,
+        today,
+      )
+      upToDate = status.upToDate
+      targetPeriod = status.targetPeriod
+      windowEnd = status.windowEnd
+    } else if (!latest) {
+      upToDate = false
+    } else if (!registry) {
+      // No registry release window — treat as stale unknown → red.
+      upToDate = false
+    }
+
+    const item: BoardIndex = {
+      indexId: idx.id as number,
+      registryKey: registry?.key ?? null,
+      name: String(idx.name),
+      kind: idx.is_kpi ? 'kpi' : 'policy',
+      frequency,
+      adapterFamily: registry?.adapterFamily ?? null,
+      tier: registry?.tier ?? null,
+      automated: Boolean(registry?.automated),
+      upToDate,
+      latestLabel: latest?.label ?? null,
+      latestRecordedAt: latest?.recordedAt ?? null,
+      targetPeriod,
+      windowEnd,
+    }
+
+    const bucket = byOffice.get(officeId) ?? {
+      officeId,
+      officeName,
+      indexes: [],
+    }
+    bucket.indexes.push(item)
+    byOffice.set(officeId, bucket)
+  }
+
+  const rank = (name: string) => {
+    const idx = OFFICE_DISPLAY_ORDER.findIndex((fragment) =>
+      name.includes(fragment),
+    )
+    return idx === -1 ? 999 : idx
+  }
+
+  const officesOut = [...byOffice.values()]
+    .map((o) => ({
+      ...o,
+      indexes: o.indexes.sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === 'kpi' ? -1 : 1
+        return a.name.localeCompare(b.name, 'he')
+      }),
+    }))
+    .sort((a, b) => {
+      const ra = rank(a.officeName)
+      const rb = rank(b.officeName)
+      if (ra !== rb) return ra - rb
+      return a.officeName.localeCompare(b.officeName, 'he')
+    })
+
+  const totals = {
+    indexes: officesOut.reduce((n, o) => n + o.indexes.length, 0),
+    upToDate: officesOut.reduce(
+      (n, o) => n + o.indexes.filter((i) => i.upToDate).length,
+      0,
+    ),
+    automated: officesOut.reduce(
+      (n, o) => n + o.indexes.filter((i) => i.automated).length,
+      0,
+    ),
+  }
+
+  return jsonOk({
+    ok: true,
+    asOf: today.toISOString(),
+    totals,
+    offices: officesOut,
+  })
+}
+
 async function publishCandidate(
   client: SupabaseClient,
   candidate: CandidateRow,
@@ -432,6 +609,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (route === 'status') return await handleStatus(client)
     if (route === 'candidates') return await handleCandidates(request, client)
     if (route === 'freshness') return await handleFreshness(client)
+    if (route === 'board') return await handleBoard(client)
     return jsonError('נתיב לא נמצא', 404)
   } catch (err) {
     return jsonError(err instanceof Error ? err.message : 'שגיאה', 500)

@@ -48,7 +48,7 @@ The full mapping is in `kpi_sources.yaml`.
   - **615908** average wage per employee post, total (yearly ₪) → index 58 שכר ממוצע
   - **493549** LFS unemployment rate ages 15+ (yearly %) → index 60 אחוז אבטלה
 - `data.gov.il/api/3/action/datastore_search?resource_id=053cea08-…` → private/commercial vehicle registry (~4.2M rows, updated daily, includes `sug_delek_nm` and `moed_aliya_lakvish`).
-- Not reachable from WebFetch / sandbox (robots rules or firewall): World Bank, BOI SDMX. Verify these from GitHub Actions in phase 1.
+- Not reachable from WebFetch / sandbox (robots rules or firewall): historically World Bank / BOI SDMX — both are verified from this machine now (`api.worldbank.org`, `edge.boi.gov.il`). Public debt/GDP and government debt stock (indexes **52** / **55**) are **not** in BOI Edge `DEBT_AGG`/`PS` (private-sector aggregates only) — they use the `curated` adapter + `curated_series.yaml` (Accountant General figures). Monthly deficit %%GDP (**51**) is derived on BOI SDMX as trailing-12m `OZAR_A5TZM_M` / trailing-4Q `GDP_Q_N`. Equality/Gini (**57**) stays `document` (BTL PDF).
 
 ## 4. Architecture
 
@@ -60,8 +60,8 @@ The full mapping is in `kpi_sources.yaml`.
  API adapters        Document discovery            Manual/alert jobs
  (cbs, obudget,      (scrape publisher page →       (edition-watch: page hash
   worldbank, boi,     newest PDF/XLSX link)          changed / date passed)
-  datagov, shkifut)        │
-      │                    ▼
+  datagov, curated,        │
+  shkifut)                 ▼
       │             raw_documents (Supabase Storage + table; sha256 dedupe)
       │                    │
       │                    ▼
@@ -78,9 +78,11 @@ The full mapping is in `kpi_sources.yaml`.
                   │                          │
      auto_publish rule true              needs review
                   ▼                          ▼
-           index_data (upsert)      Review UI (/government/dashboard/edit,
-                  │                  behind the existing pipeline password)
-                  ▼                  + GitHub issue digest
+           index_data upsert by (index_id, recorded_at);
+           also drop same-label orphans with a different recorded_at
+           (manual rows sometimes used today as recorded_at)
+                  │
+                  ▼
    pipeline_runs row · emit_site_updates("עמוד דשבורד הממשלה עודכן…")
 ```
 
@@ -98,10 +100,12 @@ Layer 1 - Gathering Data/Offices/
     cbs_series.py             # apis.cbs.gov.il/series (LFS, wages, national accounts)
     obudget.py                # raw_budget SQL
     worldbank.py
-    boi_sdmx.py
+    boi_sdmx.py               # plain series + rolling_deficit_gdp_pct (index 51)
     datagov.py                # CKAN datastore_search / datastore_search_sql
+    curated.py                # curated_series.yaml (AG debt 52/55 until BOI codes exist)
     shkifut.py                # unofficial JSON
     document.py               # discover → download → store (B/C)
+  curated_series.yaml         # hand-maintained AG debt points for curated adapter
   extractors/
     xlsx_table.py             # fixed mapping per file layout
     pdf_llm.py                # pdfplumber text/tables → OpenAI structured output
@@ -333,12 +337,14 @@ For debugging, the same command runs locally: `python run_office_kpi_pipeline.py
   - **Review queue**: each candidate side by side with a mini chart of the existing series + the new point, the evidence quote/page, and a link to the stored PDF page. Actions: Approve / Edit value / Reject.
   - **Freshness table**: 48 rows showing the latest point, expected next release, last checked time, and status (🟢 fresh / 🟡 due / 🔴 overdue / ⚪ manual).
   - **Manual entry** for tier D. It writes a candidate with `method='manual'` so the same publish path and audit apply.
-- `emit_site_updates` is called only when points were **published**, with facts like `{"page": "דשבורד הממשלה", "updated": ["מחירי הדירות", "אינפלציה"]}`.
+- `emit_site_updates` is called only when points were **published**, with facts like `{"page": "דשבורד הממשלה", "updated": ["מחירי הדירות", "אינפלציה"]}`. Dedupe key is `office-kpis:{pipeline_run_id}:{sorted index keys}` so each publishing run gets its own homepage ticker row (same-day runs no longer overwrite each other).
 
 ## 5. Data-quality flags found while mapping (curation decisions needed)
 
 1. **ביטחון לאומי › תקציב (id 22)**: the series (~₪52M/yr) is obudget code `0010`/`00105101`, which is only the **ministry HQ** (מטה). Police and Prison Service budgets are separate sections worth billions. Decide: keep it as "HQ budget" and rename it, or switch to the sum of the relevant sections. The same question applies to **תחבורה › תקציב (id 24)** (~₪0.5B, ministry section only).
-2. **כלי רכב חשמליים (id 29)**: the description says share of *all* vehicles, but the values (3.9% → 10.7% → 18% for 2021–2023) look like share of **new registrations**. The registry adapter can compute either one. Pick one and fix the `info` text.
+2. **כלי רכב חשמליים (id 29)**: values are share of **new first-registrations** (`moed_aliya_lakvish`, fuel=`חשמל`), not of the whole fleet. `indexes.info` and the datagov adapter match that definition; only complete calendar years are published.
+3. **תחבורה still on document**: נוסעים בנתב"ג (30), נסיעות באוטובוסים (31), תאונות דרכים (26) — no CBS/data.gov series matched site history; IAA/MOT/police file extractors are the next step. Vehicles/1000 (28), fuel Jan (32), road fatalities (36) use `curated`; rail passengers (34) uses CBS monthly series `1617` summed ×1000.
+4. **Freshness ≠ last label on site**: a card is green only while the *next* expected period is still inside its release window. Fuel (32) uses `year_offset: 0` and window `01-01..02-15`, so after publishing January 2025 it immediately expects January 2026 — with 2025 on site and today past mid-Feb 2026 the box is correctly red until 2026 is curated. Vehicles (28) stays red until new CBS rates are hand-added to `curated_series.yaml` (no live series id yet); catch-up through 2025 is in YAML (421 / 427).
 3. **שכר ממוצע (id 58)** and **אחוז אבטלה (id 60)** now resolve via `cbs_series` (IDs 615908 / 493549). Update live `indexes.source` URLs to the CBS series endpoints when publishing.
 4. **Monthly day convention**: ids 1 and 14 should share the same `recorded_at` per month (one has `30.08.2025`, the other `31.08.2025`). Normalize this in the first migration.
 5. **Methodology breaks**: CBS rebases the CPI and the police sometimes change yearbook definitions. The registry has a `notes`/`break_at` field, so the chart can later show a break marker.

@@ -441,13 +441,14 @@ def main(argv: list[str] | None = None) -> int:
 
     published = sorted({entries_by_key[c.obs.key].name for c in result.candidates if c.auto_publish})
     if published:
+        # One strip line per publishing run (not once/day) — matches polls/knesset dedupe.
         emit_pipeline_site_update(
             store.sb,
             event_type=PIPELINE_NAME,
             href="/government/dashboard",
             page_label_he="דשבורד הממשלה",
             facts={"pipeline": PIPELINE_NAME, "updated_indexes": published},
-            dedupe_key=f"{PIPELINE_NAME}:{today.isoformat()}",
+            dedupe_key=f"{PIPELINE_NAME}:{run_id or today.isoformat()}:{'-'.join(str(k) for k in sorted({c.obs.key for c in result.candidates if c.auto_publish}))}",
             pipeline_run_id=run_id,
         )
     return 0

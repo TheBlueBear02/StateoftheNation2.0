@@ -115,17 +115,29 @@ class SupabaseStore:
     def history(self, index_ids: list[int]) -> dict[int, list[tuple[date, float]]]:
         rows = self._all(
             lambda: self.sb.table("index_data")
-            .select("index_id, recorded_at, value")
+            .select("index_id, recorded_at, label, value")
             .in_("index_id", index_ids)
             .order("recorded_at")
             .order("id")
         )
-        out: dict[int, list[tuple[date, float]]] = {i: [] for i in index_ids}
+        # Prefer label → period when the site label is parseable, so a hand-entered
+        # row with recorded_at=today / label=2025 doesn't look like a future year
+        # and collide with a later canonical 2025-01-01 upsert.
+        best: dict[int, dict[date, tuple[date, float]]] = {i: {} for i in index_ids}
         for r in rows:
             v = clean_number(r["value"])
-            if v is not None and r.get("recorded_at"):
-                out[r["index_id"]].append((date.fromisoformat(r["recorded_at"][:10]), v))
-        return out
+            if v is None or not r.get("recorded_at"):
+                continue
+            recorded = date.fromisoformat(r["recorded_at"][:10])
+            period = parse_site_label(r.get("label") or "") or recorded
+            prev = best[r["index_id"]].get(period)
+            # Prefer the row whose recorded_at already matches the canonical period.
+            if prev is None or (recorded == period and prev[0] != period):
+                best[r["index_id"]][period] = (recorded, v)
+        return {
+            i: [(p, v) for p, (_r, v) in sorted(periods.items())]
+            for i, periods in best.items()
+        }
 
     def staged_latest(self, index_ids: list[int]) -> dict[int, date]:
         rows = self._all(
@@ -192,6 +204,16 @@ class SupabaseStore:
                     },
                     on_conflict="index_id,recorded_at",
                 ).execute()
+                # Drop same-label orphans with a non-canonical recorded_at
+                # (e.g. manual "2025" entered as recorded_at=today).
+                (
+                    self.sb.table("index_data")
+                    .delete()
+                    .eq("index_id", c.index_id)
+                    .eq("label", c.label)
+                    .neq("recorded_at", c.recorded_at.isoformat())
+                    .execute()
+                )
                 # A newer published value supersedes older pending rows for the same point.
                 cand_id = (saved or [{}])[0].get("id")
                 q = (

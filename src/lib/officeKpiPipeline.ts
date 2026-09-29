@@ -244,6 +244,58 @@ export async function saveOfficeKpiSiteUpdate(
   }
 }
 
+export type OfficeKpiBoardIndex = {
+  indexId: number
+  registryKey: number | null
+  name: string
+  kind: 'kpi' | 'policy'
+  frequency: 'yearly' | 'monthly' | null
+  adapterFamily: string | null
+  tier: string | null
+  automated: boolean
+  upToDate: boolean
+  latestLabel: string | null
+  latestRecordedAt: string | null
+  targetPeriod: string | null
+  windowEnd: string | null
+}
+
+export type OfficeKpiBoardOffice = {
+  officeId: number
+  officeName: string
+  indexes: OfficeKpiBoardIndex[]
+}
+
+export type OfficeKpiBoardResult =
+  | {
+      ok: true
+      asOf: string
+      totals: { indexes: number; upToDate: number; automated: number }
+      offices: OfficeKpiBoardOffice[]
+    }
+  | { ok: false; error: string }
+
+export async function fetchOfficeKpiBoard(): Promise<OfficeKpiBoardResult> {
+  try {
+    const response = await fetch('/api/office-kpis/board', {
+      headers: secretHeaders(),
+      cache: 'no-store',
+    })
+    const body = await parseJson<OfficeKpiBoardResult>(response)
+    if (!response.ok) {
+      return body.ok === false
+        ? body
+        : { ok: false, error: 'טעינת לוח המדדים נכשלה' }
+    }
+    return body
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'טעינת לוח המדדים נכשלה',
+    }
+  }
+}
+
 export const CANDIDATE_STATUS_HE: Record<string, string> = {
   pending: 'ממתין לאישור',
   approved: 'אושר (ממתין לפרסום)',

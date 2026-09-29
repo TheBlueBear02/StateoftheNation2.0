@@ -10,8 +10,9 @@ from datetime import date
 
 import pytest
 
+from adapters.curated import CuratedAdapter
 from registry import load_registry
-from replay import ReplayCbs, ReplayCbsSeries, ReplayObudget
+from replay import ReplayCbs, ReplayCbsSeries, ReplayDatagov, ReplayObudget, ReplayWorldbank
 from run_office_kpi_pipeline import run
 from store import OfflineStore
 
@@ -20,6 +21,9 @@ ADAPTERS = {
     "cbs_price": ReplayCbs(),
     "cbs_series": ReplayCbsSeries(),
     "obudget": ReplayObudget(),
+    "worldbank": ReplayWorldbank(),
+    "datagov": ReplayDatagov(),
+    "curated": CuratedAdapter(),
 }
 
 
@@ -70,6 +74,28 @@ def test_unemployment_mostly_matches(backtest):
     assert k["same"] + k["revision"] >= 12
 
 
+def test_gdp_per_capita_mostly_matches(backtest):
+    # World Bank floats vs rounded site dollars → dense tiny revisions.
+    k = backtest[61]
+    assert k["same"] + k["revision"] >= 14
+
+
+def test_ev_share_mostly_matches(backtest):
+    # Registry-based new-registration share ≈ site within a few tenths of a point.
+    k = backtest[29]
+    assert k["same"] + k["revision"] >= 3
+
+
+def test_debt_gdp_curated_matches_history(backtest):
+    k = backtest[52]
+    assert k["same"] >= 14
+
+
+def test_government_debt_curated_matches_history(backtest):
+    k = backtest[55]
+    assert k["same"] >= 12
+
+
 def test_nightly_run_on_real_data_publishes_backlog():
     result = run(OfflineStore(), ENTRIES, date(2026, 9, 29), adapters=ADAPTERS)
     published = {(c.obs.key, c.label) for c in result.candidates if c.auto_publish}
@@ -79,6 +105,9 @@ def test_nightly_run_on_real_data_publishes_backlog():
     assert (53, "2025") in published                 # inflation 2025
     assert (58, "2024") in published or (58, "2025") in published
     assert (60, "2025") in published                 # LFS unemployment 2025
+    assert (61, "2025") in published or (61, "2025") in pending  # WB GDP/capita
+    assert (29, "2024") in published or (29, "2024") in pending  # EV share (complete years only)
+    assert (29, "2026") not in published and (29, "2026") not in pending
     # GDP growth 2025 swings hard vs 2024 → review, not auto
     assert (54, "2025") in published or (54, "2025") in pending
     assert not any(c.rejected for c in result.candidates)
