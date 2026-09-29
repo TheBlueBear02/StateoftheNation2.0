@@ -5,6 +5,7 @@
 Office KPI/policy dashboard ported from the old Flask `/offices` page. Shows four curated ministries as a quadrant of bubbles; selecting an office opens an **inline detail panel** (not modals) with a scrollable icon-circle strip of indexes, an SVG trend chart, and a ministers eras bar under the chart. No RSS news feed.
 
 Route: `/government/dashboard`  
+Ops / review: `/government/dashboard/edit` (pipeline password; linked from `/piplines` card `office-kpis`)  
 Shareable chart deep links: `/government/dashboard?office=<officeId>&index=<indexId>` (updates as you switch office/index; **העתק קישור** copies the absolute URL).
 
 ## Page Structure
@@ -33,6 +34,11 @@ Shareable chart deep links: `/government/dashboard?office=<officeId>&index=<inde
 | File | Role |
 |------|------|
 | `src/app/government/dashboard/page.tsx` | Metadata + JSON-LD + view |
+| `src/app/government/dashboard/edit/page.tsx` | Password-gated KPI pipeline review UI |
+| `src/views/OfficeKpiEditPage.tsx` / `.css` | Run summary, candidate approve/reject, freshness table |
+| `src/app/api/office-kpis/[...path]/route.ts` | status / candidates / freshness / review (service role) |
+| `src/lib/officeKpiPipeline.ts` | Client fetch helpers for the edit page |
+| `src/content/pipelines/officeKpis.ts` | `/piplines` card + docs |
 | `src/views/OfficeDashboardPage.tsx` | Page shell, quadrant, detail panel |
 | `src/views/OfficeDashboardPage.css` | Layout, bubbles, index strip, panel |
 | `src/components/government/IndexTrendChart.tsx` | SVG line/bar/pie chart; exports `CHART_WIDTH` / `CHART_MARGIN` |

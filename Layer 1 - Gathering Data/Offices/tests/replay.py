@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 from adapters.cbs_price import to_observations as cbs_obs
+from adapters.cbs_series import parse_obs
+from adapters.cbs_series import to_observations as cbs_series_obs
 from adapters.obudget import to_observations as obudget_obs
 
 FIX = Path(__file__).resolve().parent / "fixtures"
@@ -20,6 +22,21 @@ class ReplayCbs:
         out = []
         for t in tasks:
             out += cbs_obs(t, self.data[str(t.entry.params["id"])])
+        return out
+
+
+class ReplayCbsSeries:
+    family = "cbs_series"
+    method = "api"
+
+    def __init__(self):
+        self.data = json.loads((FIX / "cbs_series_history.json").read_text(encoding="utf-8"))
+
+    def fetch(self, tasks, today):
+        out = []
+        for t in tasks:
+            ser, points = parse_obs(self.data[str(t.entry.params["id"])])
+            out += cbs_series_obs(t, ser, points)
         return out
 
 

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from adapters.base import Adapter
 from adapters.cbs_price import CbsPriceAdapter
+from adapters.cbs_series import CbsSeriesAdapter
 from adapters.obudget import ObudgetAdapter
 
 ADAPTERS: dict[str, Adapter] = {
     a.family: a
     for a in (
         CbsPriceAdapter(),
+        CbsSeriesAdapter(),
         ObudgetAdapter(),
     )
 }

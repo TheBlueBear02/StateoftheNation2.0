@@ -352,6 +352,27 @@ def main(argv: list[str] | None = None) -> int:
           else format_candidates(result.candidates, entries_by_key))
 
     counts = result.counts()
+    changes: list[dict] = []
+    for cand in result.candidates:
+        if cand.rejected or cand.kind == "same":
+            continue
+        entry = entries_by_key[cand.obs.key]
+        changes.append(
+            {
+                "key": cand.obs.key,
+                "index_id": cand.index_id,
+                "name": entry.name,
+                "office": entry.office,
+                "label": cand.label,
+                "value": cand.obs.value,
+                "previous_value": cand.previous_value,
+                "kind": cand.kind,
+                "status": cand.status,
+                "method": cand.obs.method,
+                "flags": list(cand.flags),
+                "source_url": cand.obs.source_url,
+            }
+        )
     summary = {
         "date": today.isoformat(),
         "due": s["due"],
@@ -363,8 +384,11 @@ def main(argv: list[str] | None = None) -> int:
         "pending": counts["pending"],
         "rejected": counts["rejected"],
         "errors": result.errors,
+        "changes": changes,
     }
-    log.info("[result] %s", summary)
+    log.info("[result] %s", {k: v for k, v in summary.items() if k != "changes"})
+    if changes:
+        log.info("[changes] %d value(s) staged/published", len(changes))
 
     if dry:
         log.info("dry run — nothing written")
@@ -397,12 +421,17 @@ def main(argv: list[str] | None = None) -> int:
     from record_pipeline_run import record_pipeline_run
 
     status = "error" if result.errors and not result.found_keys else ("warning" if result.errors else "success")
-    record_pipeline_run(
+    message = (
+        f"פורסמו {summary['published']} · "
+        f"ממתינים לאישור {summary['pending']} · "
+        f"נבדקו {summary['due']}"
+    )
+    run_id = record_pipeline_run(
         store.sb,
         pipeline=PIPELINE_NAME,
         action="nightly",
         status=status,
-        message=f"{summary['published']} published · {summary['pending']} pending · {summary['due']} checked",
+        message=message,
         error="; ".join(f"{k}: {v}" for k, v in result.errors.items()) or None,
         summary=summary,
         source=os.environ.get("PIPELINE_RUN_SOURCE", "cli"),
@@ -419,6 +448,7 @@ def main(argv: list[str] | None = None) -> int:
             page_label_he="דשבורד הממשלה",
             facts={"pipeline": PIPELINE_NAME, "updated_indexes": published},
             dedupe_key=f"{PIPELINE_NAME}:{today.isoformat()}",
+            pipeline_run_id=run_id,
         )
     return 0
 

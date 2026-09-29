@@ -11,12 +11,16 @@ from datetime import date
 import pytest
 
 from registry import load_registry
-from replay import ReplayCbs, ReplayObudget
+from replay import ReplayCbs, ReplayCbsSeries, ReplayObudget
 from run_office_kpi_pipeline import run
 from store import OfflineStore
 
 ENTRIES = load_registry()
-ADAPTERS = {"cbs_price": ReplayCbs(), "obudget": ReplayObudget()}
+ADAPTERS = {
+    "cbs_price": ReplayCbs(),
+    "cbs_series": ReplayCbsSeries(),
+    "obudget": ReplayObudget(),
+}
 
 
 @pytest.fixture(scope="module")
@@ -45,10 +49,36 @@ def test_inflation_mostly_matches(backtest):
     assert k["same"] >= 13 and k["revision"] <= 2
 
 
+def test_growth_mostly_matches(backtest):
+    # National accounts revise often; overlap should still be dense.
+    k = backtest[54]
+    assert k["same"] + k["revision"] >= 12
+    assert k["same"] >= 4
+
+
+def test_avg_wage_mostly_matches(backtest):
+    # Series starts 2011; hand-entered NIS values differ by 1–4 ₪ → tiny revisions.
+    k = backtest[58]
+    assert k["same"] + k["revision"] >= 12
+    assert k["revision"] >= 10
+
+
+def test_unemployment_mostly_matches(backtest):
+    # Series starts 2012; 2009–2011 stay unmatched. 2023–2024 site figures lag CBS.
+    k = backtest[60]
+    assert k["same"] >= 8
+    assert k["same"] + k["revision"] >= 12
+
+
 def test_nightly_run_on_real_data_publishes_backlog():
     result = run(OfflineStore(), ENTRIES, date(2026, 9, 29), adapters=ADAPTERS)
     published = {(c.obs.key, c.label) for c in result.candidates if c.auto_publish}
+    pending = {(c.obs.key, c.label) for c in result.candidates if c.status == "pending"}
     assert (25, "2025") in published                 # education budget 2025
     assert (56, "01.06.2026") in published           # housing index, a year past the site
     assert (53, "2025") in published                 # inflation 2025
+    assert (58, "2024") in published or (58, "2025") in published
+    assert (60, "2025") in published                 # LFS unemployment 2025
+    # GDP growth 2025 swings hard vs 2024 → review, not auto
+    assert (54, "2025") in published or (54, "2025") in pending
     assert not any(c.rejected for c in result.candidates)

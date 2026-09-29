@@ -37,6 +37,7 @@ Docs pages are `noindex` but **not** password-gated. The dashboard and all `/edi
 | `src/hooks/usePipelineRuns.ts` | Loads `pipeline_runs` |
 | `src/hooks/usePipelineRunProgress.ts` | Live total + per-step timers on edit panels |
 | `src/content/pipelines/index.ts` | `PIPELINES` registry |
+| `src/content/pipelines/officeKpis.ts` | Office KPI pipeline card + docs |
 | `src/content/pipelines/types.ts` | Includes `schedule`, `docsPath`, `editPath` |
 | `Layer 1 - Gathering Data/schema_pipeline_runs.sql` | Run-history table DDL |
 | `Layer 1 - Gathering Data/record_pipeline_run.py` | Shared insert helper |
@@ -47,7 +48,7 @@ Docs pages are `noindex` but **not** password-gated. The dashboard and all `/edi
 
 1. Breadcrumb + title **לוח צינורות נתונים**
 2. **Pipeline cards** from `PIPELINES`: status, schedule label, links to docs + edit
-3. **Run log** — last 50 rows from `pipeline_runs` (newest first)
+3. **Run log** — last 50 rows from `pipeline_runs` (newest first). Rows are clickable: expand to see structured details when `summary` has them (office KPIs store per-value `changes`: index name, period, value, previous value, status, and `source_url` as a **מקור לבדיקה** link for fact-checking). Office KPI English legacy messages are normalized to Hebrew counts (**פורסמו** / **ממתינים לאישור** / **נבדקו**).
 
 Schedules today:
 
@@ -55,6 +56,7 @@ Schedules today:
 |----------|----------------|
 | Polls | כל יום בחצות · 00:00 שעון ישראל (`0 21 * * *` UTC) |
 | Knesset | כל יום שבת בחצות · 00:00 שעון ישראל (`0 21 * * 5` UTC) |
+| Office KPIs | כל לילה ב־02:00 שעון ישראל (`0 23 * * *` UTC) |
 | Elections candidates | לא נקבע עדיין |
 
 ## `pipeline_runs`
@@ -63,9 +65,12 @@ Anon **read**; service-role **write**. Writers:
 
 - Polls CLI (`run_polls_pipeline.py`) — `source` from `PIPELINE_RUN_SOURCE` (default `cli`; GitHub Actions sets `github-actions`)
 - Knesset CLI (`load_all_knesset_data.py`) — same `PIPELINE_RUN_SOURCE` convention
+- Office KPI CLI (`run_office_kpi_pipeline.py`) — `pipeline=office-kpis`; same `PIPELINE_RUN_SOURCE` convention
 - Polls / Knesset UI APIs — `source=ui`
 
 Polls edit UI (`/elections/polls/edit`) also shows a **diagnostics console** fed by `diagnostics` from `run_polls_pipeline_api.py` (rejected staging rows, parse/validation warnings), plus **stage 7** (`יצירת עדכון`) that emits a homepage ticker row and lets you edit/save the headline. Knesset edit UI (`/knesset/edit`) has the same stage-7 pattern: stage 6 records position diffs; stage 7 emits and exposes the editable headline.
+
+Office KPI edit UI (`/government/dashboard/edit`): last run summary + status counts from `index_data_candidates`, filterable candidate cards (pending / published / rejected / all) with **Approve & publish** or **Reject**, a freshness table from `kpi_check_state`, and the homepage news-strip headline from `site_updates` (`event_type=office-kpis`) with editable save. APIs under `/api/office-kpis/*` (status, candidates, freshness, review, site-update) use `requirePipelineSecret` + service role.
 
 Apply `schema_pipeline_runs.sql` once in the Supabase SQL editor before the dashboard log can load.
 

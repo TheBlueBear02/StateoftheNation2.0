@@ -40,9 +40,13 @@
 The full mapping is in `kpi_sources.yaml`.
 
 ### Verified during design (2026-09-28)
-- `next.obudget.org/api/query?query=<SQL>` → the `raw_budget` table has `net_executed` by `code` and `year` through **2025** (2026 has the revised budget only). Works unauthenticated.
+- `next.obudget.org/api/query?query=<SQL>` → the `raw_budget` table has `net_executed` by `code` and `year` through **2025** (2026 has the revised budget only). Works unauthenticated **after a session warm-up** against `https://next.obudget.org/` with browser-like headers; a cold GET returns HTTP 200 with `status: ["Bot detected"]` and empty rows (the adapter handles this).
 - `api.cbs.gov.il/index/data/price?id=40010&format=json&last=N` → housing price index on the **1993 average base**, the same base as the site's series. The API has data through **06/2026**; the site stops at 06/2025.
 - `api.cbs.gov.il/index/data/price?id=120010…` → CPI (2024 base). Monthly `percentYear` is available, so the Dec value = annual inflation.
+- `apis.cbs.gov.il/series/data/list?id=…` → CBS statistical series (implemented as `cbs_series`):
+  - **64092** GDP quantitative change (yearly %) → index 54 צמיחה
+  - **615908** average wage per employee post, total (yearly ₪) → index 58 שכר ממוצע
+  - **493549** LFS unemployment rate ages 15+ (yearly %) → index 60 אחוז אבטלה
 - `data.gov.il/api/3/action/datastore_search?resource_id=053cea08-…` → private/commercial vehicle registry (~4.2M rows, updated daily, includes `sug_delek_nm` and `moed_aliya_lakvish`).
 - Not reachable from WebFetch / sandbox (robots rules or firewall): World Bank, BOI SDMX. Verify these from GitHub Actions in phase 1.
 
@@ -261,7 +265,7 @@ This works for backlog too. If a series is 2 years behind, `target` is the oldes
 3. **Execute:** cheapest sources first (APIs → files → PDF+LLM). Each source group is isolated: a failure in one is logged and the run continues. There are guardrails: `MAX_LLM_CALLS_PER_NIGHT` (default 20) and a total time budget (default 40 min). Groups that don't fit are pushed to tomorrow night.
 4. **Validate → stage → publish** (4.4–4.5).
 5. **Update `kpi_check_state`** (checked_at, attempts, found/not found, error).
-6. **Report:** one `pipeline_runs` row with a per-index summary. `emit_site_updates` runs only if something was published. **One** GitHub issue, "Office KPIs: needs attention", is created or updated (never duplicated) when there are pending reviews, overdue indexes, or failing sources.
+6. **Report:** one `pipeline_runs` row with a per-index summary (`changes` includes `source_url` so `/piplines` can link out for fact-checking). `emit_site_updates` runs only if something was published. **One** GitHub issue, "Office KPIs: needs attention", is created or updated (never duplicated) when there are pending reviews, overdue indexes, or failing sources.
 
 **Monthly revision sweep:** on the 1st of each month the planner also re-queries API sources for the last 12 periods, to catch revised values (CBS revises past figures). This is the only check that doesn't depend on a missing period.
 
@@ -335,7 +339,7 @@ For debugging, the same command runs locally: `python run_office_kpi_pipeline.py
 
 1. **ביטחון לאומי › תקציב (id 22)**: the series (~₪52M/yr) is obudget code `0010`/`00105101`, which is only the **ministry HQ** (מטה). Police and Prison Service budgets are separate sections worth billions. Decide: keep it as "HQ budget" and rename it, or switch to the sum of the relevant sections. The same question applies to **תחבורה › תקציב (id 24)** (~₪0.5B, ministry section only).
 2. **כלי רכב חשמליים (id 29)**: the description says share of *all* vehicles, but the values (3.9% → 10.7% → 18% for 2021–2023) look like share of **new registrations**. The registry adapter can compute either one. Pick one and fix the `info` text.
-3. **שכר ממוצע (id 58)** has an empty `source`. **אחוז אבטלה (id 60)** cites Wikipedia. Both move to CBS/BOI APIs, so this is a good time to update `indexes.source`.
+3. **שכר ממוצע (id 58)** and **אחוז אבטלה (id 60)** now resolve via `cbs_series` (IDs 615908 / 493549). Update live `indexes.source` URLs to the CBS series endpoints when publishing.
 4. **Monthly day convention**: ids 1 and 14 should share the same `recorded_at` per month (one has `30.08.2025`, the other `31.08.2025`). Normalize this in the first migration.
 5. **Methodology breaks**: CBS rebases the CPI and the police sometimes change yearbook definitions. The registry has a `notes`/`break_at` field, so the chart can later show a break marker.
 

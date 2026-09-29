@@ -1,0 +1,442 @@
+{
+  "64092": {
+    "DataSet": {
+      "Series": [
+        {
+          "id": 64092,
+          "ffu_num": null,
+          "time": {
+            "value": 1,
+            "name": "שנה"
+          },
+          "data": {
+            "value": 1,
+            "name": "נתונים מקוריים"
+          },
+          "unit": {
+            "value": 16,
+            "name": "אחוזים"
+          },
+          "calc": {
+            "value": 52,
+            "name": "כל תקופה לעומת קודמת, בשיעור שנתי"
+          },
+          "price": {
+            "value": 1490,
+            "name": "במחירי 2020"
+          },
+          "path": {
+            "level1": {
+              "value": 37,
+              "name": "חשבונות לאומיים   (נתונים  מ-1995 ,SNA 2008)"
+            },
+            "level2": {
+              "value": 1,
+              "name": "תוצר מקומי גולמי"
+            },
+            "level3": {
+              "value": 1,
+              "name": "במחירי שוק מצד ההוצאה"
+            },
+            "level4": {
+              "value": 1,
+              "name": "תוצר מקומי גולמי"
+            },
+            "name_id": {
+              "value": 4053,
+              "name": "השינוי הכמותי"
+            }
+          },
+          "precis": 1,
+          "update": "2026-08-16",
+          "obs": [
+            {
+              "TimePeriod": "2025-01",
+              "Value": 3.5
+            },
+            {
+              "TimePeriod": "2024-01",
+              "Value": 1.7
+            },
+            {
+              "TimePeriod": "2023-01",
+              "Value": 2.0
+            },
+            {
+              "TimePeriod": "2022-01",
+              "Value": 6.1
+            },
+            {
+              "TimePeriod": "2021-01",
+              "Value": 9.0
+            },
+            {
+              "TimePeriod": "2020-01",
+              "Value": -1.9
+            },
+            {
+              "TimePeriod": "2019-01",
+              "Value": 3.6
+            },
+            {
+              "TimePeriod": "2018-01",
+              "Value": 4.1
+            },
+            {
+              "TimePeriod": "2017-01",
+              "Value": 4.3
+            },
+            {
+              "TimePeriod": "2016-01",
+              "Value": 4.5
+            },
+            {
+              "TimePeriod": "2015-01",
+              "Value": 2.2
+            },
+            {
+              "TimePeriod": "2014-01",
+              "Value": 3.7
+            },
+            {
+              "TimePeriod": "2013-01",
+              "Value": 4.1
+            },
+            {
+              "TimePeriod": "2012-01",
+              "Value": 2.4
+            },
+            {
+              "TimePeriod": "2011-01",
+              "Value": 5.6
+            },
+            {
+              "TimePeriod": "2010-01",
+              "Value": 5.5
+            },
+            {
+              "TimePeriod": "2009-01",
+              "Value": 1.2
+            },
+            {
+              "TimePeriod": "2008-01",
+              "Value": 3.2
+            },
+            {
+              "TimePeriod": "2007-01",
+              "Value": 6.3
+            },
+            {
+              "TimePeriod": "2006-01",
+              "Value": 5.6
+            },
+            {
+              "TimePeriod": "2005-01",
+              "Value": 4.3
+            },
+            {
+              "TimePeriod": "2004-01",
+              "Value": 4.6
+            },
+            {
+              "TimePeriod": "2003-01",
+              "Value": 1.6
+            },
+            {
+              "TimePeriod": "2002-01",
+              "Value": -0.3
+            },
+            {
+              "TimePeriod": "2001-01",
+              "Value": 0.3
+            },
+            {
+              "TimePeriod": "2000-01",
+              "Value": 8.6
+            },
+            {
+              "TimePeriod": "1999-01",
+              "Value": 3.3
+            },
+            {
+              "TimePeriod": "1998-01",
+              "Value": 4.0
+            },
+            {
+              "TimePeriod": "1997-01",
+              "Value": 3.6
+            },
+            {
+              "TimePeriod": "1996-01",
+              "Value": 5.9
+            }
+          ]
+        }
+      ],
+      "paging": {
+        "total_items": 30,
+        "page_size": 100,
+        "current_page": 1,
+        "last_page": 1,
+        "first_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=64092&format=json&last=40&addNull=false",
+        "previous_url": null,
+        "current_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=64092&format=json&last=40&addNull=false",
+        "next_url": null,
+        "last_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=64092&format=json&last=40&addNull=false",
+        "base_url": null
+      }
+    }
+  },
+  "615908": {
+    "DataSet": {
+      "Series": [
+        {
+          "id": 615908,
+          "ffu_num": null,
+          "time": {
+            "value": 1,
+            "name": "שנה"
+          },
+          "data": {
+            "value": 1,
+            "name": "נתונים מקוריים"
+          },
+          "unit": {
+            "value": 5,
+            "name": "ש\"ח"
+          },
+          "calc": {
+            "value": 14,
+            "name": "ממוצע לחודש"
+          },
+          "price": {
+            "value": 2,
+            "name": "מחירים שוטפים"
+          },
+          "path": {
+            "level1": {
+              "value": 33,
+              "name": "תעסוקה ושכר, על פי המוסד לביטוח לאומי  (סיווג ענפי כלכלה 2011)"
+            },
+            "level2": {
+              "value": 1,
+              "name": "משרות שכיר, סך כל השכר ושכר חודשי ממוצע (כולל עובדים זרים)"
+            },
+            "level3": {
+              "value": 2,
+              "name": "שכר למשרת שכיר"
+            },
+            "level4": {
+              "value": 1,
+              "name": "סך הכל"
+            },
+            "name_id": {
+              "value": 671,
+              "name": "מספרים מוחלטים"
+            }
+          },
+          "precis": 0,
+          "update": "2026-08-31",
+          "obs": [
+            {
+              "TimePeriod": "2025-01",
+              "Value": 13592.0
+            },
+            {
+              "TimePeriod": "2024-01",
+              "Value": 13214.0
+            },
+            {
+              "TimePeriod": "2023-01",
+              "Value": 12499.0
+            },
+            {
+              "TimePeriod": "2022-01",
+              "Value": 11766.0
+            },
+            {
+              "TimePeriod": "2021-01",
+              "Value": 11441.0
+            },
+            {
+              "TimePeriod": "2020-01",
+              "Value": 11167.0
+            },
+            {
+              "TimePeriod": "2019-01",
+              "Value": 10482.0
+            },
+            {
+              "TimePeriod": "2018-01",
+              "Value": 10188.0
+            },
+            {
+              "TimePeriod": "2017-01",
+              "Value": 9845.0
+            },
+            {
+              "TimePeriod": "2016-01",
+              "Value": 9559.0
+            },
+            {
+              "TimePeriod": "2015-01",
+              "Value": 9347.0
+            },
+            {
+              "TimePeriod": "2014-01",
+              "Value": 9145.0
+            },
+            {
+              "TimePeriod": "2013-01",
+              "Value": 9001.0
+            },
+            {
+              "TimePeriod": "2012-01",
+              "Value": 8784.0
+            },
+            {
+              "TimePeriod": "2011-01",
+              "Value": 8588.0
+            }
+          ]
+        }
+      ],
+      "paging": {
+        "total_items": 15,
+        "page_size": 100,
+        "current_page": 1,
+        "last_page": 1,
+        "first_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=615908&format=json&last=40&addNull=false",
+        "previous_url": null,
+        "current_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=615908&format=json&last=40&addNull=false",
+        "next_url": null,
+        "last_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=615908&format=json&last=40&addNull=false",
+        "base_url": null
+      }
+    }
+  },
+  "493549": {
+    "DataSet": {
+      "Series": [
+        {
+          "id": 493549,
+          "ffu_num": null,
+          "time": {
+            "value": 1,
+            "name": "שנה"
+          },
+          "data": {
+            "value": 1,
+            "name": "נתונים מקוריים"
+          },
+          "unit": {
+            "value": 16,
+            "name": "אחוזים"
+          },
+          "calc": {
+            "value": 16,
+            "name": "כאחוז מסה\"כ"
+          },
+          "price": {
+            "value": 0,
+            "name": ""
+          },
+          "path": {
+            "level1": {
+              "value": 11,
+              "name": "נתוני תעסוקה על פי סקר כוח אדם"
+            },
+            "level2": {
+              "value": 5,
+              "name": "נתונים החל מינואר 2012 ועד דצמבר 2025 לפי הגדרה ישנה סכ\"א חודשי (מבוסס על אומדני מפקד 2008)"
+            },
+            "level3": {
+              "value": 1,
+              "name": "אוכלוסיית בני 15 ומעלה ובני 64-25 , לפי תכונות כוח העבודה"
+            },
+            "level4": {
+              "value": 5,
+              "name": "בלתי מועסקים"
+            },
+            "name_id": {
+              "value": 2226,
+              "name": "כלל אוכלוסייה - בני 15 ומעלה"
+            }
+          },
+          "precis": 1,
+          "update": "2026-05-13",
+          "obs": [
+            {
+              "TimePeriod": "2025-01",
+              "Value": 2.9
+            },
+            {
+              "TimePeriod": "2024-01",
+              "Value": 3.0
+            },
+            {
+              "TimePeriod": "2023-01",
+              "Value": 3.4
+            },
+            {
+              "TimePeriod": "2022-01",
+              "Value": 3.8
+            },
+            {
+              "TimePeriod": "2021-01",
+              "Value": 5.0
+            },
+            {
+              "TimePeriod": "2020-01",
+              "Value": 4.3
+            },
+            {
+              "TimePeriod": "2019-01",
+              "Value": 3.8
+            },
+            {
+              "TimePeriod": "2018-01",
+              "Value": 4.0
+            },
+            {
+              "TimePeriod": "2017-01",
+              "Value": 4.2
+            },
+            {
+              "TimePeriod": "2016-01",
+              "Value": 4.8
+            },
+            {
+              "TimePeriod": "2015-01",
+              "Value": 5.3
+            },
+            {
+              "TimePeriod": "2014-01",
+              "Value": 5.9
+            },
+            {
+              "TimePeriod": "2013-01",
+              "Value": 6.2
+            },
+            {
+              "TimePeriod": "2012-01",
+              "Value": 6.9
+            }
+          ]
+        }
+      ],
+      "paging": {
+        "total_items": 14,
+        "page_size": 100,
+        "current_page": 1,
+        "last_page": 1,
+        "first_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=493549&format=json&last=40&addNull=false",
+        "previous_url": null,
+        "current_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=493549&format=json&last=40&addNull=false",
+        "next_url": null,
+        "last_url": "https://apis.cbs.gov.il//series/data/list?Page=1&PageSize=100&id=493549&format=json&last=40&addNull=false",
+        "base_url": null
+      }
+    }
+  }
+}

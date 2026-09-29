@@ -45,13 +45,14 @@ nightly cron → planner (what's due tonight?) → group by source
 - [x] Dry run: shows the missing months correctly
 
 ### 3. All API sources
-- [x] obudget adapter (8 budgets, 100% match with history)
-- [ ] CBS series, World Bank, BOI, data.gov.il adapters
-- [ ] History-reproduction test for each
+- [x] obudget adapter (8 budgets, 100% match with history; session warm-up bypasses `Bot detected`)
+- [x] CBS series adapter — growth `64092`, avg wage `615908`, unemployment `493549` (+ fixtures/backtests)
+- [ ] World Bank, BOI, data.gov.il adapters
+- [x] History-reproduction test for cbs_price / cbs_series / obudget
 
 ### 4. Review UI
-- [ ] `/government/dashboard/edit`: review queue, freshness table, manual entry
-- [ ] Pipeline card on `/piplines`
+- [x] `/government/dashboard/edit`: review queue, freshness table, approve/reject
+- [x] Pipeline card on `/piplines` (`officeKpis.ts`, id `office-kpis`)
 
 ### 5. Documents
 - [ ] Document discovery + download (dedupe by hash)
@@ -62,7 +63,7 @@ nightly cron → planner (what's due tonight?) → group by source
 ### 6. Test before production
 - [x] Unit tests (planner dates, label rules, validation)
 - [x] `--date` simulation: checks start in the window, respect retry cadence, go weekly when overdue
-- [ ] Apply `schema_office_kpi_pipeline.sql` in Supabase
+- [x] Apply `schema_office_kpi_pipeline.sql` in Supabase
 - [ ] 1–2 weeks of nightly runs in `--dry-run`; review the plans and diffs
 
 ### 7. Production
@@ -70,4 +71,4 @@ nightly cron → planner (what's due tonight?) → group by source
 - [ ] Watch the nightly issue and run log for 2 weeks
 - [ ] Enable document sources; review all PDF values
 - [ ] Tune release windows from run history
-- [ ] Update `Database.md`, `PiplinesPage.md`
+- [x] Update `Database.md`, `PiplinesPage.md`

@@ -5,6 +5,8 @@ import pytest
 from adapters.base import AdapterError, FetchTask
 from adapters.cbs_price import parse_points
 from adapters.cbs_price import to_observations as cbs_obs
+from adapters.cbs_series import parse_obs
+from adapters.cbs_series import to_observations as cbs_series_obs
 from adapters.obudget import build_query
 from adapters.obudget import to_observations as obudget_obs
 from models import Observation
@@ -31,6 +33,26 @@ def test_cbs_inflation_uses_december_yoy():
            {"year": 2026, "month": 8, "percentYear": 1.5, "value": 105.8, "base": "2024 ממוצע"}]
     obs = cbs_obs(FetchTask(ENTRIES[53], since=date(2020, 1, 1)), pts)
     assert [(o.period, o.value) for o in obs] == [(date(2025, 1, 1), 2.6)]
+
+
+# ── CBS series ───────────────────────────────────────────────────────────────
+
+
+def test_cbs_series_growth_yearly_stamp(fixture_json):
+    ser, points = parse_obs(fixture_json("cbs_series_history.json")["64092"])
+    obs = cbs_series_obs(FetchTask(ENTRIES[54], since=date(2012, 1, 1)), ser, points)
+    by_year = {o.period.year: o.value for o in obs}
+    assert by_year[2012] == 2.4
+    assert by_year[2020] == -1.9
+    assert all(o.period.month == 1 and o.period.day == 1 for o in obs)
+
+
+def test_cbs_series_wage_levels(fixture_json):
+    ser, points = parse_obs(fixture_json("cbs_series_history.json")["615908"])
+    obs = cbs_series_obs(FetchTask(ENTRIES[58], since=date(2019, 1, 1)), ser, points)
+    by_year = {o.period.year: o.value for o in obs}
+    assert by_year[2019] == 10482.0
+    assert by_year[2023] == 12499.0
 
 
 # ── obudget ──────────────────────────────────────────────────────────────────
@@ -114,4 +136,4 @@ def test_plan_only_offline_covers_all_entries():
     result = run(OfflineStore(), list(ENTRIES.values()), date(2026, 9, 29), plan_only=True)
     assert len(result.items) == 48 and not result.unresolved
     assert all(it.reason == "no_adapter" for it in result.items
-               if it.entry.adapter_family not in {"cbs_price", "obudget"})
+               if it.entry.adapter_family not in {"cbs_price", "cbs_series", "obudget"})

@@ -528,11 +528,11 @@
   coverage: "2012 → 2024 (13 pts)"
   tier: "A"
   adapter: cbs_series
-  params: {"series": "TODO real GDP growth"}
+  params: {"id": 64092, "use": "yearly"}
   label_rule: yearly_jan1
   release: {window: "01-15..04-30", check_every_days: 3}
-  current_source: "https://public.tableau.com/views/_16733448689630/sheet1?%3Adisplay_count=y&%3Aorigin=viz_share_link&%3AshowVizHome=no"
-  notes: "CBS national accounts; cross_check: BOI."
+  current_source: "https://apis.cbs.gov.il/series/data/list?id=64092&format=json"
+  notes: "CBS national accounts — GDP quantitative change (yearly %). Small revisions vs hand-entered history expected."
 
 - key: 56
   name: "מחירי הדירות"
@@ -570,11 +570,11 @@
   coverage: "2009 → 2023 (15 pts)"
   tier: "A"
   adapter: cbs_series
-  params: {"series": "TODO avg wage per employee post"}
+  params: {"id": 615908, "use": "yearly"}
   label_rule: yearly_jan1
   release: {window: "01-15..04-30", check_every_days: 3}
-  current_source: ""
-  notes: "Source column is empty today — set it."
+  current_source: "https://apis.cbs.gov.il/series/data/list?id=615908&format=json"
+  notes: "CBS — average monthly wage per employee post, total economy, yearly. Series starts 2011."
 
 - key: 60
   name: "אחוז אבטלה"
@@ -584,11 +584,11 @@
   coverage: "2009 → 2024 (16 pts)"
   tier: "A"
   adapter: cbs_series
-  params: {"series": "TODO LFS unemployment rate 15+"}
+  params: {"id": 493549, "use": "yearly"}
   label_rule: yearly_jan1
   release: {window: "01-15..04-30", check_every_days: 3}
-  current_source: "https://en.wikipedia.org/wiki/Economy_of_Israel"
-  notes: "Source is Wikipedia today; cross_check: BOI."
+  current_source: "https://apis.cbs.gov.il/series/data/list?id=493549&format=json"
+  notes: "CBS LFS — unemployment rate, ages 15+ (yearly series 493549). Starts 2012; pre-2012 site points stay manual. 2023–2024 on the site lag the current CBS release."
 
 - key: 61
   name: "תמ\"ג לנפש"
