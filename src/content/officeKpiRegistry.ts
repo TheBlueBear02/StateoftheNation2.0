@@ -21,7 +21,7 @@ export type OfficeKpiRegistryEntry = {
   tier: string
 }
 
-export const OFFICE_KPI_IMPLEMENTED_FAMILIES = ["boi_sdmx", "cbs_price", "cbs_series", "curated", "datagov", "obudget", "worldbank"] as const
+export const OFFICE_KPI_IMPLEMENTED_FAMILIES = ["boi_sdmx", "cbs_price", "cbs_series", "curated", "datagov", "document", "obudget", "worldbank"] as const
 
 export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
   {
@@ -31,7 +31,7 @@ export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
     "kind": "kpi",
     "frequency": "monthly",
     "adapterFamily": "document",
-    "automated": false,
+    "automated": true,
     "release": {
       "min_lag_days": 3,
       "max_lag_days": 30,
@@ -62,7 +62,7 @@ export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
     "kind": "kpi",
     "frequency": "monthly",
     "adapterFamily": "document",
-    "automated": false,
+    "automated": true,
     "release": {
       "min_lag_days": 3,
       "max_lag_days": 30,
@@ -87,13 +87,28 @@ export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
     "tier": "D"
   },
   {
+    "key": 63,
+    "name": "נרצחים",
+    "office": "המשרד לביטחון לאומי",
+    "kind": "kpi",
+    "frequency": "yearly",
+    "adapterFamily": "manual_watch",
+    "automated": false,
+    "release": {
+      "window": "01-01..06-30",
+      "check_every_days": 14
+    },
+    "labelRule": "yearly_jan1",
+    "tier": "D"
+  },
+  {
     "key": 19,
     "name": "תיקים במשטרה",
     "office": "המשרד לביטחון לאומי",
     "kind": "kpi",
     "frequency": "yearly",
     "adapterFamily": "document",
-    "automated": false,
+    "automated": true,
     "release": {
       "window": "05-01..10-31",
       "check_every_days": 7
@@ -108,7 +123,7 @@ export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
     "kind": "kpi",
     "frequency": "yearly",
     "adapterFamily": "document",
-    "automated": false,
+    "automated": true,
     "release": {
       "window": "05-01..10-31",
       "check_every_days": 7
@@ -153,7 +168,7 @@ export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
     "kind": "policy",
     "frequency": "yearly",
     "adapterFamily": "document",
-    "automated": false,
+    "automated": true,
     "release": {
       "window": "05-01..10-31",
       "check_every_days": 7
@@ -183,7 +198,7 @@ export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
     "kind": "policy",
     "frequency": "yearly",
     "adapterFamily": "document",
-    "automated": false,
+    "automated": true,
     "release": {
       "window": "05-01..10-31",
       "check_every_days": 7
@@ -198,7 +213,7 @@ export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
     "kind": "policy",
     "frequency": "yearly",
     "adapterFamily": "document",
-    "automated": false,
+    "automated": true,
     "release": {
       "window": "05-01..10-31",
       "check_every_days": 7
@@ -213,7 +228,7 @@ export const OFFICE_KPI_REGISTRY: OfficeKpiRegistryEntry[] = [
     "kind": "kpi",
     "frequency": "yearly",
     "adapterFamily": "document",
-    "automated": false,
+    "automated": true,
     "release": {
       "window": "05-01..10-31",
       "check_every_days": 7

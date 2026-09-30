@@ -25,6 +25,7 @@ __pycache__/
 
 # Pipeline / scrape scratch
 Layer 1 - Gathering Data/**/.cache/
+Layer 1 - Gathering Data/Offices/.kpi_cache/
 Layer 1 - Gathering Data/**/pipeline_last_run.json
 Layer 1 - Gathering Data/**/stderr.txt
 Layer 1 - Gathering Data/**/_debug_*.txt

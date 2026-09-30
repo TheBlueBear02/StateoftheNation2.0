@@ -8,6 +8,7 @@ from adapters.cbs_price import CbsPriceAdapter
 from adapters.cbs_series import CbsSeriesAdapter
 from adapters.curated import CuratedAdapter
 from adapters.datagov import DatagovAdapter
+from adapters.document import documents_enabled
 from adapters.obudget import ObudgetAdapter
 from adapters.worldbank import WorldbankAdapter
 
@@ -23,6 +24,13 @@ ADAPTERS: dict[str, Adapter] = {
         CuratedAdapter(),
     )
 }
+
+# Document sources are opt-in so the nightly API run stays unchanged until
+# OFFICE_KPI_DOCUMENTS=true (or --documents on the CLI).
+if documents_enabled():
+    from adapters.document import DocumentAdapter
+
+    ADAPTERS["document"] = DocumentAdapter()
 
 # Cheapest first: APIs, then files, then PDF + LLM.
 FAMILY_ORDER = [
@@ -48,5 +56,18 @@ IMPLEMENTED_FAMILIES = frozenset(
         "datagov",
         "boi_sdmx",
         "curated",
+        *(["document"] if documents_enabled() else []),
     }
 )
+
+
+def with_documents(enabled: bool = True, **doc_kwargs) -> dict[str, Adapter]:
+    """Return a copy of ADAPTERS with the document adapter forced on/off (tests/CLI)."""
+    from adapters.document import DocumentAdapter
+
+    out = dict(ADAPTERS)
+    if enabled:
+        out["document"] = DocumentAdapter(**doc_kwargs)
+    else:
+        out.pop("document", None)
+    return out

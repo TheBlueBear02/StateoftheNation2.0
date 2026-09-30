@@ -2,7 +2,7 @@
 
 Code: `Layer 1 - Gathering Data/Offices/` · Workflow: `.github/workflows/office-kpi-pipeline.yml`
 
-Refreshes the 48 indexes on `/government/dashboard` automatically. Details: `OfficeKpiPipeline.md`. Per-index config: `kpi_sources.yaml`.
+Refreshes the 49 indexes on `/government/dashboard` automatically. Details: `OfficeKpiPipeline.md`. Per-index config: `kpi_sources.yaml`.
 
 ## System
 
@@ -55,10 +55,14 @@ nightly cron → planner (what's due tonight?) → group by source
 - [x] Pipeline card on `/piplines` (`officeKpis.ts`, id `office-kpis`)
 
 ### 5. Documents
-- [ ] Document discovery + download (dedupe by hash)
-- [ ] XLSX/table extractor
-- [ ] PDF + LLM extractor with a quote check. Pick the model by testing it on past editions
-- [ ] Police yearbook, Shabak monthly, then the remaining docs
+- [x] Document discovery + download (dedupe by hash) — `discover.py`, `doc_cache.py`, `documents.yaml`
+- [x] XLSX/table extractor scaffold (`extractors/xlsx_table.py`; IAA layout TBD)
+- [x] PDF + LLM extractor with quote check (`extractors/pdf_llm.py` + prompts). Default model `gpt-4.1-mini` (`OFFICE_KPI_LLM_MODEL`)
+- [x] First docs wired: police yearbook (discovery via policemuseum.org.il + PDF LLM), Shabak monthly, BTL poverty (prompt only); remaining docs still need live fixtures
+- [x] Tune police yearbook prompts/anchors so series match history (all 6 indexes match 2023 fixture: 19/20/21/26/39/40)
+- [x] Shabak confusion guard: prompt + `avoid_anchors` (מעצרים) + per-index `quote_must_include` / `quote_must_not_include` so מעצרי פעילי טרור cannot pass as index 1 פיגועים
+- [x] Shabak monthly: one PDF per month — `discover_all` + Hebrew month editions; download/extract each missing month (cap `MAX_MONTHLY_DOCS_PER_NIGHT=6`). Playwright required (Cloudflare)
+- [ ] Enable in GitHub Action: set `OFFICE_KPI_DOCUMENTS=true` + `playwright install chromium` once ready
 
 ### 6. Test before production
 - [x] Unit tests (planner dates, label rules, validation)
@@ -69,6 +73,6 @@ nightly cron → planner (what's due tonight?) → group by source
 ### 7. Production
 - [ ] Go live: set repo variable `OFFICE_KPI_LIVE=true` (scheduled runs are dry-run until then), API sources only
 - [ ] Watch the nightly issue and run log for 2 weeks
-- [ ] Enable document sources; review all PDF values
+- [ ] Enable document sources (`OFFICE_KPI_DOCUMENTS=true`); review all PDF values
 - [ ] Tune release windows from run history
 - [x] Update `Database.md`, `PiplinesPage.md`

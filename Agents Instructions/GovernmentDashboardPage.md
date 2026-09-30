@@ -5,8 +5,8 @@
 Office KPI/policy dashboard ported from the old Flask `/offices` page. Shows four curated ministries as a quadrant of bubbles; selecting an office opens an **inline detail panel** (not modals) with a scrollable icon-circle strip of indexes, an SVG trend chart, and a ministers eras bar under the chart. No RSS news feed.
 
 Route: `/government/dashboard`  
-Ops / review: `/government/dashboard/edit` (pipeline password; linked from `/piplines` card `office-kpis`)  
-Coverage board: `/piplines/government-dashboard` (same password; green/red border = freshness vs release window, green/red tag = automated pipeline for `cbs_price`/`cbs_series`/`obudget`/`worldbank`/`datagov`/`boi_sdmx`/`curated`; equal-height cards link to the dashboard graph)  
+Ops / review: `/government/dashboard/edit` (pipeline password; linked from `/piplines` card `office-kpis`). Shows **pending** rows from `index_data_candidates` only — months the extractor never staged (no PDF, or dropped quotes) do not appear. Approving publishes to `index_data` and writes a homepage `site_updates` headline.
+Coverage board: `/piplines/government-dashboard` (same password; green/red border = freshness vs release window, green/red tag = automated pipeline for `cbs_price`/`cbs_series`/`obudget`/`worldbank`/`datagov`/`boi_sdmx`/`curated` plus wired `document` keys `shabak_monthly` / `police_yearbook`; equal-height cards link to the dashboard graph)
 Shareable chart deep links: `/government/dashboard?office=<officeId>&index=<indexId>` (updates as you switch office/index; **העתק קישור** copies the absolute URL).
 
 ## Page Structure
@@ -64,7 +64,7 @@ Shareable chart deep links: `/government/dashboard?office=<officeId>&index=<inde
 ### Tables
 
 - `offices` — `is_shown=true` for the four dashboard ministries; curated `info`
-- `indexes` — KPI (`is_kpi`) / policy metrics per office; `alert`, `higher_is_better`, `chart_type`, `source`. **כלי רכב חשמליים** info: share of new first-registrations that year (not the whole fleet).
+- `indexes` — KPI (`is_kpi`) / policy metrics per office; `alert`, `higher_is_better`, `chart_type`, `source`. **כלי רכב חשמליים** info: share of new first-registrations that year (not the whole fleet). **נרצחים** (ביטחון לאומי, alert KPI): annual criminal homicide victims in Israel (`מספר קורבנות רצח פלילי בישראל בכל שנה`), yearly 2010–2025; registry key 63 / `manual_watch`; icon `kpi/מקרי רצח בחברה הערבית.png`. **רצח בחברה הערבית** uses `kpi/יד מדממת.png` (bloody handprint).
 - `index_data` — time series (`label`, `value`, `recorded_at`)
 - `minister_appointments` + `people` — current minister portrait for the active government (plus `partyName` from Knesset membership); full history across governments for the eras bar
 - `knesset_memberships` + `knesset_factions` — party/faction name + color per minister term

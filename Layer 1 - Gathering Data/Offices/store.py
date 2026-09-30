@@ -51,6 +51,7 @@ class Store(Protocol):
     def resolve(self, entries: list[Entry]) -> dict[int, int]: ...
     def history(self, index_ids: list[int]) -> dict[int, list[tuple[date, float]]]: ...
     def staged_latest(self, index_ids: list[int]) -> dict[int, date]: ...
+    def staged_periods(self, index_ids: list[int]) -> dict[int, set[date]]: ...
     def check_states(self, index_ids: list[int]) -> dict[tuple[int, date], CheckState]: ...
     def save_candidates(self, cands: list[Candidate]) -> None: ...
     def save_check_states(self, rows: list[dict]) -> None: ...
@@ -140,17 +141,20 @@ class SupabaseStore:
         }
 
     def staged_latest(self, index_ids: list[int]) -> dict[int, date]:
+        periods = self.staged_periods(index_ids)
+        return {i: max(dates) for i, dates in periods.items() if dates}
+
+    def staged_periods(self, index_ids: list[int]) -> dict[int, set[date]]:
         rows = self._all(
             lambda: self.sb.table("index_data_candidates")
             .select("index_id, recorded_at")
             .in_("index_id", index_ids)
             .in_("status", ["pending", "approved", "published"])
         )
-        out: dict[int, date] = {}
+        out: dict[int, set[date]] = {i: set() for i in index_ids}
         for r in rows:
             d = date.fromisoformat(r["recorded_at"][:10])
-            if d > out.get(r["index_id"], date.min):
-                out[r["index_id"]] = d
+            out.setdefault(r["index_id"], set()).add(d)
         return out
 
     def check_states(self, index_ids: list[int]) -> dict[tuple[int, date], CheckState]:
@@ -182,6 +186,7 @@ class SupabaseStore:
                 "method": c.obs.method,
                 "confidence": c.obs.confidence,
                 "source_url": c.obs.source_url,
+                "document_id": (c.obs.evidence or {}).get("document_id"),
                 "evidence": c.obs.evidence,
                 "validation": {"flags": c.flags},
                 "kind": c.kind,
@@ -231,6 +236,46 @@ class SupabaseStore:
         if rows:
             self.sb.table("kpi_check_state").upsert(rows, on_conflict="index_id,target_period").execute()
 
+    def save_document(self, doc) -> int | None:
+        """Upsert kpi_documents by sha256; best-effort upload to Storage bucket kpi-sources."""
+        from doc_cache import storage_object_name
+
+        storage_path = None
+        try:
+            bucket = self.sb.storage.from_("kpi-sources")
+            object_name = storage_object_name(doc)
+            data = doc.path.read_bytes()
+            try:
+                bucket.upload(
+                    object_name,
+                    data,
+                    {"content-type": doc.content_type or "application/octet-stream", "upsert": "true"},
+                )
+            except TypeError:
+                # Older supabase-py: upsert via file_options differently
+                bucket.upload(object_name, data)
+            storage_path = object_name
+        except Exception as exc:  # noqa: BLE001
+            log.warning("kpi-sources upload skipped: %s", exc)
+
+        row = {
+            "doc_key": doc.doc_key,
+            "url": doc.url,
+            "sha256": doc.sha256,
+            "storage_path": storage_path,
+            "edition": doc.edition,
+            "parse_status": "new",
+        }
+        existing = (
+            self.sb.table("kpi_documents").select("id").eq("sha256", doc.sha256).limit(1).execute().data
+            or []
+        )
+        if existing:
+            self.sb.table("kpi_documents").update(row).eq("id", existing[0]["id"]).execute()
+            return int(existing[0]["id"])
+        saved = self.sb.table("kpi_documents").insert(row).execute().data or []
+        return int(saved[0]["id"]) if saved else None
+
 
 # ── Offline (SQLite snapshot) ────────────────────────────────────────────────
 
@@ -271,6 +316,9 @@ class OfflineStore:
 
     def staged_latest(self, index_ids: list[int]) -> dict[int, date]:
         return {}
+
+    def staged_periods(self, index_ids: list[int]) -> dict[int, set[date]]:
+        return {i: set() for i in index_ids}
 
     def check_states(self, index_ids: list[int]) -> dict[tuple[int, date], CheckState]:
         return {}

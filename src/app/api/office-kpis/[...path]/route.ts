@@ -587,6 +587,35 @@ async function handleReview(request: NextRequest, client: SupabaseClient) {
     return jsonError(err instanceof Error ? err.message : 'פרסום נכשל', 500)
   }
 
+  // Homepage news strip — LLM values only land here after approve.
+  try {
+    const meta = (await loadIndexMap(client, [candidate.index_id])).get(
+      candidate.index_id,
+    )
+    const indexName = meta?.name ?? `מדד ${candidate.index_id}`
+    const dedupeKey = `${PIPELINE_ID}:publish:${candidate.id}:${candidate.recorded_at}`
+    const headline = `דשבורד הממשלה עודכן — ${indexName}`
+    await client.from('site_updates').upsert(
+      {
+        event_type: PIPELINE_ID,
+        headline,
+        href: '/government/dashboard',
+        payload: {
+          pipeline: PIPELINE_ID,
+          page: 'דשבורד הממשלה',
+          href: '/government/dashboard',
+          updated_indexes: [indexName],
+          published: 1,
+        },
+        dedupe_key: dedupeKey,
+        occurred_at: new Date().toISOString(),
+      },
+      { onConflict: 'dedupe_key' },
+    )
+  } catch (err) {
+    console.warn('office-kpis review: site_updates emit failed', err)
+  }
+
   return jsonOk({ ok: true, status: 'published', value: nextValue })
 }
 

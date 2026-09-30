@@ -13,11 +13,16 @@ Usage:
   python run_office_kpi_pipeline.py --index 56       # one registry key, ignore windows
   python run_office_kpi_pipeline.py --force          # check everything that has an adapter
   python run_office_kpi_pipeline.py --date 2026-10-15 --plan-only   # simulate another day
+  python run_office_kpi_pipeline.py --documents --index 20 --dry-run --offline
+                                                     # enable PDF/XLSX sources for this run
   python run_office_kpi_pipeline.py --backtest       # compare adapters to ALL existing history (no writes)
   python run_office_kpi_pipeline.py --offline ...    # use the repo SQLite snapshot instead of Supabase
 
 Env: SUPABASE_URL, SUPABASE_SERVICE_KEY (not needed with --offline),
-     OPENAI_API_KEY (only for the homepage headline), PIPELINE_RUN_SOURCE.
+     OPENAI_API_KEY (PDF LLM + homepage headline),
+     OFFICE_KPI_DOCUMENTS=true (opt-in document sources; same as --documents),
+     OFFICE_KPI_DOC_FIXTURES=/path (optional local {doc_key}.pdf overrides),
+     PIPELINE_RUN_SOURCE.
 """
 
 from __future__ import annotations
@@ -39,8 +44,9 @@ LAYER1 = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(LAYER1))
 
-from adapters import ADAPTERS, FAMILY_ORDER  # noqa: E402
+from adapters import ADAPTERS, FAMILY_ORDER, with_documents  # noqa: E402
 from adapters.base import FetchTask  # noqa: E402
+from extractors.pdf_llm import reset_llm_budget  # noqa: E402
 from models import Candidate, Observation  # noqa: E402
 from periods import next_period, period_of, to_site  # noqa: E402
 from planner import PlanItem, format_plan, plan, summarize  # noqa: E402
@@ -136,8 +142,8 @@ def run(
     plan_only: bool = False,
     backtest: bool = False,
     adapters: dict | None = None,
+    enable_documents: bool | None = None,
 ) -> RunResult:
-    adapters = ADAPTERS if adapters is None else adapters
     entries_by_key = {e.key: e for e in entries}
 
     key_to_id = store.resolve(entries)
@@ -145,9 +151,31 @@ def run(
     ids = sorted(set(key_to_id.values()))
     history = store.history(ids)
     staged = store.staged_latest(ids)
+    staged_periods = store.staged_periods(ids)
     raw_states = store.check_states(ids)
     id_to_key = {v: k for k, v in key_to_id.items()}
     states = {(id_to_key[i], t): s for (i, t), s in raw_states.items() if i in id_to_key}
+
+    # Registry key → history (document LLM uses last-3 hints).
+    history_by_key: dict[int, list[tuple[date, float]]] = {}
+    filled_months_by_key: dict[int, set[date]] = {}
+    for key, index_id in key_to_id.items():
+        history_by_key[key] = list(history.get(index_id, []))
+        filled_months_by_key[key] = {
+            date(d.year, d.month, 1) for d in staged_periods.get(index_id, ())
+        }
+
+    if adapters is None:
+        if enable_documents or "document" in ADAPTERS:
+            adapters = with_documents(
+                True,
+                store=store,
+                history_by_key=history_by_key,
+                filled_months_by_key=filled_months_by_key,
+                force_refresh=force or backtest,
+            )
+        else:
+            adapters = dict(ADAPTERS)
 
     latest_by_key: dict[int, date | None] = {}
     for e in entries:
@@ -173,6 +201,7 @@ def run(
     if plan_only:
         return result
 
+    reset_llm_budget()
     due = [it for it in items if it.due]
     by_family: dict[str, list[PlanItem]] = defaultdict(list)
     for it in due:
@@ -307,6 +336,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--date", type=date.fromisoformat, help="pretend today is YYYY-MM-DD")
     p.add_argument("--backtest", action="store_true", help="compare adapters to all history; implies --dry-run")
     p.add_argument("--offline", action="store_true", help="read the repo SQLite snapshot; implies --dry-run")
+    p.add_argument(
+        "--documents",
+        action="store_true",
+        help="enable document sources for this run (same as OFFICE_KPI_DOCUMENTS=true)",
+    )
     args = p.parse_args(argv)
 
     entries = load_registry()
@@ -335,6 +369,7 @@ def main(argv: list[str] | None = None) -> int:
         only_keys=set(args.index) if args.index else None,
         plan_only=args.plan_only,
         backtest=args.backtest,
+        enable_documents=True if args.documents else None,
     )
     entries_by_key = {e.key: e for e in entries}
 
@@ -439,17 +474,40 @@ def main(argv: list[str] | None = None) -> int:
         finished_at=datetime.now(timezone.utc),
     )
 
-    published = sorted({entries_by_key[c.obs.key].name for c in result.candidates if c.auto_publish})
-    if published:
-        # One strip line per publishing run (not once/day) — matches polls/knesset dedupe.
+    published = sorted(
+        {entries_by_key[c.obs.key].name for c in result.candidates if c.auto_publish}
+    )
+    # LLM/document values stay pending until review — still emit a strip title so the
+    # edit page has a headline and the homepage reflects that new KPI values arrived.
+    staged = sorted(
+        {
+            entries_by_key[c.obs.key].name
+            for c in result.candidates
+            if not c.rejected and c.kind != "same"
+        }
+    )
+    if staged:
         emit_pipeline_site_update(
             store.sb,
             event_type=PIPELINE_NAME,
             href="/government/dashboard",
             page_label_he="דשבורד הממשלה",
-            facts={"pipeline": PIPELINE_NAME, "updated_indexes": published},
-            dedupe_key=f"{PIPELINE_NAME}:{run_id or today.isoformat()}:{'-'.join(str(k) for k in sorted({c.obs.key for c in result.candidates if c.auto_publish}))}",
+            facts={
+                "pipeline": PIPELINE_NAME,
+                "updated_indexes": staged,
+                "pending_review": summary["pending"],
+                "published": summary["published"],
+            },
+            dedupe_key=(
+                f"{PIPELINE_NAME}:{run_id or today.isoformat()}:"
+                f"{'-'.join(str(k) for k in sorted({c.obs.key for c in result.candidates if not c.rejected and c.kind != 'same'}))}"
+            ),
             pipeline_run_id=run_id,
+            headline_override=(
+                None
+                if published
+                else f"דשבורד הממשלה עודכן — {' ו'.join(staged[:3])}"
+            ),
         )
     return 0
 

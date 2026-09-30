@@ -5,7 +5,7 @@
 > Code: `Layer 1 - Gathering Data/Offices/` (registry `kpi_sources.yaml`, one entry per index). Short version + to-do: [OfficeKpiPlan.md](./OfficeKpiPlan.md).
 > Registry entries use `key` = the index id in `office_dashboard_source.db`; the live Supabase index is resolved at runtime by office + name.
 
-**Scope of v1:** refresh data for the existing 4 offices × 12 indexes (7 KPI + 5 policy). No new indexes/offices yet. The design is built so that a new index is added with a registry entry and no new code, as long as its source type already has an adapter.
+**Scope of v1:** refresh data for the shown office indexes (originally 4×12; now 49 registry keys including **נרצחים**). The design is built so that a new index is added with a registry entry and no new code, as long as its source type already has an adapter.
 
 ---
 
@@ -27,7 +27,7 @@
 4. **Idempotent and revision-aware:** re-running a job doesn't change anything. If a source revises a past value (CBS does this often), we record it as a *revision* rather than silently overwriting it.
 5. **Fits the existing ops stack:** Python in `Layer 1 - Gathering Data/`, GitHub Actions cron, `record_pipeline_run`, `review_queue` → GitHub issue, `emit_site_updates` for the homepage strip, and a card in the `PIPELINES` registry on `/piplines`.
 
-## 3. Source tiers (the 48 indexes)
+## 3. Source tiers (the 49 indexes)
 
 | Tier | Method | Count | Auto-publish? | Examples |
 |------|--------|-------|---------------|----------|
@@ -91,8 +91,12 @@ The full mapping is in `kpi_sources.yaml`.
 ```
 Layer 1 - Gathering Data/Offices/
   kpi_sources.yaml            # registry (source of truth for automation)
-  run_office_kpi_pipeline.py  # orchestrator: --index 56 --force --dry-run --plan-only --date YYYY-MM-DD
-  registry.py                 # load + validate YAML (pydantic)
+  documents.yaml              # per doc_key: discover + extractor + anchors + index map
+  run_office_kpi_pipeline.py  # orchestrator: --index 56 --force --dry-run --plan-only --date YYYY-MM-DD --documents
+  registry.py                 # load + validate YAML (pydantic-less dataclasses)
+  documents_registry.py       # load documents.yaml
+  discover.py                 # BlobFolder templates → page scrape → Playwright
+  doc_cache.py                # sha256 download cache (.kpi_cache/) + extraction JSON
   planner.py                  # what's due tonight (release windows + kpi_check_state)
   adapters/
     base.py                   # Adapter protocol → list[Observation]
@@ -104,18 +108,21 @@ Layer 1 - Gathering Data/Offices/
     datagov.py                # CKAN datastore_search / datastore_search_sql
     curated.py                # curated_series.yaml (AG debt 52/55 until BOI codes exist)
     shkifut.py                # unofficial JSON
-    document.py               # discover → download → store (B/C)
+    document.py               # discover → download → store (B/C); opt-in via OFFICE_KPI_DOCUMENTS / --documents
   curated_series.yaml         # hand-maintained AG debt points for curated adapter
   extractors/
+    pdf_pages.py              # pdfplumber + Hebrew RTL heuristic + anchor windowing
     xlsx_table.py             # fixed mapping per file layout
-    pdf_llm.py                # pdfplumber text/tables → OpenAI structured output
-    prompts/<doc_key>.md      # per-document extraction prompt, e.g. police_yearbook.md
+    pdf_llm.py                # pdf text → OpenAI structured output (quote evidence)
+  prompts/<doc_key>.md        # per-document extraction prompt, e.g. police_yearbook.md
   normalize.py                # labels/recorded_at rules, units, scale
   validate.py
   publish.py                  # candidates → index_data, revisions
   schema_office_kpi_pipeline.sql
-  requirements.txt            # requests, pydantic, pyyaml, pdfplumber, openpyxl, openai, supabase
+  requirements.txt            # requests, pyyaml, pdfplumber, openpyxl, openai, supabase
 ```
+
+**Opt-in:** document indexes stay `no_adapter` until `OFFICE_KPI_DOCUMENTS=true` or `python run_office_kpi_pipeline.py --documents …`. Local fixture override: `OFFICE_KPI_DOC_FIXTURES=/dir` with `{doc_key}.pdf`. LLM model: `OFFICE_KPI_LLM_MODEL` (default `gpt-4.1-mini`). Budget: `MAX_LLM_CALLS_PER_NIGHT` (default 20).
 
 ### 4.2 Core data contract
 
@@ -215,24 +222,36 @@ LLM-extracted values are **never** auto-published in v1. After ~6 months of revi
 ### 4.6 LLM extraction (tier C)
 
 - Pre-extract with `pdfplumber` (text + tables per page). Hebrew RTL PDFs often come out reversed or garbled. Detect this (e.g. if more than X% of Hebrew tokens are reversed, flip them) and fall back to OCR (`tesseract -l heb`) only when there is no text layer.
-- **Narrow the input before calling the model.** Each document key has `anchors` in the registry (for example `"גניבות רכב"`, `"מתנדבים"`). Only the pages containing those anchors, plus their neighbouring pages, are sent to the model. This saves cost and reduces confusion between look-alike tables.
+- **Narrow the input before calling the model.** Each document key has `anchors` in the registry (for example `"גניבות רכב"`, `"מתנדבים"`). Only the pages containing those anchors, plus their neighbouring pages, are sent to the model. This saves cost and reduces confusion between look-alike tables. Optional `avoid_anchors` (e.g. Shabak `"מעצרי"`) demotes look-alike wrong-series slides so truncation keeps the real target pages first.
 - One call per document per *group* of indexes, using OpenAI structured output with a JSON schema: `[{index_key, period, value, raw_value, page, quote, unit}]`. The prompt includes each index's **definition and the last 3 known values**, so the model picks the matching series. For example, "כלי רכב פרטיים שנגנבו" and "כלל כלי הרכב" are different series, and the history shows which one we track.
+- **Post-LLM quote gates (per index in `documents.yaml`):** `quote_must_include` / `quote_must_not_include` drop items whose evidence quote is from the wrong series. Shabak index 1 requires פיגוע/מפת טרור wording and rejects מעצר/עצור — so **מעצרי פעילי טרור** counts cannot pass as פיגועים.
 - Keep all the model's outputs, including rejected ones, in `evidence` for debugging.
 
 ### 4.7 Document discovery (tiers B/C)
 
-Each `doc_key` has a `discover` block:
+Each `doc_key` has a `discover` block in **`documents.yaml`** (not duplicated on every index):
 
 ```yaml
-discover:
-  page: https://www.gov.il/he/departments/publications/reports/police_statistical_2024
-  link_regex: 'שנתון.*\.pdf$'
-  edition_from: 'url_year'     # or 'link_text', 'page_date'
-  expected: {every: year, month: 7}   # used for next_expected_at + alerting
+police_yearbook:
+  extractor: pdf_llm
+  discover:
+    blob_templates:
+      - "https://www.gov.il/BlobFolder/reports/police_statistical_{year}/he/"
+    page_templates:
+      - "https://www.gov.il/he/departments/publications/reports/police_statistical_{year}"
+    link_regex: '(?i)(שנתון|statistical).*\.pdf'
+    edition_from: 'url_year'
+    years_back: 4
+    seed_urls: [...]
+  anchors: ["גניבות רכב", "מתנדבים", ...]
+  prompt: prompts/police_yearbook.md
+  indexes: { 20: {label: "...", definition: "..."}, ... }
 ```
 
-- gov.il pages are JS-rendered and sometimes protected by bot checks. Handle them in this order: (1) the gov.il `BlobFolder` direct URL pattern with the year substituted, (2) plain `requests`, (3) Playwright (Chromium is already available on GitHub runners) as the last resort. Record which path worked.
-- A new `sha256` creates a `kpi_documents` row, and extraction runs only for new documents. This makes the job cheap enough to run weekly.
+- gov.il pages are JS-rendered and sometimes protected by bot checks. Handle them in this order: (1) the gov.il `BlobFolder` direct URL pattern with the year substituted, (2) plain `requests`, (3) Playwright (optional dependency) as the last resort. Record which path worked (`DiscoveredDoc.method`).
+- A new `sha256` creates a `kpi_documents` row (when writing to Supabase) and a local `.kpi_cache/` entry; LLM extraction JSON is cached per sha so re-runs are cheap.
+- **Same nightly pipeline** as API sources; enable with `OFFICE_KPI_DOCUMENTS=true` / `--documents` when ready (do not flip in GHA until fixtures + dry-runs look good).
+- **Monthly vs yearly documents:** police yearbook = one annual PDF (newest edition). Shabak = **one PDF per month** with data only for that month — `discover_all` lists every month link, parses Hebrew month+year into `YYYY-MM`, then downloads/extracts each *missing* month (not only the newest), capped by `MAX_MONTHLY_DOCS_PER_NIGHT`. A month is skipped only when **every** index on that doc already has it in `index_data` or pending candidates (so May can re-run for נרצחים even if פיגועים is already pending). `--force` also sets `force_refresh` so stale LLM extraction JSON is re-run. Year-only editions (no month) are ignored so they cannot collapse onto January. Needed months with no discovered PDF are logged as a warning. Zero values are kept (killed counts are often 0); bare-digit attack quotes are soft-flagged for review instead of dropped.
 
 ### 4.8 Scheduling: one nightly workflow + a planner
 
@@ -269,7 +288,7 @@ This works for backlog too. If a series is 2 years behind, `target` is the oldes
 3. **Execute:** cheapest sources first (APIs → files → PDF+LLM). Each source group is isolated: a failure in one is logged and the run continues. There are guardrails: `MAX_LLM_CALLS_PER_NIGHT` (default 20) and a total time budget (default 40 min). Groups that don't fit are pushed to tomorrow night.
 4. **Validate → stage → publish** (4.4–4.5).
 5. **Update `kpi_check_state`** (checked_at, attempts, found/not found, error).
-6. **Report:** one `pipeline_runs` row with a per-index summary (`changes` includes `source_url` so `/piplines` can link out for fact-checking). `emit_site_updates` runs only if something was published. **One** GitHub issue, "Office KPIs: needs attention", is created or updated (never duplicated) when there are pending reviews, overdue indexes, or failing sources.
+6. **Report:** one `pipeline_runs` row with a per-index summary (`changes` includes `source_url` so `/piplines` can link out for fact-checking). `emit_site_updates` runs when candidates were staged (pending) or published. **One** GitHub issue, "Office KPIs: needs attention", is created or updated (never duplicated) when there are pending reviews, overdue indexes, or failing sources.
 
 **Monthly revision sweep:** on the 1st of each month the planner also re-queries API sources for the last 12 periods, to catch revised values (CBS revises past figures). This is the only check that doesn't depend on a missing period.
 
@@ -337,7 +356,7 @@ For debugging, the same command runs locally: `python run_office_kpi_pipeline.py
   - **Review queue**: each candidate side by side with a mini chart of the existing series + the new point, the evidence quote/page, and a link to the stored PDF page. Actions: Approve / Edit value / Reject.
   - **Freshness table**: 48 rows showing the latest point, expected next release, last checked time, and status (🟢 fresh / 🟡 due / 🔴 overdue / ⚪ manual).
   - **Manual entry** for tier D. It writes a candidate with `method='manual'` so the same publish path and audit apply.
-- `emit_site_updates` is called only when points were **published**, with facts like `{"page": "דשבורד הממשלה", "updated": ["מחירי הדירות", "אינפלציה"]}`. Dedupe key is `office-kpis:{pipeline_run_id}:{sorted index keys}` so each publishing run gets its own homepage ticker row (same-day runs no longer overwrite each other).
+- `emit_site_updates` is called when the run **staged pending or published** candidates (LLM values included), with facts like `{"page": "דשבורד הממשלה", "updated_indexes": ["פיגועים", …], "pending_review": N}`. Approving on `/government/dashboard/edit` also emits. Dedupe key is `office-kpis:{pipeline_run_id}:{sorted index keys}` so each meaningful run gets its own homepage ticker row. Months with no discovered PDF never create candidates and will not appear on the pending page.
 
 ## 5. Data-quality flags found while mapping (curation decisions needed)
 
@@ -366,9 +385,12 @@ Then new indexes/offices = new registry entries + (sometimes) one new prompt fil
 
 ```bash
 cd "Layer 1 - Gathering Data/Offices"
-python run_office_kpi_pipeline.py --tier A --dry-run          # prints candidates + diff, writes nothing
-python run_office_kpi_pipeline.py --index 56 --dry-run        # single index
-python -m pytest tests/                                        # fixture PDFs/JSON per adapter
+python run_office_kpi_pipeline.py --dry-run --offline          # API adapters only by default
+python run_office_kpi_pipeline.py --documents --index 20 --force --dry-run --offline
+python run_office_kpi_pipeline.py --index 56 --dry-run         # single index
+python -m pytest tests/                                        # includes test_documents.py
 ```
 
 Each adapter has a recorded fixture (a saved JSON/PDF) and a test that replays the existing series. **Regression check:** running the adapter over past periods must reproduce the values already in `index_data` within tolerance. This is how we show that an automated source matches the hand-curated history before we let it write anything.
+
+For documents: drop `{doc_key}.pdf` under `OFFICE_KPI_DOC_FIXTURES`, or let discovery download into `.kpi_cache/`. LLM output is cached under `.kpi_cache/extractions/{sha256}.json`.

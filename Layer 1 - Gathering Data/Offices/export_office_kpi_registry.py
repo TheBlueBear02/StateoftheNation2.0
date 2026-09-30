@@ -11,6 +11,33 @@ from registry import load_registry
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "src" / "content" / "officeKpiRegistry.ts"
 
+# Document adapters that are wired + tested (board shows automated=true).
+# Nightly still requires OFFICE_KPI_DOCUMENTS / --documents.
+WORKING_DOC_KEYS = frozenset(
+    {
+        "shabak_monthly",
+        "police_yearbook",
+    }
+)
+
+
+def _doc_key(adapter: str) -> str | None:
+    if ":" not in adapter:
+        return None
+    family, _, rest = adapter.partition(":")
+    if family != "document" or not rest:
+        return None
+    return rest.strip()
+
+
+def _is_automated(entry) -> bool:
+    family = entry.adapter_family
+    if str(entry.params.get("series", "")).upper().startswith("TODO"):
+        return False
+    if family == "document":
+        return _doc_key(entry.adapter) in WORKING_DOC_KEYS
+    return family in IMPLEMENTED_FAMILIES
+
 
 def main() -> None:
     entries = []
@@ -24,17 +51,16 @@ def main() -> None:
                 "kind": e.kind,
                 "frequency": e.frequency,
                 "adapterFamily": family,
-                "automated": family in IMPLEMENTED_FAMILIES
-                and not str(e.params.get("series", "")).upper().startswith("TODO"),
+                "automated": _is_automated(e),
                 "release": e.release,
                 "labelRule": e.label_rule,
                 "tier": e.tier,
             }
         )
 
-    families = sorted(IMPLEMENTED_FAMILIES)
+    # Board "implemented families" includes document when any working doc key exists.
+    families = sorted(set(IMPLEMENTED_FAMILIES) | ({"document"} if WORKING_DOC_KEYS else set()))
     body = json.dumps(entries, ensure_ascii=False, indent=2)
-    # quote keys already from json.dumps; reformat as TS array of objects with camelCase preserved
     text = f"""/** Auto-derived from Layer 1 kpi_sources.yaml — re-run extract when registry changes. */
 export type OfficeKpiRegistryRelease = {{
   window?: string

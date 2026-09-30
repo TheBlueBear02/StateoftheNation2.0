@@ -253,7 +253,7 @@ def test_failing_adapter_is_isolated():
 
 def test_plan_only_offline_covers_all_entries():
     result = run(OfflineStore(), list(ENTRIES.values()), date(2026, 9, 29), plan_only=True)
-    assert len(result.items) == 48 and not result.unresolved
+    assert len(result.items) == len(ENTRIES) and not result.unresolved
     live = {"cbs_price", "cbs_series", "obudget", "worldbank", "boi_sdmx", "datagov", "curated"}
     assert all(it.reason == "no_adapter" for it in result.items
                if it.entry.adapter_family not in live)

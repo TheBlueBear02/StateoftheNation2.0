@@ -1,5 +1,6 @@
 # kpi_sources.yaml — automation registry for /government/dashboard indexes
 # Generated 2026-09-28 from office_dashboard_source.db (48 shown indexes).
+# Updated 2026-09-30: added נרצחים (key 63) — now 49 shown indexes.
 # tier: A=official API · A'=unofficial JSON · B=structured file · C=PDF+LLM · D=assisted manual
 # label_rule: yearly_jan1 (YYYY → YYYY-01-01) · month_start (01.MM.YYYY) · month_end (last day)
 # key: stable id from office_dashboard_source.db. The live Supabase index is resolved at runtime by office + name.
@@ -67,6 +68,20 @@
   release: {window: "01-01..06-30", check_every_days: 14}
   current_source: "https://iwn.org.il/"
   notes: "Israel Women's Network annual report."
+
+- key: 63
+  name: "נרצחים"
+  office: "המשרד לביטחון לאומי"
+  kind: kpi
+  frequency: yearly
+  coverage: "2010 → 2025 (16 pts)"
+  tier: "D"
+  adapter: manual_watch:criminal_homicide
+  params: {"expected_month": 1}
+  label_rule: yearly_jan1
+  release: {window: "01-01..06-30", check_every_days: 14}
+  current_source: ""
+  notes: "Annual criminal homicide victim count (קורבנות רצח פלילי). Curated series; alert / lower-is-better."
 
 - key: 19
   name: "תיקים במשטרה"

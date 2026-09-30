@@ -52,10 +52,10 @@ def test_release_windows():
 # ── registry ─────────────────────────────────────────────────────────────────
 
 
-def test_registry_loads_all_48():
+def test_registry_loads_all_49():
     entries = load_registry()
-    assert len(entries) == 48
-    assert len({e.key for e in entries}) == 48
+    assert len(entries) == 49
+    assert len({e.key for e in entries}) == 49
     assert {e.office for e in entries} >= {"משרד החינוך", "משרד האוצר"}
 
 

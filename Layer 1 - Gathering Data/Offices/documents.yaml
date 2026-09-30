@@ -1,0 +1,162 @@
+# Document registry for tier B/C office KPIs.
+# Each key matches the doc_key in kpi_sources.yaml (`document:<doc_key>`).
+# Discovery finds the newest edition; extraction runs once per sha256 (cached).
+
+police_yearbook:
+  title: "שנתון סטטיסטי משטרת ישראל"
+  extractor: pdf_llm
+  frequency: yearly
+  discover:
+    # Prefer direct BlobFolder year probes (gov.il listing pages are JS-heavy / often 403).
+    blob_templates:
+      - "https://www.gov.il/BlobFolder/reports/police_statistical_{year}/he/"
+    page_templates:
+      - "https://www.gov.il/he/departments/publications/reports/police_statistical_{year}"
+    page: "https://www.policemuseum.org.il/he/%D7%9E%D7%90%D7%92%D7%A8-%D7%9E%D7%99%D7%93%D7%A2/%D7%93%D7%95%D7%97%D7%95%D7%AA-%D7%A9%D7%A0%D7%AA%D7%99%D7%99%D7%9D/"
+    link_regex: '(?i)(שנתון|statistical|מונגש|police).*\.pdf|\.pdf$'
+    edition_from: url_year
+    years_back: 4
+    # Known editions — police museum hosts the recent statistical yearbooks.
+    seed_urls:
+      - "https://www.policemuseum.org.il/wp-content/uploads/2025/07/IsraelPolice2023.pdf"
+      - "https://www.policemuseum.org.il/wp-content/uploads/2025/07/IsraelPolice2022.pdf"
+    prefer_regex: '(?i)(שנתון-?סטטיסטי|IsraelPolice20|statistics_report|statistical)'
+  anchors:
+    - "תיקים שנפתחו"
+    - "תיקים"
+    - "גניבות רכב"
+    - "גניבה מתוך רכב"
+    - "שימוש ברכב ללא"
+    - "רכב ללא רשות"
+    - "מצבת כוח אדם"
+    - "כוח אדם"
+    - "מעצרים"
+    - "מעצרים פליליים"
+    - "מתנדבים"
+    - "מתנדבי"
+    - "תאונות דרכים"
+    - "תאונות"
+    # Reversed-Hebrew forms (pdfplumber often emits RTL tables backwards)
+    - "בכר שומש הבינג"
+    - "בכר ךותמ הבינג"
+    - "םיקית"
+    - "םדא חוכ"
+    - "םירצעמ"
+    - "םיבדנתמ"
+  prompt: prompts/police_yearbook.md
+  indexes:
+    19:
+      label: "תיקים במשטרה"
+      definition: "סה״כ תיקי חקירה שנפתחו במשטרה בשנה (ארצי). לא קבוצת עבירה בודדת. אופייני ~280k–310k (2023≈302946)."
+    20:
+      label: "גניבות רכב"
+      definition: "גניבה/שימוש ברכב ללא רשות — סה״כ ארצי שנתי. לא סך עבירות רכוש, לא גניבה מתוך רכב. ערכים אופייניים ~9k–25k (2023≈22165)."
+    21:
+      label: "כוח אדם במשטרה"
+      definition: "מצבת כוח אדם / מספר שוטרים (לא מתנדבים, לא תקציב). אופייני ~30k–35k (2023≈34529)."
+    39:
+      label: "מעצרים פליליים"
+      definition: "מספר מעצרים פליליים בשנה (סה״כ ארצי). אופייני ~45k–55k (2023≈52256)."
+    40:
+      label: "מתנדבי המשטרה"
+      definition: "מספר מתנדבי המשטרה (לא שוטרים). אופייני ~24k–36k (2023≈35053)."
+    26:
+      label: "תאונות דרכים"
+      definition: "מספר תאונות דרכים לפי הגדרת השנתון (לא פיצולי למ״ס). אופייני ~8k–13k (2023≈8092)."
+
+shabak_monthly:
+  title: "דוח שב״כ חודשי"
+  extractor: pdf_llm
+  frequency: monthly
+  discover:
+    page: "https://www.shabak.gov.il/reports/"
+    link_regex: '(?i)\.pdf($|\?)|media/.+\.pdf'
+    edition_from: hebrew_month_year
+    prefer_regex: '(?i)(חודשי|monthly)'
+    # Cloudflare often blocks plain requests — Playwright is required on runners.
+    # Seeds help offline/backfill tests; live runs should list every month via Playwright.
+    years_back: 2
+    seed_urls:
+      - "https://www.shabak.gov.il/media/5e4d3osf/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%90%D7%95%D7%92%D7%95%D7%A1%D7%98-2025.pdf"
+      - "https://www.shabak.gov.il/media/a4kl4xa4/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%99%D7%95%D7%9C%D7%99-2025.pdf"
+      - "https://www.shabak.gov.il/media/s42ixiqi/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%A1%D7%A4%D7%98%D7%9E%D7%91%D7%A8-2025.pdf"
+      - "https://www.shabak.gov.il/media/ndcdapr1/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%90%D7%95%D7%A7%D7%98%D7%95%D7%91%D7%A8-2025.pdf"
+      - "https://www.shabak.gov.il/media/i4pfmgsb/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%A0%D7%95%D7%91%D7%9E%D7%91%D7%A8-2025.pdf"
+      - "https://www.shabak.gov.il/media/2waps5gu/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%93%D7%A6%D7%9E%D7%91%D7%A8-2025.pdf"
+      # 2026 months discovered live (Playwright); keep as seeds when Cloudflare blocks scrape.
+      - "https://www.shabak.gov.il/media/gqtdfyeu/%D7%93%D7%95%D7%97-%D7%9E%D7%A1%D7%9B%D7%9D-%D7%99%D7%A0%D7%95%D7%90%D7%A8-2026.pdf"
+      - "https://www.shabak.gov.il/media/tetdkvu2/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%A4%D7%91%D7%A8%D7%95%D7%90%D7%A8-2026.pdf"
+      - "https://www.shabak.gov.il/media/g0jpao4k/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%9E%D7%A8%D7%A5-2026.pdf"
+      - "https://www.shabak.gov.il/media/urjbz05a/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%90%D7%A4%D7%A8%D7%99%D7%9C-2026.pdf"
+      - "https://www.shabak.gov.il/media/phucpp2i/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%9E%D7%90%D7%99-2026.pdf"
+      - "https://www.shabak.gov.il/media/dledmtkj/%D7%93%D7%95%D7%97-%D7%97%D7%95%D7%93%D7%A9%D7%99-%D7%99%D7%95%D7%9C%D7%99-2026.pdf"
+  anchors:
+    # Prefer the attacks map slide; avoid bare "מעצרים" pages.
+    - "מפת טרור"
+    - "פיגועים משמעותיים"
+    - "פיגועי טרור"
+    - "פיגועים"
+    - "הרוגים"
+    - "נרצחים"
+    - "פצועים"
+    # Reversed forms (pdfplumber RTL)
+    - "םיעוגיפ"
+    - "םייתועמשמ"
+    - "רורט תפמ"
+    - "םיגורה"
+  avoid_anchors:
+    - "מעצרי פעילי טרור"
+    - "מעצרי"
+    - "מעצרים"
+    - "עצורים"
+    - "םירצעמ"
+  prompt: prompts/shabak_monthly.md
+  indexes:
+    1:
+      label: "פיגועים"
+      definition: "סה״כ פיגועים משמעותיים בחודש ממפת הטרור החודשית (המספר הגדול ליד פיגועים משמעותיים). לא מעצרי פעילי טרור, לא סיכולים, לא פיצול אזורי. אופייני עשרות–מאות (2025-08≈287, 2025-07≈424)."
+      field: attacks_total
+      # Require attack wording (NOT bare "טרור" — that also appears on arrest slides).
+      quote_must_include: ["פיגוע", "םיעוגיפ", "משמעותי", "יממע", "מפת טרור", "רורט תפמ"]
+      quote_must_not_include: ["מעצר", "םירצעמ", "עצור", "רוצע", "סיכול", "לוחיס"]
+    14:
+      label: "נרצחים בפיגועים"
+      definition: "הרוגים/נרצחים בפיגועים בחודש (לא פצועים, לא מעצרים). לרוב 0–בודדים (2025-08≈0)."
+      field: killed
+      # Soft on include — killed slides often print bare zeros; still reject arrests/wounded.
+      quote_must_not_include: ["מעצר", "םירצעמ", "פצוע", "םיעוצפ"]
+
+iaa_monthly_stats:
+  title: "סטטיסטיקה חודשית רשות שדות התעופה"
+  extractor: xlsx_table
+  frequency: monthly
+  discover:
+    page: "https://www.iaa.gov.il/about/aeronautical-information/annualreport/"
+    link_regex: '(?i)(passenger|נוסעים|statistics|סטטיסטי).*\.(xlsx|xls|csv)$|\.(xlsx|xls)$'
+    edition_from: link_text
+  # Layout confirmed after first successful parse + review approval.
+  table:
+    sheet: 0
+    # Placeholder — fill once a real IAA workbook is captured.
+    header_row: 0
+    date_column: null
+    value_columns: {}
+  indexes:
+    30: {label: "נוסעים בנתב\"ג", definition: "סה״כ נוסעים בנתב״ג לחודש", field: total_passengers}
+
+btl_poverty_report:
+  title: "דוח העוני של הביטוח הלאומי"
+  extractor: pdf_llm
+  frequency: yearly
+  discover:
+    page: "https://www.btl.gov.il/"
+    link_regex: '(?i)(עוני|poverty|gini).*\.pdf'
+    edition_from: link_text
+    years_back: 3
+  anchors:
+    - "מקדם ג׳יני"
+    - "Gini"
+    - "אי-שוויון"
+  prompt: prompts/btl_poverty_report.md
+  indexes:
+    57: {label: "שוויון", definition: "מקדם ג׳יני להכנסה פנויה (לאחר העברות ומסים)"}
