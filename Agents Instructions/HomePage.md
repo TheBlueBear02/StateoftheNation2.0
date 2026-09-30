@@ -131,7 +131,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Feed: up to **10** latest DB rows (`occurred_at` desc). On query failure, missing Supabase config, or an empty table, the strip is **hidden** (not padded with placeholders).
 - The track renders `newsItems` twice for a seamless CSS marquee loop — that is intentional duplication for animation, not a second fetch.
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
-- CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
+- CSS marquee animation (`ticker` keyframes, **55s** per loop); disabled when `prefers-reduced-motion: reduce`.
 
 ### 4. Hot indexes carousel (`#hot-indexes`)
 

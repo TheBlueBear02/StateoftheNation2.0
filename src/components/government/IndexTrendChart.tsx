@@ -131,6 +131,29 @@ const MARGIN = CHART_MARGIN
 
 const BAR_SLOT_FILL = 0.72
 
+/** Approx CSS-px width of an axis date/year label at the given font size. */
+function estimateXAxisLabelWidth(label: string, fontSize: number): number {
+  return Math.max(0, (label || '').length) * fontSize * 0.62
+}
+
+/**
+ * Keep short ticks middle-anchored under the bar/point; only shift to start/end
+ * when a long label (e.g. DD.MM.YYYY) would otherwise clip the SVG edge.
+ */
+function xAxisLabelTextAnchor(
+  x: number,
+  label: string,
+  fontSize: number,
+  leftEdge: number,
+  rightEdge: number,
+): 'start' | 'middle' | 'end' {
+  const half = estimateXAxisLabelWidth(label, fontSize) / 2
+  const pad = 2
+  if (x + half > rightEdge - pad) return 'end'
+  if (x - half < leftEdge + pad) return 'start'
+  return 'middle'
+}
+
 /** Corner radius that stays proportional on narrow bars (avoids pill tops). */
 function barCornerRadius(barW: number, barH: number, scale: number): number {
   const ideal = 10 * scale
@@ -952,7 +975,13 @@ export function IndexTrendChart({
                 x={item.x}
                 y={height - axisPadY}
                 className="index-trend-chart__axis"
-                textAnchor="middle"
+                textAnchor={xAxisLabelTextAnchor(
+                  item.x,
+                  item.label,
+                  fontSize,
+                  0,
+                  WIDTH,
+                )}
                 fill="#4a4a4a"
                 fontSize={fontSize}
               >

@@ -1,4 +1,5 @@
 import { resolveFactionColor } from './hemicycle'
+import { classifyGovernmentRole } from './governmentStructure'
 import {
   supabase,
   supabaseConfigError,
@@ -135,7 +136,15 @@ export type OfficeDashboardOffice = {
 
 export type OfficeDashboardResult = {
   offices: OfficeDashboardOffice[]
+  /** Shared Prime Minister eras strip (same timeline for every office). */
+  primeMinisterHistory: OfficeDashboardMinisterEra[]
   error: string | null
+}
+
+function emptyOfficeDashboardResult(
+  error: string | null,
+): OfficeDashboardResult {
+  return { offices: [], primeMinisterHistory: [], error }
 }
 
 function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -270,6 +279,14 @@ function appointmentOfficeName(row: GovernmentAppointmentRow): string {
     office?.knesset_category_name?.trim() ||
     office?.name?.trim() ||
     ''
+  )
+}
+
+/** True when this appointment is the sitting Prime Minister (not deputy/alt/minister-in-PMO). */
+function isPrimeMinisterAppointment(row: GovernmentAppointmentRow): boolean {
+  return (
+    classifyGovernmentRole(row.duty_desc, appointmentOfficeName(row)) ===
+    'primeMinister'
   )
 }
 
@@ -661,10 +678,9 @@ function buildMinisterEras(
 
 export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
   if (supabaseConfigError || !supabase) {
-    return {
-      offices: [],
-      error: supabaseConfigError ?? 'Supabase client is not configured',
-    }
+    return emptyOfficeDashboardResult(
+      supabaseConfigError ?? 'Supabase client is not configured',
+    )
   }
 
   const { data: officeRows, error: officeError } = await supabase
@@ -673,12 +689,12 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
     .eq('is_shown', true)
 
   if (officeError) {
-    return { offices: [], error: officeError.message }
+    return emptyOfficeDashboardResult(officeError.message)
   }
 
   const offices = (officeRows ?? []) as OfficeDashboardOfficeRow[]
   if (offices.length === 0) {
-    return { offices: [], error: null }
+    return emptyOfficeDashboardResult(null)
   }
 
   const officeIds = offices.map((o) => o.id)
@@ -694,7 +710,7 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
     .order('id')
 
   if (indexError) {
-    return { offices: [], error: indexError.message }
+    return emptyOfficeDashboardResult(indexError.message)
   }
 
   const indexes = (indexRows ?? []) as IndexRow[]
@@ -704,7 +720,7 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
   if (indexIds.length > 0) {
     const { rows: points, error: dataError } = await fetchAllIndexData(indexIds)
     if (dataError) {
-      return { offices: [], error: dataError }
+      return emptyOfficeDashboardResult(dataError)
     }
     dataRows = points
   }
@@ -771,8 +787,23 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
     portfolioOfficeIds.set(needle, ids)
   }
 
+  // Prime Minister office rows (PMO duplicates across Knesset history).
+  const pmOfficeIds = (
+    (allOfficeRows ?? []) as Array<{
+      id: number
+      name: string | null
+      knesset_category_name: string | null
+    }>
+  )
+    .filter((row) => {
+      const name = row.name?.trim() || ''
+      const category = row.knesset_category_name?.trim() || ''
+      return name.includes('ראש הממשלה') || category.includes('ראש הממשלה')
+    })
+    .map((row) => row.id)
+
   const historyOfficeIds = [
-    ...new Set([...portfolioOfficeIds.values()].flat()),
+    ...new Set([...portfolioOfficeIds.values()].flat().concat(pmOfficeIds)),
   ]
 
   let historyAppts: GovernmentAppointmentRow[] = []
@@ -788,11 +819,20 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
     historyAppts = (historyData ?? []) as unknown as GovernmentAppointmentRow[]
   }
 
+  const pmOfficeIdSet = new Set(pmOfficeIds)
+  const pmAppts = historyAppts.filter(
+    (row) =>
+      row.office_id !== null &&
+      pmOfficeIdSet.has(row.office_id) &&
+      isPrimeMinisterAppointment(row),
+  )
+
   const historyPersonIds = [
     ...new Set(
       [
         ...historyAppts.map((row) => row.person_id),
         ...appointmentRows.map((row) => row.person_id),
+        ...pmAppts.map((row) => row.person_id),
       ].filter(Boolean),
     ),
   ]
@@ -836,6 +876,8 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
     erasByNeedle.set(needle, buildMinisterEras(rows, memberships, today))
   }
 
+  const primeMinisterHistory = buildMinisterEras(pmAppts, memberships, today)
+
   const result: OfficeDashboardOffice[] = offices
     .map((row) => {
       const name = officeDisplayName(row)
@@ -863,7 +905,7 @@ export async function fetchOfficeDashboard(): Promise<OfficeDashboardResult> {
       (a, b) => displayOrderRank(a.name) - displayOrderRank(b.name) || a.id - b.id,
     )
 
-  return { offices: result, error: null }
+  return { offices: result, primeMinisterHistory, error: null }
 }
 
 export function formatIndexValue(value: number | null | undefined): string {

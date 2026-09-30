@@ -321,7 +321,7 @@
   align-items: center;
   gap: 0;
   width: max-content;
-  animation: ticker 40s linear infinite;
+  animation: ticker 55s linear infinite;
 }
 
 .news-strip__item {
