@@ -132,18 +132,17 @@
   border-radius: 0 0 28px 28px;
   box-sizing: border-box;
   overflow: hidden;
-  /* Quieter wash so selected eras (compare wash) stand out */
+  /* Same wash + solid accent for every era (selected no longer brighter). */
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--era-accent, #4890fd) 14%, #fff) 0%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 7%, #fff) 55%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 2%, #fff) 85%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 42%, #fff) 0%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 22%, #fff) 55%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 8%, #fff) 85%,
     #fff 100%
   );
   /* 5px solid top accent (inset so bar height / photo fit stay intact) */
   box-shadow:
-    inset 0 5px 0 0
-      color-mix(in srgb, var(--era-accent, #4890fd) 72%, #fff),
+    inset 0 5px 0 0 var(--era-accent, #4890fd),
     inset -2px 0 0 #fff;
   cursor: pointer;
   z-index: 1;
@@ -158,45 +157,24 @@
 }
 
 .office-eras-bar__era:hover,
-.office-eras-bar__era--hovered {
+.office-eras-bar__era--hovered,
+.office-eras-bar__era--selected:hover,
+.office-eras-bar__era--selected.office-eras-bar__era--hovered {
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--era-accent, #4890fd) 20%, #fff) 0%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 10%, #fff) 55%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 3%, #fff) 85%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 48%, #fff) 0%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 26%, #fff) 55%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 10%, #fff) 85%,
     #fff 100%
   );
   box-shadow:
-    inset 0 5px 0 0
-      color-mix(in srgb, var(--era-accent, #4890fd) 88%, #fff),
+    inset 0 5px 0 0 var(--era-accent, #4890fd),
     inset -2px 0 0 #fff;
   z-index: 2;
 }
 
 .office-eras-bar__era--selected {
   z-index: 4;
-  /* Exact same wash + solid accent as .office-eras-bar__detail-half */
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--era-accent, #4890fd) 26%, #fff) 0%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 12%, #fff) 55%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 4%, #fff) 85%,
-    #fff 100%
-  );
-  box-shadow:
-    inset 0 5px 0 0 var(--era-accent, #4890fd),
-    inset -2px 0 0 #fff;
-}
-
-.office-eras-bar__era--selected:hover,
-.office-eras-bar__era--selected.office-eras-bar__era--hovered {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--era-accent, #4890fd) 30%, #fff) 0%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 14%, #fff) 55%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 5%, #fff) 85%,
-    #fff 100%
-  );
 }
 
 .office-eras-bar__era:focus-visible {
@@ -207,8 +185,10 @@
 
 .office-eras-bar__clip {
   display: flex;
+  flex-direction: row-reverse;
   align-items: center;
-  justify-content: flex-start;
+  /* Center photo / photo+name as a group (photo on the right). */
+  justify-content: center;
   gap: 8px;
   width: 100%;
   height: 100%;
@@ -221,7 +201,6 @@
 }
 
 .office-eras-bar__clip--photo-only {
-  justify-content: center;
   padding-inline: 4px;
 }
 
@@ -254,8 +233,7 @@
   align-items: flex-end;
   gap: 1px;
   min-width: 0;
-  flex: 1;
-  margin-inline-start: auto;
+  flex: 0 1 auto;
   text-align: right;
   direction: rtl;
 }
@@ -532,7 +510,7 @@
   width: 132px;
   height: 132px;
   margin: 0;
-  padding: 16px;
+  padding: 20px;
   border-radius: 50%;
   border: 3px solid #000;
   background: var(--color-white, #fff);
@@ -678,7 +656,7 @@
   .office-eras-bar__detail-delta-badge {
     width: 112px;
     height: 112px;
-    padding: 12px;
+    padding: 16px;
   }
 
   .office-eras-bar__detail-delta-badge-text {

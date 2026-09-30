@@ -445,6 +445,7 @@ export function HotIndexesCarousel() {
               <IndexTrendChart
                 key={current.index.id}
                 index={current.index}
+                eras={current.office.ministerHistory}
                 uiScale={uiScale}
                 tall={false}
                 compact

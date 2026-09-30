@@ -33,14 +33,13 @@
 }
 
 .index-trend-chart__line {
-  stroke: var(--color-blue);
-  /* stroke-width comes from the scaled SVG attribute */
+  /* stroke comes from the SVG attribute (party gradient or default blue) */
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 
 .index-trend-chart__area {
-  fill: rgba(72, 144, 253, 0.18);
+  /* fill comes from the SVG attribute */
   stroke: none;
   pointer-events: none;
 }
@@ -50,21 +49,28 @@
 }
 
 .index-trend-chart__dot {
-  fill: var(--color-blue);
+  /* fill comes from the SVG attribute (party color or default blue) */
   stroke: #fff;
-  /* stroke-width comes from the scaled SVG attribute */
   cursor: pointer;
 }
 
 .index-trend-chart__bar {
-  fill: var(--color-blue);
+  /* Fill comes from the SVG path (party color / gradient). */
+  fill: none;
   opacity: 1;
   cursor: pointer;
 }
 
 .index-trend-chart__bar--active {
   opacity: 1;
-  fill: var(--color-blue-dark);
+}
+
+.index-trend-chart__bar-value {
+  fill: #fff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
 }
 
 .index-trend-chart__pie-slice {

@@ -221,6 +221,7 @@ function DetailPanel({
   >([])
   const [eraSelectedKeys, setEraSelectedKeys] = useState<string[]>([])
   const [showPrimeMinisters, setShowPrimeMinisters] = useState(false)
+  const [showBarValues, setShowBarValues] = useState(true)
   const [chartMetrics, setChartMetrics] = useState<{
     uiScale: number
     tall: boolean
@@ -683,14 +684,46 @@ function DetailPanel({
                     מקור
                   </a>
                 ) : null}
+                {selectedIndex.chartType === 'bar' ? (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showBarValues}
+                    className={`office-dashboard__chart-switch${
+                      showBarValues
+                        ? ' office-dashboard__chart-switch--on'
+                        : ''
+                    }`}
+                    onClick={() => {
+                      setShowBarValues((prev) => !prev)
+                    }}
+                    aria-label={
+                      showBarValues
+                        ? 'מספרים על העמודות מוצגים — לחצו להסתרה'
+                        : 'מספרים על העמודות מוסתרים — לחצו להצגה'
+                    }
+                    title={
+                      showBarValues
+                        ? 'הסתרת מספרים על העמודות'
+                        : 'הצגת מספרים על העמודות'
+                    }
+                  >
+                    <span
+                      className="office-dashboard__chart-switch-knob"
+                      aria-hidden="true"
+                    >
+                      123
+                    </span>
+                  </button>
+                ) : null}
                 {canShowPmSwitch ? (
                   <button
                     type="button"
                     role="switch"
                     aria-checked={showPrimeMinisters}
-                    className={`office-dashboard__pm-switch${
+                    className={`office-dashboard__chart-switch office-dashboard__pm-switch${
                       showPrimeMinisters
-                        ? ' office-dashboard__pm-switch--on'
+                        ? ' office-dashboard__chart-switch--on office-dashboard__pm-switch--on'
                         : ''
                     }`}
                     onClick={() => {
@@ -708,15 +741,19 @@ function DetailPanel({
                     }
                   >
                     <span
-                      className="office-dashboard__pm-switch-knob"
+                      className="office-dashboard__chart-switch-knob office-dashboard__pm-switch-knob"
                       aria-hidden="true"
-                    />
+                    >
+                      PM
+                    </span>
                   </button>
                 ) : null}
               </div>
             </div>
             <IndexTrendChart
               index={selectedIndex}
+              eras={erasForBar}
+              showBarValues={showBarValues}
               highlightBands={eraHighlightBands}
               uiScale={uiScale}
               tall={tallChart}
@@ -758,6 +795,8 @@ function DetailPanel({
             </div>
             <IndexTrendChart
               index={selectedIndex}
+              eras={erasForBar}
+              showBarValues={showBarValues}
               highlightBands={eraHighlightBands}
               uiScale={1}
               tall={false}

@@ -443,10 +443,11 @@
   display: flex;
   flex: 1 1 auto;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   min-width: 0;
   padding: 14px 16px;
-  text-align: right;
+  text-align: center;
 }
 
 .office-dashboard__office-current.office-dashboard__slide {
@@ -458,24 +459,27 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
   min-width: 0;
+  text-align: center;
 }
 
 .office-dashboard__office-current-meta {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px 16px;
   min-width: 0;
   width: 100%;
 }
 
 .office-dashboard__office-current-meta .office-dashboard__subtitle {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
+  text-align: center;
 }
 
 .office-dashboard__office-current-meta .office-dashboard__legend {
@@ -908,7 +912,8 @@
   text-decoration: underline;
 }
 
-/* Round PM / minister eras toggle — sits to the physical right of מקור. */
+/* Round chart toggles (bar values / PM eras) — sit to the physical right of מקור. */
+.office-dashboard__chart-switch,
 .office-dashboard__pm-switch {
   position: relative;
   display: inline-flex;
@@ -927,38 +932,60 @@
     border-color 0.18s ease;
 }
 
+.office-dashboard__chart-switch:hover,
 .office-dashboard__pm-switch:hover {
   border-color: var(--color-blue-dark, #2f6fd6);
 }
 
+.office-dashboard__chart-switch:focus-visible,
 .office-dashboard__pm-switch:focus-visible {
   outline: 2px solid var(--color-blue);
   outline-offset: 2px;
 }
 
+.office-dashboard__chart-switch--on,
 .office-dashboard__pm-switch--on {
   background: var(--color-blue);
   border-color: var(--color-blue);
 }
 
+.office-dashboard__chart-switch-knob,
 .office-dashboard__pm-switch-knob {
   position: absolute;
   top: 50%;
   left: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
   height: 18px;
   border-radius: 50%;
   background: var(--color-blue);
+  color: var(--color-white);
+  font-family: inherit;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
   transform: translateY(-50%);
   transition:
     left 0.18s ease,
-    background-color 0.18s ease;
+    background-color 0.18s ease,
+    color 0.18s ease;
   pointer-events: none;
+  user-select: none;
 }
 
+.office-dashboard__pm-switch-knob {
+  font-size: 8px;
+  letter-spacing: -0.02em;
+}
+
+.office-dashboard__chart-switch--on .office-dashboard__chart-switch-knob,
 .office-dashboard__pm-switch--on .office-dashboard__pm-switch-knob {
   left: calc(100% - 21px);
   background: var(--color-white);
+  color: var(--color-blue);
 }
 
 .office-dashboard__chart-hint {

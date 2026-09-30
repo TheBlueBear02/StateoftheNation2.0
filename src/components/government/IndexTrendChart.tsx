@@ -1,7 +1,11 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
-import type { OfficeDashboardIndex } from '../../lib/fetchOfficeDashboard'
+import type {
+  OfficeDashboardIndex,
+  OfficeDashboardMinisterEra,
+  OfficeDashboardPoint,
+} from '../../lib/fetchOfficeDashboard'
 import { formatIndexValue } from '../../lib/fetchOfficeDashboard'
 import './IndexTrendChart.css'
 
@@ -13,8 +17,22 @@ type EraHighlightBand = {
   avg?: number | null
 }
 
+/** Horizontal color slice within a bar (0–1 along the bar width, LTR time). */
+type BarColorSegment = {
+  color: string
+  startFrac: number
+  endFrac: number
+}
+
 type IndexTrendChartProps = {
   index: OfficeDashboardIndex
+  /**
+   * Minister / PM eras used to paint bar fills (party color). Yearly bars that
+   * span a minister switch are split left→right by days in office.
+   */
+  eras?: OfficeDashboardMinisterEra[]
+  /** When false, hide white value labels (and their scrim) on bar charts. */
+  showBarValues?: boolean
   /** Vertical band highlight(s) as % of chart width (selected eras). */
   highlightBand?: {
     leftPct: number
@@ -169,13 +187,10 @@ function barStrokeWidth(barW: number, scale: number): number {
 }
 const ERA_HIGHLIGHT_FALLBACK = '#4890fd'
 const ERA_HIGHLIGHT_OPACITY = 0.22
+const BAR_DEFAULT_FILL = '#4890fd'
+const BAR_DEFAULT_FILL_ACTIVE = '#3b7ae6'
 
-function eraStrokeColor(color: string | null | undefined): string {
-  const raw = (color || ERA_HIGHLIGHT_FALLBACK).trim()
-  return raw || ERA_HIGHLIGHT_FALLBACK
-}
-
-/** Party color at low opacity for the eras hover band on the chart. */
+/** Party color at low opacity — used for line-chart selected-era bands only. */
 function eraHighlightFill(color: string | null | undefined): string {
   const raw = (color || ERA_HIGHLIGHT_FALLBACK).trim()
   const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)
@@ -199,6 +214,403 @@ function eraHighlightFill(color: string | null | undefined): string {
     return `rgba(${rgb[1]}, ${rgb[2]}, ${rgb[3]}, ${ERA_HIGHLIGHT_OPACITY})`
   }
   return `rgba(72, 144, 253, ${ERA_HIGHLIGHT_OPACITY})`
+}
+
+function dateToMs(value: string): number {
+  const t = Date.parse(value.slice(0, 10))
+  return Number.isFinite(t) ? t : 0
+}
+
+function isYearOnlySeries(points: OfficeDashboardPoint[]): boolean {
+  if (points.length === 0) return false
+  return points.every((p) => /^\d{4}$/.test((p.label || '').trim()))
+}
+
+function yearFromPoint(point: OfficeDashboardPoint): string {
+  const label = (point.label || '').trim()
+  if (/^\d{4}$/.test(label)) return label
+  return point.recordedAt.slice(0, 4)
+}
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+}
+
+function daysInYear(year: number): number {
+  return isLeapYear(year) ? 366 : 365
+}
+
+/** Inclusive calendar-day overlap between an era and a calendar year. */
+function eraOverlapDaysInYear(
+  year: number,
+  era: OfficeDashboardMinisterEra,
+): number {
+  const eraStart = dateToMs(era.startDate)
+  const eraEnd = dateToMs(era.endDate)
+  if (!(eraEnd >= eraStart)) return 0
+  const yearStart = Date.UTC(year, 0, 1)
+  const yearEnd = Date.UTC(year, 11, 31)
+  const overlapStart = Math.max(eraStart, yearStart)
+  const overlapEnd = Math.min(eraEnd, yearEnd)
+  if (overlapEnd < overlapStart) return 0
+  return Math.floor((overlapEnd - overlapStart) / 86_400_000) + 1
+}
+
+function normalizeHexColor(color: string | null | undefined): string | null {
+  const raw = (color || '').trim()
+  if (!raw) return null
+  const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)
+  if (hex) {
+    let h = hex[1]!
+    if (h.length === 3) {
+      h = h
+        .split('')
+        .map((c) => c + c)
+        .join('')
+    }
+    return `#${h.toLowerCase()}`
+  }
+  return raw
+}
+
+/** Darken a hex/rgb color for the active (hovered) bar state. */
+function darkenColor(color: string, amount = 0.14): string {
+  const hex = color.match(/^#([0-9a-f]{6})$/i)
+  if (hex) {
+    const h = hex[1]!
+    const channel = (start: number) => {
+      const n = Number.parseInt(h.slice(start, start + 2), 16)
+      return Math.max(0, Math.min(255, Math.round(n * (1 - amount))))
+    }
+    const r = channel(0).toString(16).padStart(2, '0')
+    const g = channel(2).toString(16).padStart(2, '0')
+    const b = channel(4).toString(16).padStart(2, '0')
+    return `#${r}${g}${b}`
+  }
+  return color
+}
+
+function mergeAdjacentSegments(segments: BarColorSegment[]): BarColorSegment[] {
+  if (segments.length <= 1) return segments
+  const merged: BarColorSegment[] = []
+  for (const seg of segments) {
+    const prev = merged[merged.length - 1]
+    if (prev && prev.color === seg.color && Math.abs(prev.endFrac - seg.startFrac) < 0.001) {
+      prev.endFrac = seg.endFrac
+    } else {
+      merged.push({ ...seg })
+    }
+  }
+  return merged
+}
+
+/**
+ * Party-color fill plan for one bar. Yearly points that cover a minister
+ * switch become multiple left→right slices proportional to days in office.
+ * Gaps with no minister keep the default chart blue.
+ */
+function barColorSegmentsForPoint(
+  point: OfficeDashboardPoint,
+  eras: OfficeDashboardMinisterEra[],
+  yearOnly: boolean,
+): BarColorSegment[] {
+  if (eras.length === 0) {
+    return [{ color: BAR_DEFAULT_FILL, startFrac: 0, endFrac: 1 }]
+  }
+
+  if (yearOnly) {
+    const year = Number(yearFromPoint(point))
+    if (!year) {
+      return [{ color: BAR_DEFAULT_FILL, startFrac: 0, endFrac: 1 }]
+    }
+
+    const yearStart = Date.UTC(year, 0, 1)
+    const yearDayCount = daysInYear(year)
+    const overlaps = eras
+      .map((era) => {
+        const days = eraOverlapDaysInYear(year, era)
+        if (days <= 0) return null
+        const eraStart = dateToMs(era.startDate)
+        const eraEnd = dateToMs(era.endDate)
+        const overlapStart = Math.max(eraStart, yearStart)
+        const overlapEnd = Math.min(eraEnd, Date.UTC(year, 11, 31))
+        const startFrac = Math.max(
+          0,
+          Math.min(1, Math.floor((overlapStart - yearStart) / 86_400_000) / yearDayCount),
+        )
+        const endFrac = Math.max(
+          startFrac,
+          Math.min(
+            1,
+            (Math.floor((overlapEnd - yearStart) / 86_400_000) + 1) / yearDayCount,
+          ),
+        )
+        return {
+          color:
+            normalizeHexColor(era.factionColor) || BAR_DEFAULT_FILL,
+          startFrac,
+          endFrac,
+          overlapStart,
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row))
+      .sort((a, b) => a.overlapStart - b.overlapStart)
+
+    if (overlaps.length === 0) {
+      return [{ color: BAR_DEFAULT_FILL, startFrac: 0, endFrac: 1 }]
+    }
+
+    const segments: BarColorSegment[] = []
+    let cursor = 0
+    for (const row of overlaps) {
+      const start = Math.max(cursor, row.startFrac)
+      const end = Math.max(start, row.endFrac)
+      if (start > cursor + 0.001) {
+        segments.push({
+          color: BAR_DEFAULT_FILL,
+          startFrac: cursor,
+          endFrac: start,
+        })
+      }
+      if (end > start + 0.001) {
+        segments.push({
+          color: row.color,
+          startFrac: start,
+          endFrac: end,
+        })
+      }
+      cursor = Math.max(cursor, end)
+    }
+    if (cursor < 0.999) {
+      segments.push({
+        color: BAR_DEFAULT_FILL,
+        startFrac: cursor,
+        endFrac: 1,
+      })
+    }
+    return mergeAdjacentSegments(segments)
+  }
+
+  const t = dateToMs(point.recordedAt)
+  const match = eras.find((era) => {
+    const start = dateToMs(era.startDate)
+    const end = dateToMs(era.endDate)
+    return t >= start && t <= end
+  })
+  return [
+    {
+      color: normalizeHexColor(match?.factionColor) || BAR_DEFAULT_FILL,
+      startFrac: 0,
+      endFrac: 1,
+    },
+  ]
+}
+
+function yearProgress(value: string): number {
+  const iso = value.slice(0, 10)
+  const [ys, ms, ds] = iso.split('-')
+  const y = Number(ys)
+  const m = Number(ms)
+  const d = Number(ds)
+  if (!y || !m || !d) return 0
+  const start = Date.UTC(y, 0, 1)
+  const end = Date.UTC(y, 11, 31)
+  const t = Date.UTC(y, m - 1, d)
+  if (end <= start) return 0
+  return Math.min(1, Math.max(0, (t - start) / (end - start)))
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t
+}
+
+/** Dominant party color for a single data point (longest year-overlap segment). */
+function colorForPoint(
+  point: OfficeDashboardPoint,
+  eras: OfficeDashboardMinisterEra[],
+  yearOnly: boolean,
+): string {
+  const segments = barColorSegmentsForPoint(point, eras, yearOnly)
+  let best = segments[0]!
+  for (const seg of segments) {
+    if (seg.endFrac - seg.startFrac > best.endFrac - best.startFrac) {
+      best = seg
+    }
+  }
+  return best.color
+}
+
+/**
+ * Map a calendar date onto the line series X (viewBox), matching eras-bar
+ * year-only bounds (midpoints between points) and recordedAt interpolation.
+ */
+function dateToLineX(
+  date: string,
+  points: OfficeDashboardPoint[],
+  toX: (i: number) => number,
+  startX: number,
+  endX: number,
+  yearOnly: boolean,
+): number {
+  const n = points.length
+  if (n === 0) return startX
+  if (n === 1) return toX(0)
+
+  const target = dateToMs(date)
+
+  if (yearOnly) {
+    const years = points.map((p) => Number(yearFromPoint(p)))
+    const dateYear = Number(date.slice(0, 4))
+    const progress = yearProgress(date)
+    const exactIdx = years.indexOf(dateYear)
+    if (exactIdx >= 0) {
+      const leftBound =
+        exactIdx === 0 ? startX : (toX(exactIdx - 1) + toX(exactIdx)) / 2
+      const rightBound =
+        exactIdx === n - 1 ? endX : (toX(exactIdx) + toX(exactIdx + 1)) / 2
+      return lerp(leftBound, rightBound, progress)
+    }
+    for (let i = 0; i < n - 1; i++) {
+      const y0 = years[i]!
+      const y1 = years[i + 1]!
+      if (dateYear > y0 && dateYear < y1) {
+        const startMs = dateToMs(`${y0}-12-31`)
+        const endMs = dateToMs(`${y1}-01-01`)
+        const local =
+          endMs <= startMs ? 0 : (target - startMs) / (endMs - startMs)
+        return lerp(toX(i), toX(i + 1), Math.min(1, Math.max(0, local)))
+      }
+    }
+    if (dateYear < years[0]!) return startX
+    return endX
+  }
+
+  const anchors = points.map((p) => dateToMs(p.recordedAt))
+  if (target <= anchors[0]!) return toX(0)
+  if (target >= anchors[n - 1]!) return toX(n - 1)
+  for (let i = 0; i < n - 1; i++) {
+    const a = anchors[i]!
+    const b = anchors[i + 1]!
+    if (target >= a && target <= b) {
+      const local = b === a ? 0 : (target - a) / (b - a)
+      return lerp(toX(i), toX(i + 1), local)
+    }
+  }
+  return toX(n - 1)
+}
+
+type LineColorStop = { offset: number; color: string }
+
+/**
+ * Hard left→right color stops for the line stroke / area fill, keyed by
+ * minister era spans along the series.
+ */
+function buildLineEraColorStops(
+  points: OfficeDashboardPoint[],
+  eras: OfficeDashboardMinisterEra[],
+  yearOnly: boolean,
+  toX: (i: number) => number,
+  startX: number,
+  endX: number,
+): LineColorStop[] {
+  const span = endX - startX
+  if (points.length === 0 || !(span > 0) || eras.length === 0) {
+    return [
+      { offset: 0, color: BAR_DEFAULT_FILL },
+      { offset: 1, color: BAR_DEFAULT_FILL },
+    ]
+  }
+
+  const toOffset = (x: number) =>
+    Math.min(1, Math.max(0, (x - startX) / span))
+
+  const sorted = [...eras].sort(
+    (a, b) => dateToMs(a.startDate) - dateToMs(b.startDate),
+  )
+
+  type Seg = { start: number; end: number; color: string }
+  const segs: Seg[] = []
+  for (const era of sorted) {
+    const x0 = dateToLineX(
+      era.startDate,
+      points,
+      toX,
+      startX,
+      endX,
+      yearOnly,
+    )
+    const x1 = dateToLineX(era.endDate, points, toX, startX, endX, yearOnly)
+    const start = toOffset(Math.min(x0, x1))
+    const end = toOffset(Math.max(x0, x1))
+    if (end <= start + 0.0005) continue
+    segs.push({
+      start,
+      end,
+      color: normalizeHexColor(era.factionColor) || BAR_DEFAULT_FILL,
+    })
+  }
+
+  if (segs.length === 0) {
+    return [
+      { offset: 0, color: BAR_DEFAULT_FILL },
+      { offset: 1, color: BAR_DEFAULT_FILL },
+    ]
+  }
+
+  const filled: Seg[] = []
+  let cursor = 0
+  for (const seg of segs) {
+    const start = Math.max(cursor, seg.start)
+    const end = Math.max(start, seg.end)
+    if (start > cursor + 0.0005) {
+      filled.push({
+        start: cursor,
+        end: start,
+        color: BAR_DEFAULT_FILL,
+      })
+    }
+    if (end > start + 0.0005) {
+      filled.push({ start, end, color: seg.color })
+    }
+    cursor = Math.max(cursor, end)
+  }
+  if (cursor < 0.999) {
+    filled.push({
+      start: cursor,
+      end: 1,
+      color: BAR_DEFAULT_FILL,
+    })
+  }
+
+  const merged: Seg[] = []
+  for (const seg of filled) {
+    const prev = merged[merged.length - 1]
+    if (prev && prev.color === seg.color && Math.abs(prev.end - seg.start) < 0.001) {
+      prev.end = seg.end
+    } else {
+      merged.push({ ...seg })
+    }
+  }
+
+  const stops: LineColorStop[] = []
+  for (const seg of merged) {
+    stops.push({ offset: seg.start, color: seg.color })
+    stops.push({ offset: seg.end, color: seg.color })
+  }
+  if (stops[0]!.offset > 0) {
+    stops.unshift({ offset: 0, color: stops[0]!.color })
+  }
+  if (stops[stops.length - 1]!.offset < 1) {
+    stops.push({ offset: 1, color: stops[stops.length - 1]!.color })
+  }
+  return stops
+}
+
+function solidBarFill(segments: BarColorSegment[], active: boolean): string {
+  const color = segments[0]?.color || BAR_DEFAULT_FILL
+  if (!active) return color
+  if (color === BAR_DEFAULT_FILL) return BAR_DEFAULT_FILL_ACTIVE
+  return darkenColor(color)
 }
 
 /** Left gutter wide enough for the longest Y tick, no larger. */
@@ -432,6 +844,8 @@ function roundedBarStrokePath(
 
 export function IndexTrendChart({
   index,
+  eras = [],
+  showBarValues = true,
   highlightBand = null,
   highlightBands,
   uiScale: uiScaleProp,
@@ -448,6 +862,11 @@ export function IndexTrendChart({
   const chartType = index.chartType === 'pie' || index.chartType === 'bar'
     ? index.chartType
     : 'line'
+  const yearOnly = useMemo(() => isYearOnlySeries(points), [points])
+  const colorSeriesByEra =
+    (chartType === 'bar' || chartType === 'line') && eras.length > 0
+  const colorBarsByEra = colorSeriesByEra && chartType === 'bar'
+  const colorLineByEra = colorSeriesByEra && chartType === 'line'
 
   useLayoutEffect(() => {
     const node = wrapRef.current
@@ -573,6 +992,23 @@ export function IndexTrendChart({
         ? ''
         : `${linePath} L${toX(points.length - 1).toFixed(1)},${baselineY.toFixed(1)} L${toX(0).toFixed(1)},${baselineY.toFixed(1)} Z`
 
+    const seriesEdges = getChartSeriesEdgeXs(points.length, 'line', left)
+    const lineColorStops = colorLineByEra
+      ? buildLineEraColorStops(
+          points,
+          eras,
+          yearOnly,
+          toX,
+          seriesEdges.startX,
+          seriesEdges.endX,
+        )
+      : [
+          { offset: 0, color: BAR_DEFAULT_FILL },
+          { offset: 1, color: BAR_DEFAULT_FILL },
+        ]
+    const lineGradientX1 = seriesEdges.startX
+    const lineGradientX2 = seriesEdges.endX
+
     // Bars stay fully inside the plot so they never cover Y-axis labels.
     const slot = plotW / points.length
     const barW = Math.max(2, slot * BAR_SLOT_FILL)
@@ -586,6 +1022,9 @@ export function IndexTrendChart({
       const h = Math.max(Math.abs(zeroY - yVal), minBarH)
       const roundTop = p.value >= 0
       const radius = barCornerRadius(barW, h, scale)
+      const colorSegments = colorBarsByEra
+        ? barColorSegmentsForPoint(p, eras, yearOnly)
+        : [{ color: BAR_DEFAULT_FILL, startFrac: 0, endFrac: 1 }]
       return {
         x,
         y,
@@ -593,8 +1032,10 @@ export function IndexTrendChart({
         h,
         cx,
         cy: yVal,
+        value: p.value,
         d: roundedBarPath(x, y, barW, h, radius, roundTop),
         strokeD: roundedBarStrokePath(x, y, barW, h, radius, roundTop),
+        colorSegments,
       }
     })
 
@@ -652,6 +1093,9 @@ export function IndexTrendChart({
       y: toY(p.value),
       label: p.label,
       value: p.value,
+      color: colorLineByEra
+        ? colorForPoint(p, eras, yearOnly)
+        : BAR_DEFAULT_FILL,
     }))
 
     return {
@@ -666,8 +1110,23 @@ export function IndexTrendChart({
       yMax,
       dots,
       left,
+      lineColorStops,
+      lineGradientX1,
+      lineGradientX2,
+      colorLineByEra,
     }
-  }, [index.chartType, points, scale, plotH, height, minBarH])
+  }, [
+    index.chartType,
+    points,
+    scale,
+    plotH,
+    height,
+    minBarH,
+    colorBarsByEra,
+    colorLineByEra,
+    eras,
+    yearOnly,
+  ])
 
   if (!geometry) {
     return (
@@ -689,6 +1148,10 @@ export function IndexTrendChart({
     yMax,
     dots,
     left,
+    lineColorStops,
+    lineGradientX1,
+    lineGradientX2,
+    colorLineByEra: lineColoredByEra,
   } = geometry
 
   const activeEraBands = (
@@ -787,28 +1250,69 @@ export function IndexTrendChart({
                 />
               )
             })}
-            {activeEraBands.map((band, i) => (
-                <rect
-                  key={`era-hl-${i}-${band.leftPct}-${band.widthPct}`}
-                  className="index-trend-chart__era-highlight"
-                  x={(band.leftPct / 100) * WIDTH}
-                  y={MARGIN.top}
-                  width={(band.widthPct / 100) * WIDTH}
-                  height={plotH}
-                  style={{ fill: eraHighlightFill(band.color) }}
-                  pointerEvents="none"
-                />
-              ))}
+            {/*
+              Selected-era background bands only when the series itself is not
+              already party-colored (bar fills / line stroke+area).
+            */}
+            {!colorSeriesByEra
+              ? activeEraBands.map((band, i) => (
+                  <rect
+                    key={`era-hl-${i}-${band.leftPct}-${band.widthPct}`}
+                    className="index-trend-chart__era-highlight"
+                    x={(band.leftPct / 100) * WIDTH}
+                    y={MARGIN.top}
+                    width={(band.widthPct / 100) * WIDTH}
+                    height={plotH}
+                    style={{ fill: eraHighlightFill(band.color) }}
+                    pointerEvents="none"
+                  />
+                ))
+              : null}
           </>
         ) : null}
 
         {chartType === 'bar'
-          ? bars.map((bar, i) => {
-              const fill = hoverIdx === i ? '#3b7ae6' : '#4890fd'
-              const className =
-                hoverIdx === i
-                  ? 'index-trend-chart__bar index-trend-chart__bar--active'
-                  : 'index-trend-chart__bar'
+          ? (() => {
+              const MIN_BAR_VALUE_FONT = 8
+              const labelPad = Math.max(6, 7 * scale)
+              // One shared size for the whole chart: shrink to fit the
+              // narrowest / longest eligible label, then use it everywhere.
+              let sharedLabelFont = fontSize * 1.15
+              for (const bar of bars) {
+                const label = formatIndexValue(bar.value)
+                const digits = (label.match(/\d/g) || []).length
+                if (digits >= 6) continue
+                const fit =
+                  (bar.w * 0.88) / (Math.max(1, label.length) * 0.62)
+                sharedLabelFont = Math.min(sharedLabelFont, fit)
+              }
+              const sharedLabelsOk =
+                showBarValues && sharedLabelFont >= MIN_BAR_VALUE_FONT
+
+              return bars.map((bar, i) => {
+              const active = hoverIdx === i
+              const segments = bar.colorSegments
+              const split = segments.length > 1
+              const gradientId = `bar-fill-${index.id}-${i}`
+              const fill = split
+                ? `url(#${gradientId})`
+                : solidBarFill(segments, active)
+              const className = active
+                ? 'index-trend-chart__bar index-trend-chart__bar--active'
+                : 'index-trend-chart__bar'
+              const valueLabel = formatIndexValue(bar.value)
+              const digitCount = (valueLabel.match(/\d/g) || []).length
+              const labelFont = sharedLabelFont
+              const labelInside =
+                sharedLabelsOk &&
+                digitCount < 6 &&
+                bar.h >= labelFont + labelPad * 2
+              const positive = bar.value >= 0
+              // White value sits inside the bar near the value end (top for positive).
+              const labelY = positive
+                ? bar.y + labelPad + labelFont * 0.9
+                : bar.y + bar.h - labelPad
+              const scrimId = `bar-scrim-${index.id}-${i}`
               return (
                 <g
                   key={i}
@@ -817,9 +1321,66 @@ export function IndexTrendChart({
                   onMouseLeave={() => setHoverFromMouse(null)}
                   onPointerUp={(e) => onPointPointerUp(i, e)}
                   onClick={stopClick}
-                  style={{ cursor: 'pointer' }}
+                  style={{
+                    cursor: 'pointer',
+                  }}
                 >
+                  <defs>
+                    {split ? (
+                      <linearGradient
+                        id={gradientId}
+                        gradientUnits="objectBoundingBox"
+                        x1="0"
+                        y1="0"
+                        x2="1"
+                        y2="0"
+                      >
+                        {segments.flatMap((seg, segIdx) => {
+                          const start = `${(seg.startFrac * 100).toFixed(3)}%`
+                          const end = `${(seg.endFrac * 100).toFixed(3)}%`
+                          const color = active
+                            ? darkenColor(seg.color)
+                            : seg.color
+                          return [
+                            <stop
+                              key={`${segIdx}-a`}
+                              offset={start}
+                              stopColor={color}
+                            />,
+                            <stop
+                              key={`${segIdx}-b`}
+                              offset={end}
+                              stopColor={color}
+                            />,
+                          ]
+                        })}
+                      </linearGradient>
+                    ) : null}
+                    {labelInside ? (
+                      <linearGradient
+                        id={scrimId}
+                        gradientUnits="objectBoundingBox"
+                        x1="0"
+                        y1={positive ? '0' : '1'}
+                        x2="0"
+                        y2={positive ? '1' : '0'}
+                      >
+                        {/* Soft dark fade behind white value labels. */}
+                        <stop offset="0%" stopColor="#000" stopOpacity="0.28" />
+                        <stop offset="24%" stopColor="#000" stopOpacity="0.1" />
+                        <stop offset="48%" stopColor="#000" stopOpacity="0" />
+                      </linearGradient>
+                    ) : null}
+                  </defs>
                   <path d={bar.d} fill={fill} stroke="none" />
+                  {labelInside ? (
+                    <path
+                      d={bar.d}
+                      fill={`url(#${scrimId})`}
+                      stroke="none"
+                      pointerEvents="none"
+                    />
+                  ) : null}
                   {barStrokeW > 0.35 ? (
                     <path
                       d={bar.strokeD}
@@ -831,24 +1392,71 @@ export function IndexTrendChart({
                       pointerEvents="none"
                     />
                   ) : null}
+                  {labelInside ? (
+                    <text
+                      className="index-trend-chart__bar-value"
+                      x={bar.cx}
+                      y={labelY}
+                      textAnchor="middle"
+                      dominantBaseline="auto"
+                      direction="ltr"
+                      fill="#fff"
+                      fontSize={labelFont}
+                      fontWeight={800}
+                      pointerEvents="none"
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {valueLabel}
+                    </text>
+                  ) : null}
                 </g>
               )
-            })
+              })
+            })()
           : null}
 
         {chartType === 'line' ? (
           <>
+            {lineColoredByEra ? (
+              <defs>
+                <linearGradient
+                  id={`line-era-${index.id}`}
+                  gradientUnits="userSpaceOnUse"
+                  x1={lineGradientX1}
+                  y1={0}
+                  x2={lineGradientX2}
+                  y2={0}
+                >
+                  {lineColorStops.map((stop, stopIdx) => (
+                    <stop
+                      key={`${stopIdx}-${stop.offset}`}
+                      offset={`${(stop.offset * 100).toFixed(3)}%`}
+                      stopColor={stop.color}
+                    />
+                  ))}
+                </linearGradient>
+              </defs>
+            ) : null}
             <path
               d={areaPath}
               className="index-trend-chart__area"
-              fill="rgba(72, 144, 253, 0.18)"
+              fill={
+                lineColoredByEra
+                  ? `url(#line-era-${index.id})`
+                  : 'rgba(72, 144, 253, 0.18)'
+              }
+              fillOpacity={lineColoredByEra ? 0.22 : undefined}
               stroke="none"
             />
             <path
               d={linePath}
               className="index-trend-chart__line"
               fill="none"
-              stroke="#4890fd"
+              stroke={
+                lineColoredByEra
+                  ? `url(#line-era-${index.id})`
+                  : '#4890fd'
+              }
               strokeWidth={lineStroke}
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -871,7 +1479,7 @@ export function IndexTrendChart({
                   cy={dot.y}
                   r={hoverIdx === i ? dotRActive : dotR}
                   className="index-trend-chart__dot"
-                  fill="#4890fd"
+                  fill={dot.color}
                   stroke="#fff"
                   strokeWidth={1.5 * scale}
                   pointerEvents="none"
@@ -899,55 +1507,6 @@ export function IndexTrendChart({
         {/* Axis labels after series so they stay above bars/lines. */}
         {chartType !== 'pie' ? (
           <>
-            {activeEraBands.map((band, i) => {
-              if (band.avg == null || !Number.isFinite(band.avg)) return null
-              const yRange = yMax - yMin || 1
-              const yRaw =
-                MARGIN.top + plotH - ((band.avg - yMin) / yRange) * plotH
-              const y = Math.min(
-                MARGIN.top + plotH,
-                Math.max(MARGIN.top, yRaw),
-              )
-              const x1 = (band.leftPct / 100) * WIDTH
-              const x2 = x1 + (band.widthPct / 100) * WIDTH
-              const stroke = eraStrokeColor(band.color)
-              const labelX = (x1 + x2) / 2
-              const labelY = Math.max(MARGIN.top + fontSize * 0.85, y - 6 * scale)
-              return (
-                <g
-                  key={`era-avg-${i}-${band.leftPct}-${band.avg}`}
-                  className="index-trend-chart__era-avg"
-                  pointerEvents="none"
-                >
-                  <line
-                    x1={x1}
-                    y1={y}
-                    x2={x2}
-                    y2={y}
-                    stroke={stroke}
-                    strokeWidth={Math.max(1.5, 2 * scale)}
-                    strokeDasharray={`${7 * scale} ${5 * scale}`}
-                    strokeLinecap="round"
-                  />
-                  <text
-                    x={labelX}
-                    y={labelY}
-                    textAnchor="middle"
-                    dominantBaseline="auto"
-                    direction="ltr"
-                    fill="#111"
-                    stroke="#fff"
-                    strokeWidth={Math.max(2.5, 3 * scale)}
-                    paintOrder="stroke"
-                    fontSize={fontSize}
-                    fontWeight={800}
-                    style={{ fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {formatIndexValue(band.avg)}
-                  </text>
-                </g>
-              )
-            })}
             {yTicks.map((tick) => {
               const y =
                 MARGIN.top +
