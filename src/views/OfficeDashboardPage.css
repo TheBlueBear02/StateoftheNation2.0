@@ -908,6 +908,59 @@
   text-decoration: underline;
 }
 
+/* Round PM / minister eras toggle — sits to the physical right of מקור. */
+.office-dashboard__pm-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--color-blue);
+  border-radius: 999px;
+  background: var(--color-white);
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.office-dashboard__pm-switch:hover {
+  border-color: var(--color-blue-dark, #2f6fd6);
+}
+
+.office-dashboard__pm-switch:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+}
+
+.office-dashboard__pm-switch--on {
+  background: var(--color-blue);
+  border-color: var(--color-blue);
+}
+
+.office-dashboard__pm-switch-knob {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-blue);
+  transform: translateY(-50%);
+  transition:
+    left 0.18s ease,
+    background-color 0.18s ease;
+  pointer-events: none;
+}
+
+.office-dashboard__pm-switch--on .office-dashboard__pm-switch-knob {
+  left: calc(100% - 21px);
+  background: var(--color-white);
+}
+
 .office-dashboard__chart-hint {
   margin: 0;
   padding: 18px;

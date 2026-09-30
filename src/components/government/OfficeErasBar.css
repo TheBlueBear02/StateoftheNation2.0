@@ -547,10 +547,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
   width: 100%;
   max-width: 100%;
-  font-size: 0.7rem;
+  font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.2;
   text-align: center;
@@ -571,9 +571,9 @@
   max-width: 100%;
   /* Scale with digit count so long values (e.g. 44,099.5) stay inside the circle */
   font-size: clamp(
-    0.95rem,
-    calc(84px / (var(--delta-chars, 5) * 0.62)),
-    2.15rem
+    1.15rem,
+    calc(96px / (var(--delta-chars, 5) * 0.62)),
+    2.55rem
   );
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -682,14 +682,14 @@
   }
 
   .office-eras-bar__detail-delta-badge-text {
-    font-size: 0.62rem;
+    font-size: 0.76rem;
   }
 
   .office-eras-bar__detail-delta-badge-value {
     font-size: clamp(
-      0.85rem,
-      calc(72px / (var(--delta-chars, 5) * 0.62)),
-      1.7rem
+      1rem,
+      calc(84px / (var(--delta-chars, 5) * 0.62)),
+      2rem
     );
   }
 
