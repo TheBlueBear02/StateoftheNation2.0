@@ -13,6 +13,25 @@ dist-ssr
 .next
 out
 *.local
+tsconfig.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Pipeline / scrape scratch
+Layer 1 - Gathering Data/**/.cache/
+Layer 1 - Gathering Data/Offices/.kpi_cache/
+Layer 1 - Gathering Data/**/pipeline_last_run.json
+Layer 1 - Gathering Data/**/stderr.txt
+Layer 1 - Gathering Data/**/_debug_*.txt
+Layer 1 - Gathering Data/Offices/=
+tmp_*.py
+tmp_*.ts
 
 # Editor directories and files
 .vscode/*
@@ -25,3 +44,5 @@ out
 *.sln
 *.sw?
 .env
+# Office KPI pipeline run output
+Layer 1 - Gathering Data/Offices/attention.md

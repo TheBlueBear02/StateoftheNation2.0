@@ -47,6 +47,26 @@ SKIP_PARTY_LABELS = re.compile(
 )
 
 FOOTNOTE = re.compile(r"\s*\[[^\]]*\]\s*")
+# Wikipedia occasionally emits broken markup like colspan="2data-sort-value=\"\""
+# (missing quote between colspan value and the next attribute). Take the leading int.
+SPAN_INT = re.compile(r"^\d+")
+
+
+def _span_int(raw: object, default: int = 1) -> int:
+    """Parse HTML colspan/rowspan, tolerating glued sibling attributes."""
+    if raw is None:
+        return default
+    if isinstance(raw, list):
+        raw = raw[0] if raw else default
+    text = str(raw).strip()
+    if not text:
+        return default
+    if text.isdigit():
+        return int(text)
+    m = SPAN_INT.match(text)
+    if m:
+        return int(m.group())
+    return default
 
 
 def _strip_footnotes(text: str) -> str:
@@ -169,8 +189,8 @@ def _place_header_row(
             col += 1
 
         text = _clean_party_label(cell.get_text(" ", strip=True))
-        colspan = int(cell.get("colspan", 1))
-        rowspan = int(cell.get("rowspan", 1))
+        colspan = _span_int(cell.get("colspan"), 1)
+        rowspan = _span_int(cell.get("rowspan"), 1)
 
         for c in range(colspan):
             while len(grid[row_idx]) <= col + c:
@@ -233,7 +253,7 @@ def _expand_row_cells(tr: Tag) -> list[tuple[str, bool]]:
     expanded: list[tuple[str, bool]] = []
     for cell in tr.find_all(["td", "th"]):
         text = cell.get_text(" ", strip=True)
-        colspan = int(cell.get("colspan", 1))
+        colspan = _span_int(cell.get("colspan"), 1)
         expanded.append((text, False))
         for _ in range(colspan - 1):
             expanded.append((text, True))

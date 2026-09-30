@@ -245,7 +245,7 @@ KPI definitions attached to a government office. Each index defines one trackabl
 | `is_shown` | boolean | Whether to show on the dashboard |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** Curated. Seeded from the old Flask `sn.db` by `Layer 1 - Gathering Data/knesset/seed_office_dashboard.py` (idempotent upsert by `office_id` + `name`). No automated sync.
+**Data source:** Curated. Seeded from the old Flask `sn.db` by `Layer 1 - Gathering Data/knesset/seed_office_dashboard.py` (idempotent upsert by `office_id` + `name`). Definitions are curated; data points are refreshed by the office KPI pipeline.
 
 **Used by:** `/government/dashboard` via `fetchOfficeDashboard.ts`.
 
@@ -267,6 +267,7 @@ Time-series data points for each index.
 **Constraints:** `UNIQUE (index_id, recorded_at)` — required for seed upserts (`schema_office_dashboard.sql`).
 
 **Data source:** Same seed script. Upserts on `(index_id, recorded_at)`.
+Since 2026-09 also refreshed nightly by the office KPI pipeline (`Layer 1 - Gathering Data/Offices/`, see [OfficeKpiPipeline.md](./OfficeKpiPipeline.md)). New values are staged in `index_data_candidates` (provenance + review status) and planner state lives in `kpi_check_state`; DDL in `Offices/schema_office_kpi_pipeline.sql`.
 
 **RLS:** anon SELECT — see `Layer 1 - Gathering Data/schema_office_dashboard.sql`.
 
