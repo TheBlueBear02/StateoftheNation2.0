@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { SiteLayout } from '../components/SiteLayout'
 import { KnessetHemicycle } from '../components/knesset/KnessetHemicycle'
@@ -76,26 +77,32 @@ export function KnessetPage() {
                   {title}
                 </h1>
 
-                <label className="knesset-page__picker">
-                  <select
-                    className="knesset-page__picker-select"
-                    value={selectedKnesset?.id ?? ''}
-                    onChange={(event) => {
-                      const nextTerm = knessets.find(
-                        (term) => term.id === Number(event.target.value),
-                      )
-                      setSelectedKnesset(nextTerm ?? null)
-                    }}
-                    disabled={listLoading || knessets.length === 0}
-                    aria-label="בחירת כנסת"
-                  >
-                    {knessets.map((term) => (
-                      <option key={term.id} value={term.id}>
-                        {formatKnessetLabel(term)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="knesset-page__header-actions">
+                  <Link href="/knesset/committees" className="knesset-page__committees-link">
+                    ועדות הכנסת
+                  </Link>
+
+                  <label className="knesset-page__picker">
+                    <select
+                      className="knesset-page__picker-select"
+                      value={selectedKnesset?.id ?? ''}
+                      onChange={(event) => {
+                        const nextTerm = knessets.find(
+                          (term) => term.id === Number(event.target.value),
+                        )
+                        setSelectedKnesset(nextTerm ?? null)
+                      }}
+                      disabled={listLoading || knessets.length === 0}
+                      aria-label="בחירת כנסת"
+                    >
+                      {knessets.map((term) => (
+                        <option key={term.id} value={term.id}>
+                          {formatKnessetLabel(term)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
             </header>
 

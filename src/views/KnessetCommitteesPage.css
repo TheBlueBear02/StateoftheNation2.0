@@ -1,0 +1,956 @@
+.committees-page__main {
+  padding-block: clamp(24px, 4vw, 48px);
+}
+
+.committees-page__inner {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 3vw, 28px);
+}
+
+.committees-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.committees-page__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+
+.committees-page__title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.committees-page__back {
+  color: var(--color-blue);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.committees-page__back:hover {
+  color: var(--color-blue-dark);
+  text-decoration: underline;
+}
+
+.committees-page__subtitle {
+  margin: 0;
+  font-size: clamp(1rem, 2.2vw, 1.125rem);
+  color: var(--color-text-muted);
+  max-width: 42rem;
+}
+
+.committees-page__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 20px;
+}
+
+.committees-page__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  min-height: 40px;
+}
+
+/* Custom select — keeps closed trigger truncated; open menu stays in viewport
+   and wraps long committee names instead of overflowing the screen. */
+.committee-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  max-width: 100%;
+}
+
+.committee-select__label {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.committee-select__field {
+  position: relative;
+  min-width: 0;
+  width: min(100vw - 96px, 320px);
+  max-width: 100%;
+}
+
+.committee-select__trigger {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  padding-inline-end: 40px;
+  border: 1px solid #ddd;
+  border-radius: 0;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%231a1a1a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: left 14px center;
+  background-repeat: no-repeat;
+  background-size: 12px 8px;
+  color: var(--color-text);
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+
+.committee-select__trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.committee-select__trigger-text {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.committee-select__menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  inset-inline-start: 0;
+  inset-inline-end: auto;
+  box-sizing: border-box;
+  width: min(100vw - 32px, 420px);
+  max-width: min(100vw - 32px, 420px);
+  max-height: min(50vh, 360px);
+  overflow: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #ddd;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.committee-select__option {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.committee-select__option:hover,
+.committee-select__option:focus-visible {
+  background: #f5f8ff;
+  outline: none;
+}
+
+.committee-select__option--selected {
+  background: #eef4ff;
+  font-weight: 700;
+  color: var(--color-blue-dark);
+}
+
+.committee-select__empty {
+  padding: 10px 14px;
+  color: var(--color-text-muted);
+}
+
+.committees-page__error,
+.committees-page__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.committees-page__error {
+  color: var(--color-alert);
+}
+
+.committees-page__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  /* Keep table on the left and chat on the right regardless of page RTL. */
+  direction: ltr;
+}
+
+.committees-page__stage > * {
+  direction: rtl;
+}
+
+.committees-page__stage-table {
+  min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .committees-page__stage {
+    grid-template-columns: minmax(280px, 400px) minmax(0, 1fr);
+    gap: 24px;
+    min-height: min(75vh, 760px);
+  }
+
+  .committees-page__stage-table {
+    display: flex;
+    align-items: center;
+  }
+}
+
+@media (max-width: 959px) {
+  .committees-page__stage {
+    grid-template-rows: auto minmax(280px, 48vh);
+  }
+
+  .committee-table {
+    max-width: min(300px, 100%);
+  }
+
+  .committee-table__svg {
+    max-height: 42vh;
+  }
+}
+
+.committees-page__stage-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Table — vertical hollow oval, polished dark wood */
+.committee-table {
+  width: 100%;
+  max-width: 400px;
+  margin-inline: auto;
+}
+
+.committee-table__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: transparent;
+}
+
+.committee-table__void {
+  fill: #f3eee7;
+}
+
+.committee-table__rim--outer {
+  stroke: rgba(20, 10, 4, 0.55);
+  stroke-width: 2.5;
+}
+
+.committee-table__rim--inner {
+  stroke: rgba(255, 220, 180, 0.18);
+  stroke-width: 2;
+}
+
+.committee-table__overflow {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.committee-seat {
+  outline: none;
+}
+
+.committee-seat:focus,
+.committee-seat:focus-visible {
+  outline: none;
+}
+
+.committee-seat__ring {
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 2;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+/* Speaking uses a soft white pulse — blue ring is reserved for selection. */
+.committee-seat--speaking .committee-seat__ring {
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
+}
+
+.committee-seat--selected .committee-seat__ring {
+  stroke: var(--color-blue);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 5px rgba(72, 144, 253, 0.55));
+}
+
+.committee-seat--selected.committee-seat--speaking .committee-seat__ring {
+  stroke: var(--color-blue);
+  stroke-width: 4.5;
+}
+
+.committee-seat__disc {
+  stroke: rgba(40, 24, 12, 0.35);
+  stroke-width: 1;
+}
+
+.committee-seat__initials {
+  fill: var(--color-text-muted);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.committee-seat--counsel {
+  opacity: 0.9;
+}
+
+.committee-seat--counsel .committee-seat__ring {
+  stroke: rgba(90, 70, 50, 0.45);
+  stroke-dasharray: 3 2;
+}
+
+.committee-seat--absent {
+  opacity: 0.72;
+}
+
+.committee-seat--absent .committee-seat__photo {
+  filter: grayscale(1) brightness(0.92);
+}
+
+.committee-seat--absent .committee-seat__ring {
+  stroke: rgba(140, 140, 140, 0.65);
+}
+
+.committee-seat--absent .committee-seat__disc {
+  fill: #e8e8e8;
+}
+
+.committee-seat--absent .committee-seat__initials {
+  fill: #8a8a8a;
+}
+
+/* WhatsApp-style transcript chat */
+.committee-chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 280px;
+  height: 100%;
+  max-height: min(75vh, 760px);
+  background: #ece5dd;
+  border: 1px solid #d9d0c5;
+  overflow: hidden;
+}
+
+.committee-chat__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--color-blue);
+  border-bottom: 1px solid var(--color-blue-dark);
+  flex-shrink: 0;
+}
+
+.committee-chat__header-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.committee-chat__header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.committee-chat__title {
+  margin: 0;
+  font-size: 1.22rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.committee-chat__session-when {
+  margin: 0;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 500;
+}
+
+.committee-chat__subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.88);
+  flex-shrink: 0;
+}
+
+.committee-chat__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 12px 8px;
+  background: #f0ebe3;
+  border-top: 1px solid #d9d0c5;
+  flex-shrink: 0;
+}
+
+.committee-chat__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.committee-chat__btn {
+  padding: 7px 12px;
+  border: 1px solid #cfc5b8;
+  background: #fff;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.committee-chat__btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.committee-chat__btn--play {
+  width: 38px;
+  height: 38px;
+}
+
+.committee-chat__icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.committee-chat__btn--play .committee-chat__icon {
+  width: 20px;
+  height: 20px;
+}
+
+.committee-chat__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.committee-chat__btn--primary {
+  background: var(--color-blue);
+  border-color: var(--color-blue);
+  color: #fff;
+  font-weight: 700;
+}
+
+.committee-chat__btn--primary:hover:not(:disabled) {
+  background: var(--color-blue-dark);
+  border-color: var(--color-blue-dark);
+}
+
+.committee-chat__btn--small {
+  padding: 5px 10px;
+  font-size: 0.85rem;
+  border-radius: 0;
+  width: auto;
+  height: auto;
+}
+
+.committee-chat__track {
+  height: 3px;
+  background: #ddd4c8;
+  overflow: hidden;
+}
+
+.committee-chat__fill {
+  height: 100%;
+  background: var(--color-blue);
+  transition: width 0.25s ease;
+}
+
+.committee-chat__filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  background: #e8f1ff;
+  border-bottom: 1px solid rgba(72, 144, 253, 0.28);
+  flex-shrink: 0;
+}
+
+.committee-chat__filter-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--color-blue-dark);
+  font-weight: 600;
+  min-width: 0;
+}
+
+.committee-chat__filter-photo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.committee-chat__filter-photo--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.committee-chat__filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.committee-chat__thread {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-behavior: smooth;
+  background-color: #ece5dd;
+  background-image: url('/images/Knesset Committees/whatsapp bg.png');
+  background-repeat: repeat;
+  background-size: 360px auto;
+  background-position: top center;
+  scrollbar-width: thin;
+  scrollbar-color: #d2c0a8 #f4efe8;
+}
+
+.committee-chat__thread::-webkit-scrollbar {
+  width: 10px;
+}
+
+.committee-chat__thread::-webkit-scrollbar-track {
+  margin-block: 6px;
+  background: #f4efe8;
+  border-radius: 999px;
+}
+
+.committee-chat__thread::-webkit-scrollbar-thumb {
+  background: #d2c0a8;
+  border-radius: 999px;
+  border: 2px solid #f4efe8;
+  background-clip: padding-box;
+}
+
+.committee-chat__thread::-webkit-scrollbar-thumb:hover {
+  background: #c4ae94;
+  border: 2px solid #f4efe8;
+  background-clip: padding-box;
+}
+
+.committee-chat__thread::-webkit-scrollbar-button {
+  display: block;
+  height: 10px;
+  background: #d2c0a8;
+  border: 2px solid #f4efe8;
+  background-clip: padding-box;
+}
+
+.committee-chat__thread::-webkit-scrollbar-button:hover {
+  background: #c4ae94;
+}
+
+.committee-chat__thread::-webkit-scrollbar-button:single-button:vertical:decrement {
+  border-radius: 999px 999px 2px 2px;
+}
+
+.committee-chat__thread::-webkit-scrollbar-button:single-button:vertical:increment {
+  border-radius: 2px 2px 999px 999px;
+}
+
+.committee-chat__thread::-webkit-scrollbar-corner {
+  background: #f4efe8;
+}
+
+.committee-chat__empty {
+  margin: auto;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.committee-chat__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(100%, 520px);
+  transition: opacity 0.2s ease;
+}
+
+.committee-chat__row--dimmed {
+  opacity: 0.28;
+}
+
+.committee-chat__row--selected-speaker .committee-chat__bubble {
+  border-color: rgba(72, 144, 253, 0.55);
+  box-shadow: 0 0 0 2px rgba(72, 144, 253, 0.18);
+}
+
+.committee-chat__row--active .committee-chat__bubble {
+  border-color: var(--color-blue);
+  box-shadow: 0 0 0 3px rgba(72, 144, 253, 0.28);
+}
+
+.committee-chat__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.committee-chat__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.committee-chat__bubble {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fff;
+  color: var(--color-text);
+  text-align: right;
+  padding: 8px 11px 10px;
+  border-radius: 14px 14px 4px 14px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.committee-chat__bubble:hover {
+  border-color: rgba(72, 144, 253, 0.35);
+}
+
+.committee-chat__bubble:focus,
+.committee-chat__bubble:focus-visible {
+  outline: none;
+}
+
+.committee-chat__bubble-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+}
+
+.committee-chat__bubble-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--color-blue-dark);
+}
+
+.committee-chat__bubble-party {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.committee-chat__bubble-body {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.committee-chat__system {
+  align-self: center;
+  width: fit-content;
+  max-width: min(92%, 420px);
+  margin-inline: auto;
+  transition: opacity 0.2s ease;
+}
+
+.committee-chat__system--dimmed {
+  opacity: 0.3;
+}
+
+.committee-chat__system--active .committee-chat__system-btn {
+  box-shadow:
+    0 0 0 2px rgba(72, 144, 253, 0.35),
+    0 1px 1px rgba(0, 0, 0, 0.08);
+}
+
+.committee-chat__system-btn {
+  appearance: none;
+  width: 100%;
+  border: none;
+  background: #fff3c5;
+  color: #54656f;
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: center;
+  padding: 8px 12px 9px;
+  border-radius: 8px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.committee-chat__system-btn:hover {
+  background: #ffefb3;
+}
+
+.committee-chat__system-btn:focus,
+.committee-chat__system-btn:focus-visible {
+  outline: none;
+}
+
+.committee-chat__system-btn strong {
+  color: #3b4a54;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.committee-chat__system-btn span {
+  white-space: pre-wrap;
+  color: #54656f;
+}
+
+/* Play bar / speech / MK panel — kept for older embeds; unused on current page */
+.committee-play-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.committee-play-bar__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.committee-play-bar__btn {
+  padding: 8px 14px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.committee-play-bar__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.committee-play-bar__btn--primary {
+  background: var(--color-blue);
+  border-color: var(--color-blue);
+  color: #fff;
+  font-weight: 700;
+}
+
+.committee-play-bar__btn--primary:hover:not(:disabled) {
+  background: var(--color-blue-dark);
+  border-color: var(--color-blue-dark);
+}
+
+.committee-play-bar__meta {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.committee-play-bar__track {
+  height: 6px;
+  background: #e8e8e8;
+  overflow: hidden;
+}
+
+.committee-play-bar__fill {
+  height: 100%;
+  background: var(--color-blue);
+  transition: width 0.2s ease;
+}
+
+/* Speech */
+.committee-speech {
+  padding: 16px 18px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  min-height: 5.5rem;
+}
+
+.committee-speech__speaker {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.committee-speech__body {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  color: var(--color-text);
+}
+
+.committee-speech__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* MK panel */
+.committee-mk-panel {
+  background: #fff;
+  border: 1px solid #eee;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(80vh, 720px);
+  overflow: auto;
+}
+
+.committee-mk-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.committee-mk-panel__identity {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.committee-mk-panel__photo {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #f0f0f0;
+}
+
+.committee-mk-panel__photo--placeholder {
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.committee-mk-panel__name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.committee-mk-panel__role {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.committee-mk-panel__close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  padding: 4px;
+}
+
+.committee-mk-panel__count {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.committee-mk-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.committee-mk-panel__part {
+  width: 100%;
+  text-align: right;
+  border: 1px solid #eee;
+  background: #fafafa;
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.committee-mk-panel__part:hover {
+  border-color: var(--color-blue);
+}
+
+.committee-mk-panel__ordinal {
+  font-size: 0.8rem;
+  color: var(--color-blue);
+  font-weight: 700;
+}
+
+.committee-mk-panel__excerpt {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-text);
+}

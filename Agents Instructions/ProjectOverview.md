@@ -184,6 +184,7 @@ npm run lint
 | [HomePage.md](./HomePage.md) | `/` |
 | [LegalPages.md](./LegalPages.md) | `/about`, `/terms` (footer only) |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` + `/knesset/edit` |
+| [KnessetCommitteesPage.md](./KnessetCommitteesPage.md) | `/knesset/committees` — K25 committees table + transcript Play |
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` dashboard + `/piplines/docs` |
 | [ElectionsPage.md](./ElectionsPage.md) | `/elections` module |
 | [PollsPage.md](./PollsPage.md) | `/elections/polls` |

@@ -6,11 +6,12 @@ Reference doc for all Supabase tables. Covers what each table stores, where its 
 
 ## Overview
 
-The schema is split into four logical groups:
+The schema is split into these logical groups:
 
 | Group | Tables | Status |
 |-------|--------|--------|
 | **Knesset** | `people` · `knessets` · `knesset_factions` · `knesset_memberships` | Live — powers the Knesset page |
+| **Committees** | `knesset_committees` · `knesset_committee_memberships` · `knesset_committee_sessions` · `knesset_committee_session_documents` · `knesset_committee_session_transcripts` · `knesset_committee_transcript_parts` · `knesset_committee_session_attendance` | Live — ingest + `/knesset/committees` |
 | **Government** | `governments` · `offices` · `minister_appointments` | Seeded — powers the Government page |
 | **KPI data** | `indexes` · `index_data` | Live — `/government/dashboard` |
 | **Elections** | `elections` · `election_parties` · `election_candidates` · `raw_candidate_lists` · `dream_cabinet_picks` | Live — `/elections`, party detail, lists game, dream government, edit |
@@ -27,6 +28,13 @@ All data is populated and kept current by Python scripts in `Layer 1 - Gathering
 people ──────────────────┬── knesset_memberships ── knessets
         │                │         └── knesset_factions
         │                │
+        ├── knesset_committee_memberships ── knesset_committees ── knessets
+        │         │                              └── knesset_committee_sessions
+        │         │                                        ├── documents
+        │         │                                        ├── transcripts ── transcript_parts
+        │         │                                        └── attendance
+        │         └── (transcript_parts.person_id)
+        │
         ├── minister_appointments ── governments ── knessets
         │         └── offices
         │
@@ -153,6 +161,150 @@ Records each person's membership as an MK in a specific Knesset, within a specif
 - `end_date` comes from `KNS_PersonToPosition.FinishDate` (not `EndDate`) in the OData API.
 - Coalition status is **not** stored on memberships — use `knesset_factions.is_coalition` (joined via `faction_id`).
 - “Current MK” for a term snapshot is derived from date ranges (`end_date` null / overlapping ref date), not from a membership boolean.
+- Do **not** use `committee_role` for the committees product — seat membership lives in `knesset_committee_memberships`.
+
+---
+
+## Committees Group
+
+Schema file: `Layer 1 - Gathering Data/knesset/schema_knesset_committees.sql` (apply in Supabase SQL Editor). Product vision: [KnessetCommitteesPage.md](./KnessetCommitteesPage.md).
+
+**Scope:** First ingest targets **Knesset 25** only (`knessets.knesset_number = 25`); tables are term-scoped via `knesset_id` so later terms can be added without redesign.
+
+**Source split (important):**
+| Data | Source | Notes |
+|------|--------|-------|
+| Committees, sessions | Knesset OData `ParliamentInfo.svc` | `KNS_Committee`, `KNS_CommitteeSession` |
+| Protocol file URLs | Hasadna document dump (`GroupTypeID=23`); OData fallback | `FilePath` / `file_url` |
+| Committee seat membership + roles | Hasadna `mk_individual_committees.csv` | Live OData `KNS_PersonToPosition.CommitteeID` / committee PositionIDs are **empty** for K20–25 |
+| Full transcript text + speaker parts | Hasadna `meeting_protocols_text` / `meeting_protocols_parts` | Via `kns_committeesession` filename columns |
+| Attendance | Protocol `נכחו` + `חברי הכנסת` parts (parsed into `knesset_committee_session_attendance`; includes guest MKs) | Not in OData; filled on transcript sync / `--table attendance` |
+
+**RLS:** anon SELECT on all committees tables; writes via `SUPABASE_SERVICE_KEY` only.
+
+### `knesset_committees`
+
+One parliamentary committee (ועדה) in a Knesset term.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `knesset_committee_id` | integer | OData `KNS_Committee.CommitteeID`. UNIQUE. |
+| `knesset_id` | bigint | FK → `knessets.id` |
+| `name` | text | Committee name |
+| `committee_type_id` / `committee_type_desc` | integer / text | e.g. ראשית / מיוחדת / משנה |
+| `additional_type_id` / `additional_type_desc` | integer / text | e.g. קבועה / מיוחדת |
+| `parent_committee_id` | integer | OData parent CommitteeID (no FK initially) |
+| `start_date` / `end_date` | date | Term of the committee |
+| `is_current` | boolean | OData `IsCurrent` |
+| `email` | text | Optional contact |
+| `created_at` / `updated_at` | timestamptz | |
+
+**Upsert key:** `knesset_committee_id`.
+
+### `knesset_committee_memberships`
+
+Who sits on a committee — drives the hollow-table seat layout (chair at head).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `committee_id` | bigint | FK → `knesset_committees.id` ON DELETE CASCADE |
+| `person_id` | bigint | FK → `people.id` |
+| `knesset_position_id` | integer | Position catalog: 41 יו״ר · 42/66 חבר · 67 ממלא מקום · 663 משקיף |
+| `role_desc` | text | Hebrew position name from source |
+| `seat_role` | text | Normalized UI role: `chair` \| `member` \| `alternate` \| `observer` |
+| `start_date` / `end_date` | date | Membership stretch |
+| `created_at` / `updated_at` | timestamptz | |
+
+**Natural key:** unique `(committee_id, person_id, start_date)` with `NULLS NOT DISTINCT`.
+
+**Notes:** Legal counsel (יועמ״ש) is UI-only — no membership row / no photo. Prefer this table over unused `knesset_memberships.committee_role`.
+
+### `knesset_committee_sessions`
+
+One committee meeting (ישיבה).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `knesset_session_id` | integer | OData `CommitteeSessionID`. UNIQUE. |
+| `committee_id` | bigint | FK → `knesset_committees.id` ON DELETE CASCADE |
+| `session_number` | integer | Session ordinal when present |
+| `session_type_id` / `session_type_desc` | integer / text | 161 פתוחה · 160 חסויה |
+| `status_id` / `status_desc` | integer / text | e.g. פעילה / מבוטלת |
+| `location` | text | |
+| `session_url` / `broadcast_url` | text | |
+| `note` | text | |
+| `start_at` / `finish_at` | timestamptz | Meeting window |
+| `created_at` / `updated_at` | timestamptz | |
+
+**Upsert key:** `knesset_session_id`.
+
+### `knesset_committee_session_documents`
+
+Attached session files (protocols and related).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `knesset_document_id` | bigint | OData `DocumentCommitteeSessionID`. UNIQUE. |
+| `session_id` | bigint | FK → `knesset_committee_sessions.id` ON DELETE CASCADE |
+| `group_type_id` / `group_type_desc` | integer / text | **23** = פרוטוקול ועדה |
+| `application_desc` | text | DOC / PDF / … |
+| `file_url` | text | Official `FilePath` on fs.knesset.gov.il |
+| `sha256` / `storage_path` | text | Optional mirror into Supabase Storage |
+| `fetched_at` | timestamptz | When the file was last fetched |
+| `created_at` | timestamptz | |
+
+### `knesset_committee_session_transcripts`
+
+One normalized full-text transcript per session.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `session_id` | bigint | FK → sessions. UNIQUE (one transcript per session). |
+| `document_id` | bigint | FK → documents ON DELETE SET NULL |
+| `full_text` | text | Entire protocol text |
+| `source` | text | `hasadna` \| `parsed_file` \| `manual` |
+| `parse_status` | text | `pending` \| `ready` \| `failed` \| `partial` |
+| `parsed_at` | timestamptz | |
+| `error` | text | Failure detail when `failed` / `partial` |
+| `created_at` / `updated_at` | timestamptz | |
+
+### `knesset_committee_transcript_parts`
+
+Ordered speaker turns — Play UI, per-MK filter, keyword search.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `transcript_id` | bigint | FK → transcripts ON DELETE CASCADE |
+| `session_id` | bigint | FK → sessions (denormalized for simpler queries) |
+| `ordinal` | integer | Playback order (≥ 0). UNIQUE with `transcript_id`. |
+| `speaker_header` | text | Raw protocol speaker line |
+| `person_id` | bigint | FK → `people.id` ON DELETE SET NULL — null for staff / unmatched |
+| `body` | text | Spoken / attributed text |
+| `start_offset_ms` | integer | Reserved for timed Play; null until a timing source exists |
+| `created_at` | timestamptz | |
+
+**Indexes:** `(session_id, ordinal)`, `(session_id, person_id)`, GIN `to_tsvector('simple', speaker_header || body)` for keyword search.
+
+### `knesset_committee_session_attendance`
+
+Per-session presence of MKs, parsed from protocol transcript parts with `speaker_header` in (`נכחו`, `חברי הכנסת`, …). Includes committee members and **guest MKs** who attended but are not on the committee roster. Written by `load_knesset_committees.py` during transcript sync and via `--table attendance` backfill. `source` is typically `protocol_nochachu`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | bigint | Primary key |
+| `session_id` | bigint | FK → sessions ON DELETE CASCADE |
+| `person_id` | bigint | FK → `people.id` ON DELETE CASCADE |
+| `attended` | boolean | True when listed as present |
+| `source` | text | Provenance label (`protocol_nochachu`) |
+| `created_at` | timestamptz | |
+
+**Natural key:** UNIQUE `(session_id, person_id)`.
 
 ---
 
@@ -642,6 +794,7 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 | Script | Tables updated | Trigger |
 |--------|---------------|---------|
 | `load_all_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Weekly Saturday midnight Israel (GitHub Actions: `.github/workflows/knesset-pipeline.yml`) |
+| `load_knesset_committees.py` | `knesset_committees` · `knesset_committee_memberships` · `knesset_committee_sessions` · `knesset_committee_session_documents` · `knesset_committee_session_transcripts` · `knesset_committee_transcript_parts` | Same weekly workflow (after main knesset sync). OData + Hasadna. Default: newest **200** missing transcripts/run |
 | `seed_office_dashboard.py` | `offices.is_shown` / `info` · `indexes` · `index_data` | Manual — migrate curated KPI data from old sn.db |
 | `insert_raw_list.py` | `raw_candidate_lists` | Manual — when a party publishes their list |
 | `run_pipeline.py` | `election_candidates` · `people` (enrichment) | Manual — after each `insert_raw_list.py` run |
@@ -666,9 +819,14 @@ Live on Supabase (applied; one-shot migration scripts removed from the repo). In
 | `raw_poll_rows` UNIQUE `(natural_key, content_hash)` | Dedup staging payloads |
 | `dream_cabinet_picks` UNIQUE `(election_id, client_id, office_id)` | One current dream-gov vote per browser per seat |
 | `pollster_house_effects` UNIQUE `(pollster, party_id, as_of_date)` | Idempotent house-effect upserts |
+| `knesset_committees` UNIQUE `knesset_committee_id`; sessions UNIQUE `knesset_session_id`; documents UNIQUE `knesset_document_id` | OData upsert keys |
+| `knesset_committee_memberships` UNIQUE `(committee_id, person_id, start_date)` NULLS NOT DISTINCT | One stretch per person/committee/start |
+| `knesset_committee_session_transcripts` UNIQUE `session_id` | One transcript per session |
+| `knesset_committee_transcript_parts` UNIQUE `(transcript_id, ordinal)` | Ordered speaker turns |
+| `knesset_committee_session_attendance` UNIQUE `(session_id, person_id)` | One attendance row per MK per session |
 | Partial unique on `knessets.is_active` / `governments.is_active` | At most one active term/government |
-| Date-order CHECKs | `end_date >= start_date` (or null end) on terms, memberships, appointments, factions, poll fieldwork |
-| Domain CHECKs | `people.gender`, poll seats `0..120`, `sample_size > 0`, aggregate `method`, `indexes.chart_type`, `list_position >= 1` |
+| Date-order CHECKs | `end_date >= start_date` (or null end) on terms, memberships, appointments, factions, poll fieldwork, committee memberships; `finish_at >= start_at` on sessions |
+| Domain CHECKs | `people.gender`, poll seats `0..120`, `sample_size > 0`, aggregate `method`, `indexes.chart_type`, `list_position >= 1`, committee `seat_role` / transcript `source` / `parse_status` |
 
 ---
 
@@ -679,6 +837,7 @@ Live on Supabase (applied; one-shot migration scripts removed from the repo). Co
 | Area | Indexes |
 |------|---------|
 | Knesset / government | `knesset_memberships` (person, knesset, faction); `knesset_factions(knesset_id)`; `minister_appointments` (person, government, office); `governments(knesset_id)` |
+| Committees | `knesset_committees(knesset_id)`; memberships (committee, person, seat_role); sessions `(committee_id, start_at)`; documents by session (+ partial protocol `group_type_id=23`); parts `(session_id, ordinal)` / `(session_id, person_id)`; GIN FTS on parts body |
 | Elections | `election_candidates` (election, person); confirmed parties by election; `people(full_name)`; raw list pending/party; `dream_cabinet_picks(election_id, office_id, candidate_id)` |
 | Polls | `polls` (election, fieldwork, regular, publisher); `poll_results(party_id)`; aggregates lookup; pending raw rows; aliases; lineage |
 | KPI | `indexes(office_id)`; `index_data(index_id, recorded_at)` |
@@ -699,6 +858,8 @@ Unique constraints also provide leading-column indexes for several keys (e.g. `e
 | Poll pollster | `polls.pollster` text identity; `pollster_id` FK | Normalize resolves/creates `pollsters` rows; Hebrew on `pollsters.name_he` |
 | Party color / logo | Ballot: `election_parties`; chamber: `knesset_factions` | Intentional dual branding — do not auto-overwrite either from the other |
 | Election → Knesset | `elections.knesset_number` FK → `knessets.knesset_number` | Applied |
+| Committee seats | `knesset_committee_memberships` (Hasadna) | Do **not** use `knesset_memberships.committee_role` or empty OData `CommitteeID` |
+| Committee protocols | OData docs (`GroupTypeID=23`) + Hasadna text/parts | File URL from OData; body/parts from Hasadna or self-parse |
 | Cross-election party identity | Deferred — use `election_parties` + `party_lineage` | A stable `parties` master table is not needed until multi-election trends are productized |
 | Pollsters / Wikidata / KPI numeric | Applied on Supabase | `pollsters`, `people.wikidata_id`, `index_data.value` numeric |
 
@@ -708,12 +869,12 @@ Unique constraints also provide leading-column indexes for several keys (e.g. `e
 
 Live on Supabase (applied; one-shot migration script removed from the repo).
 
-**`updated_at`:** column + `BEFORE UPDATE` trigger (`set_updated_at`) on `people`, `election_parties`, `election_candidates`, `knesset_factions`, `offices`, `polls`, `poll_publishers`, `pollsters`, `governments`, `knessets`, `indexes`. Staging tables like `raw_poll_rows` intentionally keep insert-only timestamps.
+**`updated_at`:** column + `BEFORE UPDATE` trigger (`set_updated_at`) on `people`, `election_parties`, `election_candidates`, `knesset_factions`, `offices`, `polls`, `poll_publishers`, `pollsters`, `governments`, `knessets`, `indexes`, `knesset_committees`, `knesset_committee_memberships`, `knesset_committee_sessions`, `knesset_committee_session_transcripts`. Staging tables like `raw_poll_rows` intentionally keep insert-only timestamps.
 
 **ON DELETE:**
 
 | Behavior | Relationships |
 |----------|----------------|
-| `CASCADE` | `poll_results` ← polls; aggregates/aliases/house effects/lineage ← `election_parties`; `index_data` ← indexes; `raw_candidate_lists` ← party; `dream_cabinet_picks` ← election / candidate / person / party |
-| `SET NULL` | `polls.raw_poll_row_id`, `polls.publisher_id`, `polls.pollster_id`, `election_parties.knesset_faction_id` |
-| Restrict (default) | `people` / party / knesset roots — refuse delete while memberships, candidates, or appointments still reference them |
+| `CASCADE` | `poll_results` ← polls; aggregates/aliases/house effects/lineage ← `election_parties`; `index_data` ← indexes; `raw_candidate_lists` ← party; `dream_cabinet_picks` ← election / candidate / person / party; committee memberships/sessions ← committees; documents/transcripts/parts/attendance ← sessions; parts ← transcripts |
+| `SET NULL` | `polls.raw_poll_row_id`, `polls.publisher_id`, `polls.pollster_id`, `election_parties.knesset_faction_id`; `knesset_committee_session_transcripts.document_id`; `knesset_committee_transcript_parts.person_id` |
+| Restrict (default) | `people` / party / knesset roots — refuse delete while memberships, candidates, appointments, or committee memberships still reference them |
