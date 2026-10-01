@@ -143,6 +143,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Each slide shows the **office name** above the index **description** (`indexes.info`, fallback to `name`) — same hierarchy as the share PNG — plus dashboard-style **share** and **מקור** actions, the live `IndexTrendChart` (bar fills use that office’s `ministerHistory` party colors, including split yearly bars), and `OfficeErasBar` with **`showCompare={false}`** (eras strip only — no compare panel). Title/office copy is forced **RTL right-aligned** (higher-specificity rules beat leftover `.office-dashboard__chart-header` flex styles if that page’s CSS was loaded earlier in the session).
 - Clicking anywhere on the card opens `/government/dashboard?office=&index=` for the active slide (title underlines on card hover). Share, מקור, and the side arrows keep their own actions; horizontal swipes change slides without navigating.
 - Side arrows (‹ / ›) step slides; on touch, horizontal swipe left = next / right = previous.
+- Below the carousel card: text link **לצפייה בכל מדדי משרדי הממשלה כנסו >>** → `/government/dashboard` (`.hot-indexes__cta`, same bold blue underline-on-hover style as elections page text links).
 - Data: same `useOfficeDashboard` / Supabase path as `/government/dashboard`. Section hides on fetch error / empty; shows a skeleton while loading.
 - Share reuses `exportOfficeChartImage` + `sharePngImage` (capture node uses dashboard chart-header classnames so the PNG decorator still finds the title).
 

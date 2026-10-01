@@ -11,6 +11,26 @@
   touch-action: pan-y;
 }
 
+.hot-indexes__cta {
+  margin: 18px 0 0;
+  text-align: center;
+}
+
+.hot-indexes__cta a {
+  color: var(--color-blue-dark);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.hot-indexes__cta a:hover {
+  text-decoration: underline;
+}
+
+.hot-indexes__cta a:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 3px;
+}
+
 .hot-indexes__box {
   position: relative;
   flex: 1;

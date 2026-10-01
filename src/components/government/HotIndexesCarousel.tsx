@@ -9,6 +9,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type TouchEvent as ReactTouchEvent,
 } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   CHART_MOBILE_MAX_WIDTH,
@@ -475,6 +476,12 @@ export function HotIndexesCarousel() {
             ›
           </button>
         </div>
+
+        <p className="hot-indexes__cta">
+          <Link href="/government/dashboard">
+            לצפייה בכל מדדי משרדי הממשלה כנסו {'>>'}
+          </Link>
+        </p>
       </div>
     </section>
   )
