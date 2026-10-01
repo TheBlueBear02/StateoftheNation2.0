@@ -92,9 +92,12 @@ def test_cbs_series_yearly_sum_rail():
 
 
 def test_obudget_skips_unfinished_year(fixture_json):
-    rows = fixture_json("obudget_0010.json")["rows"]
+    rows = fixture_json("obudget_0007.json")["rows"]
     obs = obudget_obs(FetchTask(ENTRIES[22], since=date(2024, 1, 1)), rows, "q")
-    assert [(o.period.year, o.value) for o in obs] == [(2024, 53166755.0), (2025, 54664990.0)]
+    assert [(o.period.year, o.value) for o in obs] == [
+        (2024, 25176846831.0),
+        (2025, 27635155719.0),
+    ]
 
 
 def test_obudget_query_is_injection_safe():

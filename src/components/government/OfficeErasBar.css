@@ -510,7 +510,8 @@
   width: 132px;
   height: 132px;
   margin: 0;
-  padding: 20px;
+  /* Keep padding under the formula's usable width so the delta never clips the rim */
+  padding: 16px 14px;
   border-radius: 50%;
   border: 3px solid #000;
   background: var(--color-white, #fff);
@@ -547,18 +548,23 @@
   display: block;
   width: 100%;
   max-width: 100%;
-  /* Scale with digit count so long values (e.g. 44,099.5) stay inside the circle */
+  box-sizing: border-box;
+  padding-inline: 2px;
+  /* Usable width ≈ 94px after padding; bold tabular glyphs need ~0.72em each */
   font-size: clamp(
-    1.15rem,
-    calc(96px / (var(--delta-chars, 5) * 0.62)),
-    2.55rem
+    1.05rem,
+    calc(90px / (var(--delta-chars, 5) * 0.72)),
+    2.35rem
   );
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
   white-space: nowrap;
-  overflow: hidden;
+  /* Latin numerals: LTR so residual overflow doesn't clip only the physical left in RTL */
+  direction: ltr;
+  unicode-bidi: isolate;
+  overflow: visible;
 }
 
 .office-eras-bar__detail-delta-badge--up
@@ -656,7 +662,7 @@
   .office-eras-bar__detail-delta-badge {
     width: 112px;
     height: 112px;
-    padding: 16px;
+    padding: 14px 12px;
   }
 
   .office-eras-bar__detail-delta-badge-text {
@@ -665,9 +671,9 @@
 
   .office-eras-bar__detail-delta-badge-value {
     font-size: clamp(
-      1rem,
-      calc(84px / (var(--delta-chars, 5) * 0.62)),
-      2rem
+      0.95rem,
+      calc(76px / (var(--delta-chars, 5) * 0.72)),
+      1.85rem
     );
   }
 

@@ -1372,7 +1372,12 @@ export function IndexTrendChart({
                       </linearGradient>
                     ) : null}
                   </defs>
-                  <path d={bar.d} fill={fill} stroke="none" />
+                  <path
+                    className="index-trend-chart__bar-fill"
+                    d={bar.d}
+                    fill={fill}
+                    stroke="none"
+                  />
                   {labelInside ? (
                     <path
                       d={bar.d}

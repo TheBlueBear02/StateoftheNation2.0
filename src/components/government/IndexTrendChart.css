@@ -57,12 +57,19 @@
 .index-trend-chart__bar {
   /* Fill comes from the SVG path (party color / gradient). */
   fill: none;
-  opacity: 1;
   cursor: pointer;
 }
 
+.index-trend-chart__bar-fill {
+  fill-opacity: 0.85;
+}
+
+.index-trend-chart__bar--active .index-trend-chart__bar-fill {
+  fill-opacity: 0.9;
+}
+
 .index-trend-chart__bar--active {
-  opacity: 1;
+  cursor: pointer;
 }
 
 .index-trend-chart__bar-value {

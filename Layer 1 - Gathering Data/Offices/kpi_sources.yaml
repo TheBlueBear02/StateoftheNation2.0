@@ -156,14 +156,14 @@
   office: "המשרד לביטחון לאומי"
   kind: policy
   frequency: yearly
-  coverage: "2009 → 2023 (15 pts)"
+  coverage: "2009 → 2025 (17 pts)"
   tier: "A"
   adapter: obudget
-  params: {"codes": ["0010"], "field": "net_executed"}
+  params: {"codes": ["0007"], "field": "net_executed"}
   label_rule: yearly_jan1
   release: {window: "03-01..07-31", check_every_days: 7}
-  current_source: "https://next.obudget.org/i/budget/00105101/2025"
-  notes: "FLAG: code 0010 = ministry HQ only (~₪52M). Decide whether to include Police/IPS sections."
+  current_source: "https://next.obudget.org/i/budget/0007/2026"
+  notes: "Full ministry section 0007 (משרד לביטחון לאומי) — net_executed / ביצוע בפועל from מפתח התקציב. Not HQ-only 0010."
 
 - key: 39
   name: "מעצרים פליליים"
