@@ -28,7 +28,7 @@ export function Tooltip({
   x,
   y,
 }: TooltipProps) {
-  if (!fullName || !factionName) {
+  if (!fullName) {
     return null
   }
 
@@ -63,7 +63,9 @@ export function Tooltip({
 
           <div className="knesset-tooltip__identity">
             <div className="knesset-tooltip__name">{fullName}</div>
-            <div className="knesset-tooltip__faction">{factionName}</div>
+            {factionName ? (
+              <div className="knesset-tooltip__faction">{factionName}</div>
+            ) : null}
             {additionalRoles.length > 0 ? (
               <div className="knesset-tooltip__roles">
                 {additionalRoles.join(' · ')}

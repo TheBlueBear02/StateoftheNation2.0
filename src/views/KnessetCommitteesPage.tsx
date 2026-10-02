@@ -1,20 +1,22 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
-import { CommitteeSelectMenu } from '../components/knesset/CommitteeSelectMenu'
+import { CommitteeChatPicker } from '../components/knesset/CommitteeChatPicker'
 import { CommitteeTable } from '../components/knesset/CommitteeTable'
-import { CommitteeTranscriptChat } from '../components/knesset/CommitteeTranscriptChat'
+import {
+  CommitteeTranscriptChat,
+  getFirstSpeechIndex,
+  isMetaPart,
+} from '../components/knesset/CommitteeTranscriptChat'
 import { useCommitteeAttendance } from '../hooks/useCommitteeAttendance'
 import { useCommitteeMemberships } from '../hooks/useCommitteeMemberships'
-import {
-  formatCommitteeSessionLabel,
-  useCommitteeSessions,
-} from '../hooks/useCommitteeSessions'
+import { useCommitteeSessions } from '../hooks/useCommitteeSessions'
 import { useCommitteeTranscript } from '../hooks/useCommitteeTranscript'
 import { useKnessetCommittees } from '../hooks/useKnessetCommittees'
 import { usePersonFactions } from '../hooks/usePersonFactions'
+import { usePersonTenures } from '../hooks/usePersonTenures'
 import type { CommitteeMember } from '../lib/committeeTypes'
 import type { KnessetCommittee } from '../lib/committeeTypes'
 import type { CommitteeSession } from '../lib/committeeTypes'
@@ -22,10 +24,13 @@ import { layoutCommitteeSeats } from '../lib/committeeTableLayout'
 import {
   partBelongsToPerson,
   resolvePartPersonId,
+  coalesceTranscriptParts,
 } from '../lib/committeeSpeakerMatch'
 import './KnessetCommitteesPage.css'
 
 const PLAY_INTERVAL_MS = 3000
+
+type ChatNav = 'committees' | 'sessions' | 'transcript'
 
 export function KnessetCommitteesPage() {
   const { committees, loading: committeesLoading, error: committeesError } =
@@ -35,11 +40,11 @@ export function KnessetCommitteesPage() {
     useState<KnessetCommittee | null>(null)
   const [selectedSession, setSelectedSession] =
     useState<CommitteeSession | null>(null)
-  const [withTranscriptOnly, setWithTranscriptOnly] = useState(true)
+  const [chatNav, setChatNav] = useState<ChatNav>('committees')
+  const [withTranscriptOnly] = useState(true)
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null)
   const [activeOrdinal, setActiveOrdinal] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [bootstrapped, setBootstrapped] = useState(false)
 
   const {
     sessions,
@@ -70,8 +75,17 @@ export function KnessetCommitteesPage() {
     error: transcriptError,
   } = useCommitteeTranscript(selectedSession?.id ?? null)
 
-  const parts = transcript?.parts ?? []
-  const activePart = parts[activeOrdinal] ?? null
+  const rawParts = useMemo(() => {
+    const raw = transcript?.parts ?? []
+    // Drop the leading untitled "פרוטוקול" preamble card from every session.
+    const firstProtocolIdx = raw.findIndex(
+      (part) => !(part.speakerHeader ?? '').trim(),
+    )
+    if (firstProtocolIdx < 0) {
+      return raw
+    }
+    return raw.filter((_, index) => index !== firstProtocolIdx)
+  }, [transcript?.parts])
 
   // Full committee roster around the table. When protocol attendance exists,
   // guests listed in נכחו but not in memberships are still added; absentees
@@ -93,7 +107,7 @@ export function KnessetCommitteesPage() {
           imageUrl: attendee.imageUrl,
           factionName: null,
           seatRole: 'member',
-          roleDesc: 'חבר כנסת (לא חבר ועדה)',
+          roleDesc: 'חבר כנסת (לא חבר הועדה)',
           startDate: null,
           endDate: null,
         })
@@ -120,15 +134,30 @@ export function KnessetCommitteesPage() {
     selectedSession?.startAt ?? null,
   )
 
+  const { tenureByPersonId } = usePersonTenures(seatPersonIds)
+
   const seatsMembers = useMemo(
     (): CommitteeMember[] =>
-      seatsMembersBase.map((member) => ({
-        ...member,
-        factionName:
-          factionByPersonId.get(member.personId) ?? member.factionName,
-      })),
-    [seatsMembersBase, factionByPersonId],
+      seatsMembersBase.map((member) => {
+        const tenure = tenureByPersonId.get(member.personId)
+        return {
+          ...member,
+          factionName:
+            factionByPersonId.get(member.personId) ?? member.factionName,
+          firstElectedYear: tenure?.firstElectedYear ?? null,
+          totalDaysInKnesset: tenure?.totalDaysInKnesset ?? 0,
+          totalYearsInKnesset: tenure?.totalYearsInKnesset ?? 0,
+        }
+      }),
+    [seatsMembersBase, factionByPersonId, tenureByPersonId],
   )
+
+  // Fold false Hasadna splits (e.g. "ואני אומר לנתניהו") into the prior speech.
+  const parts = useMemo(
+    () => coalesceTranscriptParts(rawParts, seatsMembers),
+    [rawParts, seatsMembers],
+  )
+  const activePart = parts[activeOrdinal] ?? null
 
   const { seats, overflowCount } = useMemo(
     () =>
@@ -145,48 +174,17 @@ export function KnessetCommitteesPage() {
     [activePart, seatsMembers],
   )
 
-  const selectedMemberOrdinals = useMemo(() => {
+  const selectedMemberIndexes = useMemo(() => {
     if (selectedPersonId == null) {
       return [] as number[]
     }
     return parts
-      .filter((part) =>
+      .map((part, index) => ({ part, index }))
+      .filter(({ part }) =>
         partBelongsToPerson(part, selectedPersonId, seatsMembers),
       )
-      .map((part) => part.ordinal)
+      .map(({ index }) => index)
   }, [parts, selectedPersonId, seatsMembers])
-
-  // Auto-select first committee that has a ready transcript.
-  useEffect(() => {
-    if (bootstrapped || committeesLoading || committees.length === 0) {
-      return
-    }
-    if (!selectedCommittee) {
-      setSelectedCommittee(committees[0] ?? null)
-    }
-    setBootstrapped(true)
-  }, [bootstrapped, committees, committeesLoading, selectedCommittee])
-
-  // When sessions load, auto-select newest.
-  useEffect(() => {
-    if (!selectedCommittee) {
-      setSelectedSession(null)
-      return
-    }
-    if (sessionsLoading) {
-      return
-    }
-    if (sessions.length === 0) {
-      setSelectedSession(null)
-      return
-    }
-    setSelectedSession((prev) => {
-      if (prev && sessions.some((s) => s.id === prev.id)) {
-        return sessions.find((s) => s.id === prev.id) ?? sessions[0] ?? null
-      }
-      return sessions[0] ?? null
-    })
-  }, [selectedCommittee, sessions, sessionsLoading])
 
   // Reset play state when session changes.
   useEffect(() => {
@@ -200,35 +198,43 @@ export function KnessetCommitteesPage() {
     if (selectedPersonId == null) {
       return
     }
-    const ordinals = parts
-      .filter((part) =>
+    const indexes = parts
+      .map((part, index) => ({ part, index }))
+      .filter(({ part }) =>
         partBelongsToPerson(part, selectedPersonId, seatsMembers),
       )
-      .map((part) => part.ordinal)
-    if (ordinals.length === 0) {
+      .map(({ index }) => index)
+    if (indexes.length === 0) {
       return
     }
-    setActiveOrdinal(ordinals[0]!)
+    setActiveOrdinal(indexes[0]!)
     // Only re-run when the selected person changes, not on every play tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPersonId])
 
-  // Play ticker — delivers the next message every 3s.
+  // Play ticker — pops the next real speech every 3s (skips meta cards).
   useEffect(() => {
     if (!playing || parts.length === 0) {
       return
     }
     const id = window.setInterval(() => {
       setActiveOrdinal((prev) => {
-        if (prev >= parts.length - 1) {
-          setPlaying(false)
-          return prev
+        let next = prev + 1
+        while (
+          next < parts.length &&
+          isMetaPart(parts[next]!, next, parts)
+        ) {
+          next += 1
         }
-        return prev + 1
+        if (next >= parts.length) {
+          setPlaying(false)
+          return Math.max(prev, parts.length - 1)
+        }
+        return next
       })
     }, PLAY_INTERVAL_MS)
     return () => window.clearInterval(id)
-  }, [playing, parts.length])
+  }, [playing, parts])
 
   const pageError =
     committeesError ||
@@ -238,6 +244,7 @@ export function KnessetCommitteesPage() {
     transcriptError
   const hasParts = parts.length > 0
   const loadingTable = membersLoading || attendanceLoading || committeesLoading
+  const sessionOpen = chatNav === 'transcript' && selectedSession != null
 
   function selectPerson(personId: number | null) {
     setPlaying(false)
@@ -245,95 +252,57 @@ export function KnessetCommitteesPage() {
   }
 
   function jumpToNextSelectedMemberMessage() {
-    if (selectedMemberOrdinals.length === 0) {
+    if (selectedMemberIndexes.length === 0) {
       return
     }
     setPlaying(false)
     const next =
-      selectedMemberOrdinals.find((ordinal) => ordinal > activeOrdinal) ??
-      selectedMemberOrdinals[0]!
+      selectedMemberIndexes.find((index) => index > activeOrdinal) ??
+      selectedMemberIndexes[0]!
     setActiveOrdinal(next)
+  }
+
+  function openCommittee(committee: KnessetCommittee) {
+    setPlaying(false)
+    setSelectedPersonId(null)
+    setSelectedSession(null)
+    setSelectedCommittee(committee)
+    setChatNav('sessions')
+  }
+
+  function openSession(session: CommitteeSession) {
+    setPlaying(false)
+    setSelectedPersonId(null)
+    setSelectedSession(session)
+    setChatNav('transcript')
+  }
+
+  function backFromTranscript() {
+    setPlaying(false)
+    setSelectedPersonId(null)
+    setSelectedSession(null)
+    setChatNav('sessions')
+  }
+
+  function backFromSessions() {
+    setPlaying(false)
+    setSelectedPersonId(null)
+    setSelectedSession(null)
+    setSelectedCommittee(null)
+    setChatNav('committees')
   }
 
   return (
     <SiteLayout className="committees-page">
       <main className="committees-page__main">
-        <section
-          className="committees-page__section"
-          aria-labelledby="committees-title"
-        >
+        <section className="committees-page__section">
           <div className="committees-page__inner container">
-            <header className="committees-page__header">
-              <div className="committees-page__title-row">
-                <h1 id="committees-title" className="committees-page__title">
-                  ועדות הכנסת
-                </h1>
-                <Link href="/knesset" className="committees-page__back">
-                  ← חזרה לכנסת
-                </Link>
-              </div>
-              <p className="committees-page__subtitle">
-                בחרו ועדה וישיבה, צפו בחברי הוועדה סביב השולחן, והפעילו את
-                התמליל כשיחה
-              </p>
-
-              <div className="committees-page__controls">
-                <CommitteeSelectMenu
-                  label="ועדה"
-                  ariaLabel="בחירת ועדה"
-                  value={selectedCommittee ? String(selectedCommittee.id) : ''}
-                  disabled={committeesLoading || committees.length === 0}
-                  placeholder={
-                    committeesLoading
-                      ? 'טוען ועדות…'
-                      : 'אין ועדות עם תמליל'
-                  }
-                  options={committees.map((committee) => ({
-                    value: String(committee.id),
-                    label: committee.name,
-                  }))}
-                  onChange={(nextValue) => {
-                    const next = committees.find(
-                      (c) => c.id === Number(nextValue),
-                    )
-                    setSelectedCommittee(next ?? null)
-                  }}
-                />
-
-                <CommitteeSelectMenu
-                  label="ישיבה"
-                  ariaLabel="בחירת ישיבה"
-                  value={selectedSession ? String(selectedSession.id) : ''}
-                  disabled={sessionsLoading || sessions.length === 0}
-                  placeholder={
-                    withTranscriptOnly
-                      ? 'אין ישיבות עם תמליל'
-                      : 'אין ישיבות'
-                  }
-                  options={sessions.map((session) => ({
-                    value: String(session.id),
-                    label: formatCommitteeSessionLabel(session),
-                  }))}
-                  onChange={(nextValue) => {
-                    const next = sessions.find(
-                      (s) => s.id === Number(nextValue),
-                    )
-                    setSelectedSession(next ?? null)
-                  }}
-                />
-
-                <label className="committees-page__toggle">
-                  <input
-                    type="checkbox"
-                    checked={withTranscriptOnly}
-                    onChange={(event) =>
-                      setWithTranscriptOnly(event.target.checked)
-                    }
-                  />
-                  <span>רק ישיבות עם תמליל</span>
-                </label>
-              </div>
-            </header>
+            <PageBreadcrumb
+              items={[
+                { label: 'הכנסת', to: '/knesset' },
+                { label: 'ועדות הכנסת' },
+              ]}
+            />
 
             {pageError ? (
               <p className="committees-page__error" role="alert">
@@ -341,51 +310,111 @@ export function KnessetCommitteesPage() {
               </p>
             ) : null}
 
-            <div className="committees-page__stage">
+            <div
+              className={[
+                'committees-page__stage',
+                sessionOpen ? '' : 'committees-page__stage--no-session',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
               <div className="committees-page__stage-table">
-                <CommitteeTable
-                  seats={seats}
-                  overflowCount={overflowCount}
-                  speakingPersonId={speakingPersonId}
-                  selectedPersonId={selectedPersonId}
-                  onSelectPerson={selectPerson}
-                  loading={loadingTable}
-                />
+                <div className="committees-page__table-stack">
+                  <p
+                    className={[
+                      'committees-page__table-hint',
+                      sessionOpen ? 'committees-page__table-hint--hidden' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    aria-hidden={sessionOpen || undefined}
+                  >
+                    בחרו ישיבת וועדה על מנת להראות את המשתתפים מסביב לשולחן
+                  </p>
+                  <CommitteeTable
+                    seats={sessionOpen ? seats : []}
+                    overflowCount={sessionOpen ? overflowCount : 0}
+                    speakingPersonId={
+                      sessionOpen && playing ? speakingPersonId : null
+                    }
+                    selectedPersonId={sessionOpen ? selectedPersonId : null}
+                    onSelectPerson={selectPerson}
+                    loading={sessionOpen ? loadingTable : false}
+                  />
+                </div>
               </div>
 
-              <CommitteeTranscriptChat
-                parts={parts}
-                members={seatsMembers}
-                session={selectedSession}
-                committeeName={selectedCommittee?.name ?? null}
-                activeOrdinal={activeOrdinal}
-                playing={playing}
-                selectedPersonId={selectedPersonId}
-                disabled={!hasParts || transcriptLoading}
-                loading={transcriptLoading}
-                onPlayPause={() => {
-                  if (!hasParts) {
-                    return
-                  }
-                  setPlaying((prev) => !prev)
-                }}
-                onPrev={() => {
-                  setPlaying(false)
-                  setActiveOrdinal((prev) => Math.max(0, prev - 1))
-                }}
-                onNext={() => {
-                  setPlaying(false)
-                  setActiveOrdinal((prev) =>
-                    Math.min(parts.length - 1, prev + 1),
-                  )
-                }}
-                onJumpToOrdinal={(ordinal) => {
-                  setPlaying(false)
-                  setActiveOrdinal(ordinal)
-                }}
-                onNextSelectedMemberMessage={jumpToNextSelectedMemberMessage}
-                onClearMemberFilter={() => setSelectedPersonId(null)}
-              />
+              {chatNav === 'committees' ? (
+                <CommitteeChatPicker
+                  mode="committees"
+                  committees={committees}
+                  loading={committeesLoading}
+                  onSelectCommittee={openCommittee}
+                />
+              ) : null}
+
+              {chatNav === 'sessions' && selectedCommittee ? (
+                <CommitteeChatPicker
+                  mode="sessions"
+                  committeeName={selectedCommittee.name}
+                  sessions={sessions}
+                  loading={sessionsLoading}
+                  onSelectSession={openSession}
+                  onBack={backFromSessions}
+                />
+              ) : null}
+
+              {chatNav === 'transcript' ? (
+                <CommitteeTranscriptChat
+                  parts={parts}
+                  members={seatsMembers}
+                  session={selectedSession}
+                  committeeName={selectedCommittee?.name ?? null}
+                  activeOrdinal={activeOrdinal}
+                  playing={playing}
+                  selectedPersonId={selectedPersonId}
+                  disabled={!hasParts || transcriptLoading}
+                  loading={transcriptLoading}
+                  onBack={backFromTranscript}
+                  onPlayPause={() => {
+                    if (!hasParts) {
+                      return
+                    }
+                    if (playing) {
+                      setPlaying(false)
+                      return
+                    }
+                    // Resume from the current message; only restart after finishing.
+                    const firstSpeech = getFirstSpeechIndex(parts)
+                    const atEnd = activeOrdinal >= parts.length - 1
+                    if (atEnd) {
+                      setActiveOrdinal(firstSpeech >= 0 ? firstSpeech : 0)
+                    } else if (
+                      firstSpeech >= 0 &&
+                      activeOrdinal < firstSpeech
+                    ) {
+                      setActiveOrdinal(firstSpeech)
+                    }
+                    setPlaying(true)
+                  }}
+                  onPrev={() => {
+                    setPlaying(false)
+                    setActiveOrdinal((prev) => Math.max(0, prev - 1))
+                  }}
+                  onNext={() => {
+                    setPlaying(false)
+                    setActiveOrdinal((prev) =>
+                      Math.min(parts.length - 1, prev + 1),
+                    )
+                  }}
+                  onJumpToOrdinal={(ordinal) => {
+                    setPlaying(false)
+                    setActiveOrdinal(ordinal)
+                  }}
+                  onNextSelectedMemberMessage={jumpToNextSelectedMemberMessage}
+                  onClearMemberFilter={() => setSelectedPersonId(null)}
+                />
+              ) : null}
             </div>
           </div>
         </section>

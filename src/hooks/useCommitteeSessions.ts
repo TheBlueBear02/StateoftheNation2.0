@@ -14,6 +14,7 @@ export type UseCommitteeSessionsResult = {
 function normalizeSession(
   row: CommitteeSessionRow,
   hasTranscript: boolean,
+  agenda: string | null,
 ): CommitteeSession {
   return {
     id: row.id,
@@ -26,6 +27,7 @@ function normalizeSession(
     startAt: row.start_at,
     finishAt: row.finish_at,
     hasTranscript,
+    agenda,
   }
 }
 
@@ -45,6 +47,49 @@ export function formatCommitteeSessionLabel(session: CommitteeSession): string {
     session.sessionNumber != null ? `ישיבה ${session.sessionNumber} · ` : ''
   const badge = session.hasTranscript ? '' : ' · ללא תמליל'
   return `${num}${datePart}${badge}`
+}
+
+export function formatCommitteeDateTime(iso: string | null | undefined): string {
+  if (!iso) {
+    return 'ללא תאריך'
+  }
+  const date = new Date(iso)
+  // Order is day · time · date; rendered RTL so day is on the right.
+  const dayPart = new Intl.DateTimeFormat('he-IL', {
+    weekday: 'short',
+  }).format(date)
+  const timePart = new Intl.DateTimeFormat('he-IL', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+  const datePart = new Intl.DateTimeFormat('he-IL', {
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+  }).format(date)
+  return `${dayPart} · ${timePart} · ${datePart}`
+}
+
+export function formatCommitteeDateOnly(iso: string | null | undefined): string {
+  if (!iso) {
+    return 'ללא תאריך'
+  }
+  return new Intl.DateTimeFormat('he-IL', {
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+  }).format(new Date(iso))
+}
+
+export function formatCommitteeSessionWhen(session: CommitteeSession): string {
+  return formatCommitteeDateTime(session.startAt)
+}
+
+function compactAgenda(body: string): string {
+  return body
+    .replace(/\s+/g, ' ')
+    .replace(/^סדר היום\s*:?\s*/u, '')
+    .trim()
 }
 
 async function fetchReadySessionIds(
@@ -72,6 +117,43 @@ async function fetchReadySessionIds(
     }
   }
   return ready
+}
+
+/** First סדר היום body per session, from transcript parts. */
+async function fetchAgendaBySessionIds(
+  sessionIds: number[],
+): Promise<Map<number, string>> {
+  const agendas = new Map<number, string>()
+  if (!supabase || sessionIds.length === 0) {
+    return agendas
+  }
+
+  const chunkSize = 200
+  for (let i = 0; i < sessionIds.length; i += chunkSize) {
+    const chunk = sessionIds.slice(i, i + chunkSize)
+    const { data, error } = await supabase
+      .from('knesset_committee_transcript_parts')
+      .select('session_id, speaker_header, body, ordinal')
+      .in('session_id', chunk)
+      .or('speaker_header.eq.סדר היום,speaker_header.like.סדר היום%')
+      .order('ordinal', { ascending: true })
+
+    if (error) {
+      throw error
+    }
+
+    for (const row of data ?? []) {
+      const sessionId = row.session_id as number
+      if (agendas.has(sessionId)) {
+        continue
+      }
+      const text = compactAgenda(String(row.body ?? ''))
+      if (text) {
+        agendas.set(sessionId, text)
+      }
+    }
+  }
+  return agendas
 }
 
 export function useCommitteeSessions(
@@ -130,8 +212,22 @@ export function useCommitteeSessions(
           return
         }
 
+        let candidateIds = rows
+          .filter((row) => !withTranscriptOnly || readyIds.has(row.id))
+          .map((row) => row.id)
+
+        const agendas = await fetchAgendaBySessionIds(candidateIds)
+
+        if (cancelled) {
+          return
+        }
+
         let normalized = rows.map((row) =>
-          normalizeSession(row, readyIds.has(row.id)),
+          normalizeSession(
+            row,
+            readyIds.has(row.id),
+            agendas.get(row.id) ?? null,
+          ),
         )
         if (withTranscriptOnly) {
           normalized = normalized.filter((session) => session.hasTranscript)

@@ -8,45 +8,6 @@
   gap: clamp(16px, 3vw, 28px);
 }
 
-.committees-page__header {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.committees-page__title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px 20px;
-}
-
-.committees-page__title {
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 2.75rem);
-  font-weight: 800;
-  color: var(--color-text);
-}
-
-.committees-page__back {
-  color: var(--color-blue);
-  text-decoration: none;
-  font-size: 0.95rem;
-}
-
-.committees-page__back:hover {
-  color: var(--color-blue-dark);
-  text-decoration: underline;
-}
-
-.committees-page__subtitle {
-  margin: 0;
-  font-size: clamp(1rem, 2.2vw, 1.125rem);
-  color: var(--color-text-muted);
-  max-width: 42rem;
-}
-
 .committees-page__controls {
   display: flex;
   flex-wrap: wrap;
@@ -201,6 +162,35 @@
   min-width: 0;
 }
 
+.committees-page__table-stack {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.committees-page__table-hint {
+  position: absolute;
+  left: 50%;
+  /* Sit just above the wood ring inside the tall SVG viewBox padding. */
+  top: 12%;
+  transform: translate(-50%, -100%);
+  z-index: 1;
+  margin: 0;
+  width: max-content;
+  max-width: min(18rem, calc(100% - 12px));
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.committees-page__table-hint--hidden {
+  visibility: hidden;
+}
+
 @media (min-width: 960px) {
   .committees-page__stage {
     grid-template-columns: minmax(280px, 400px) minmax(0, 1fr);
@@ -210,21 +200,140 @@
 
   .committees-page__stage-table {
     display: flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
+    align-self: stretch;
   }
 }
 
 @media (max-width: 959px) {
+  .committees-page__main {
+    padding-block: 12px 20px;
+  }
+
+  .committees-page__inner {
+    gap: 12px;
+  }
+
+  /* Full-bleed chat on mobile; keep breadcrumb/table inset. */
+  .committees-page__inner.container {
+    padding-inline: 0;
+  }
+
+  .committees-page__inner > .page-breadcrumb,
+  .committees-page__inner > .committees-page__error {
+    padding-inline: var(--container-pad);
+  }
+
   .committees-page__stage {
-    grid-template-rows: auto minmax(280px, 48vh);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* Chat / list first; table below when a session is open. */
+  .committees-page__stage > .committee-chat {
+    order: 1;
+    width: 100%;
+    height: min(72dvh, 780px);
+    min-height: 62dvh;
+    max-height: none;
+    border-inline: none;
+  }
+
+  .committees-page__stage-table {
+    order: 2;
+    width: 100%;
+    padding-inline: var(--container-pad);
+  }
+
+  /* On mobile, hide the empty table until a session is selected. */
+  .committees-page__stage--no-session .committees-page__stage-table {
+    display: none;
   }
 
   .committee-table {
-    max-width: min(300px, 100%);
+    width: 100%;
+    max-width: none;
+    height: auto;
   }
 
   .committee-table__svg {
-    max-height: 42vh;
+    width: 100%;
+    height: auto;
+    max-height: none;
+  }
+
+  /* Full committee titles wrap; badge stays top-left beside the title. */
+  .committee-chat-picker__row--committee .committee-chat-picker__name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .committee-chat-picker__row--committee .committee-chat-picker__when,
+  .committee-chat-picker__row--session .committee-chat-picker__when {
+    white-space: normal;
+  }
+
+  /* Compact chat / picker header on mobile. */
+  .committee-chat__header {
+    padding: 4px 8px;
+    gap: 0;
+  }
+
+  .committee-chat__header-bar {
+    gap: 6px;
+    align-items: center;
+  }
+
+  .committee-chat__back {
+    width: 28px;
+    height: 28px;
+  }
+
+  .committee-chat__back-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .committee-chat__header-text {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .committee-chat__header-main {
+    width: 100%;
+    gap: 1px;
+  }
+
+  .committee-chat__title-row {
+    gap: 8px;
+  }
+
+  .committee-chat__title {
+    font-size: 1.02rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .committee-chat__session-when {
+    width: 100%;
+    max-width: 100%;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .committee-chat__subtitle {
+    font-size: 0.72rem;
+    line-height: 1.2;
+    white-space: nowrap;
   }
 }
 
@@ -279,23 +388,48 @@
   outline: none;
 }
 
+.committee-seat__visual {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    transform 0.16s ease,
+    filter 0.16s ease;
+}
+
+.committee-seat[role='button']:hover .committee-seat__visual,
+.committee-seat[role='button']:focus-visible .committee-seat__visual {
+  transform: scale(1.14);
+  filter: drop-shadow(0 2px 6px rgba(26, 16, 8, 0.28));
+}
+
 .committee-seat__ring {
   stroke: rgba(255, 255, 255, 0.75);
   stroke-width: 2;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+  transition:
+    stroke 0.16s ease,
+    stroke-width 0.16s ease,
+    filter 0.16s ease;
 }
 
-/* Speaking uses a soft white pulse — blue ring is reserved for selection. */
+.committee-seat[role='button']:hover .committee-seat__ring,
+.committee-seat[role='button']:focus-visible .committee-seat__ring {
+  stroke: var(--color-blue);
+  stroke-width: 3.25;
+  filter: drop-shadow(0 0 6px rgba(72, 144, 253, 0.5));
+}
+
+/* Speaking (current Play message) — blue ring on the table seat. */
 .committee-seat--speaking .committee-seat__ring {
-  stroke: rgba(255, 255, 255, 0.95);
-  stroke-width: 4;
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
-}
-
-.committee-seat--selected .committee-seat__ring {
   stroke: var(--color-blue);
   stroke-width: 4;
   filter: drop-shadow(0 0 5px rgba(72, 144, 253, 0.55));
+}
+
+.committee-seat--selected .committee-seat__ring {
+  stroke: var(--color-blue-dark);
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 4px rgba(59, 122, 230, 0.4));
 }
 
 .committee-seat--selected.committee-seat--speaking .committee-seat__ring {
@@ -335,6 +469,13 @@
   stroke: rgba(140, 140, 140, 0.65);
 }
 
+.committee-seat[role='button'].committee-seat--absent:hover .committee-seat__ring,
+.committee-seat[role='button'].committee-seat--absent:focus-visible
+  .committee-seat__ring {
+  stroke: #9aa3ad;
+  filter: drop-shadow(0 0 5px rgba(120, 120, 120, 0.35));
+}
+
 .committee-seat--absent .committee-seat__disc {
   fill: #e8e8e8;
 }
@@ -359,19 +500,56 @@
 .committee-chat__header {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
+  gap: 2px;
+  padding: 6px 10px;
   background: var(--color-blue);
   border-bottom: 1px solid var(--color-blue-dark);
   flex-shrink: 0;
 }
 
+.committee-chat__header-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.committee-chat__back {
+  appearance: none;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.committee-chat__back:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.committee-chat__back:focus,
+.committee-chat__back:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.committee-chat__back-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
 .committee-chat__header-text {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 6px 12px;
+  min-width: 0;
+  flex: 1;
+  width: 100%;
 }
 
 .committee-chat__header-main {
@@ -379,10 +557,22 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  width: 100%;
+}
+
+.committee-chat__title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
 }
 
 .committee-chat__title {
   margin: 0;
+  flex: 1;
+  min-width: 0;
   font-size: 1.22rem;
   font-weight: 800;
   color: #fff;
@@ -391,16 +581,41 @@
 
 .committee-chat__session-when {
   margin: 0;
+  width: 100%;
   font-size: 0.88rem;
   color: rgba(255, 255, 255, 0.92);
   font-weight: 500;
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+.committee-chat__session-when-full {
+  display: inline;
+}
+
+.committee-chat__session-when-short {
+  display: none;
+}
+
+@media (max-width: 959px) {
+  /* Mobile: drop פרוטוקול / ישיבה N — keep day · time · date only. */
+  .committee-chat__session-when-full {
+    display: none;
+  }
+
+  .committee-chat__session-when-short {
+    display: inline;
+  }
 }
 
 .committee-chat__subtitle {
   margin: 0;
+  flex-shrink: 0;
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.88);
-  flex-shrink: 0;
+  text-align: left;
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .committee-chat__footer {
@@ -612,10 +827,29 @@
 
 .committee-chat__row {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 8px;
   max-width: min(100%, 520px);
   transition: opacity 0.2s ease;
+}
+
+@keyframes committee-chat-message-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.committee-chat__message--pop {
+  animation: committee-chat-message-pop 0.35s ease-out;
+}
+
+.committee-chat__system.committee-chat__message--pop {
+  animation: committee-chat-message-pop 0.35s ease-out;
 }
 
 .committee-chat__row--dimmed {
@@ -661,7 +895,7 @@
   color: var(--color-text);
   text-align: right;
   padding: 8px 11px 10px;
-  border-radius: 14px 14px 4px 14px;
+  border-radius: 14px 4px 14px 14px;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   font: inherit;
@@ -728,7 +962,7 @@
   appearance: none;
   width: 100%;
   border: none;
-  background: #fff3c5;
+  background: rgba(255, 243, 197, 0.55);
   color: #54656f;
   font: inherit;
   font-size: 0.78rem;
@@ -736,7 +970,7 @@
   text-align: center;
   padding: 8px 12px 9px;
   border-radius: 8px;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -745,7 +979,7 @@
 }
 
 .committee-chat__system-btn:hover {
-  background: #ffefb3;
+  background: rgba(255, 239, 179, 0.7);
 }
 
 .committee-chat__system-btn:focus,
@@ -762,6 +996,205 @@
 .committee-chat__system-btn span {
   white-space: pre-wrap;
   color: #54656f;
+}
+
+/* WhatsApp-style committee / session picker */
+.committee-chat--picker {
+  background: #fff;
+}
+
+.committee-chat-picker__list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.committee-chat-picker__empty {
+  margin: auto;
+  padding: 24px 16px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.committee-chat-picker__row {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  color: var(--color-text);
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+
+.committee-chat-picker__row:hover {
+  background: #f5f6f6;
+}
+
+.committee-chat-picker__row:focus,
+.committee-chat-picker__row:focus-visible {
+  outline: none;
+  background: #eef5ff;
+}
+
+.committee-chat-picker__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(145deg, #7eb6ff, var(--color-blue));
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.committee-chat-picker__avatar-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.committee-chat-picker__avatar--session {
+  background: linear-gradient(145deg, #9aa7b5, #6b7785);
+  font-size: 0.8rem;
+}
+
+.committee-chat-picker__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.committee-chat-picker__name {
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.committee-chat-picker__meta {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.committee-chat-picker__row--session,
+.committee-chat-picker__row--committee {
+  align-items: flex-start;
+}
+
+.committee-chat-picker__row--session .committee-chat-picker__avatar,
+.committee-chat-picker__row--committee .committee-chat-picker__avatar {
+  margin-top: 2px;
+}
+
+.committee-chat-picker__session-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.committee-chat-picker__session-top .committee-chat-picker__name {
+  flex: 1;
+  min-width: 0;
+}
+
+.committee-chat-picker__name-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.committee-chat-picker__name-line .committee-chat-picker__name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.committee-chat-picker__type {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.committee-chat-picker__row--session .committee-chat-picker__name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.committee-chat-picker__agenda {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  white-space: normal;
+}
+
+.committee-chat-picker__count-badge {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-blue);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.committee-chat-picker__count-badge-num {
+  /* Digit glyphs sit high in the font metrics — nudge down optically. */
+  transform: translateY(1.5px);
+  display: block;
+  line-height: 1;
+}
+
+.committee-chat-picker__when {
+  font-size: 0.78rem;
+  color: #8a8a8a;
+  direction: rtl;
+  unicode-bidi: isolate;
+  text-align: start;
+  white-space: nowrap;
 }
 
 /* Play bar / speech / MK panel — kept for older embeds; unused on current page */
@@ -953,4 +1386,96 @@
   font-size: 0.9rem;
   line-height: 1.45;
   color: var(--color-text);
+}
+
+/* MK seat hover tooltip (shared class names with /knesset Tooltip) */
+.knesset-tooltip {
+  position: fixed;
+  z-index: 40;
+  min-width: 220px;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  border-radius: 0;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(26, 16, 8, 0.18);
+  pointer-events: none;
+}
+
+.knesset-tooltip__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.knesset-tooltip__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.knesset-tooltip__photo,
+.knesset-tooltip__initials {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--color-blue);
+}
+
+.knesset-tooltip__photo {
+  object-fit: cover;
+}
+
+.knesset-tooltip__initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  background: #eef5ff;
+}
+
+.knesset-tooltip__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.knesset-tooltip__details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.knesset-tooltip__faction {
+  font-size: 0.875rem;
+  line-height: 1.25;
+  color: var(--color-text-muted);
+}
+
+.knesset-tooltip__roles {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.knesset-tooltip__name {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--color-text);
+}
+
+.knesset-tooltip__meta,
+.knesset-tooltip__tenure {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
 }

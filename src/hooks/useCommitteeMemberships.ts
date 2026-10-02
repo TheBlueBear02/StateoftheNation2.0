@@ -40,6 +40,15 @@ function isActiveOnDate(
   return true
 }
 
+function normalizeRoleDesc(roleDesc: string | null): string | null {
+  if (!roleDesc) {
+    return null
+  }
+  return roleDesc
+    .replaceAll('חברת ועדה', 'חברת הועדה')
+    .replaceAll('חבר ועדה', 'חבר הועדה')
+}
+
 function normalizeMember(row: CommitteeMembershipRow): CommitteeMember | null {
   const person = unwrapRelation(row.person)
   if (!person?.full_name) {
@@ -54,7 +63,7 @@ function normalizeMember(row: CommitteeMembershipRow): CommitteeMember | null {
     imageUrl: person.image_url,
     factionName: null,
     seatRole,
-    roleDesc: row.role_desc,
+    roleDesc: normalizeRoleDesc(row.role_desc),
     startDate: row.start_date,
     endDate: row.end_date,
   }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   COMMITTEE_TABLE_GEOMETRY,
   COMMITTEE_TABLE_VIEWBOX,
@@ -8,12 +9,17 @@ import {
   roundedRectPath,
   type LaidOutSeat,
 } from '../../lib/committeeTableLayout'
+import { Tooltip } from './Tooltip'
 
 type CommitteeSeatProps = {
   seat: LaidOutSeat
   isSpeaking: boolean
   isSelected: boolean
   onSelect: (personId: number | null) => void
+  onHover: (
+    seat: LaidOutSeat | null,
+    event: ReactMouseEvent<SVGGElement> | null,
+  ) => void
 }
 
 function CommitteeSeat({
@@ -21,12 +27,13 @@ function CommitteeSeat({
   isSpeaking,
   isSelected,
   onSelect,
+  onHover,
 }: CommitteeSeatProps) {
   const isCounsel = seat.kind === 'legal_counsel'
   const isAbsent = !isCounsel && !seat.attended
   const personId = seat.member?.personId ?? null
   const interactive = !isCounsel && personId != null
-  const radius = isCounsel ? 18 : 24
+  const radius = 24
   const imageUrl = seat.member?.imageUrl
   const clipId = `seat-clip-${seat.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
@@ -61,6 +68,21 @@ function CommitteeSeat({
           onSelect(personId)
         }
       }}
+      onMouseEnter={(event) => {
+        if (interactive) {
+          onHover(seat, event)
+        }
+      }}
+      onMouseMove={(event) => {
+        if (interactive) {
+          onHover(seat, event)
+        }
+      }}
+      onMouseLeave={() => {
+        if (interactive) {
+          onHover(null, null)
+        }
+      }}
       style={interactive ? { cursor: 'pointer' } : undefined}
     >
       <defs>
@@ -68,40 +90,35 @@ function CommitteeSeat({
           <circle r={radius} cx={0} cy={0} />
         </clipPath>
       </defs>
-      <circle className="committee-seat__ring" r={radius + 3.5} fill="none" />
-      <circle
-        className="committee-seat__disc"
-        r={radius}
-        fill={isCounsel ? '#ebe4da' : '#fff'}
-      />
-      {imageUrl && !isCounsel ? (
-        <image
-          className="committee-seat__photo"
-          href={imageUrl}
-          x={-radius}
-          y={-radius}
-          width={radius * 2}
-          height={radius * 2}
-          clipPath={`url(#${clipId})`}
-          preserveAspectRatio="xMidYMid slice"
+      <g className="committee-seat__visual">
+        <circle className="committee-seat__ring" r={radius + 3.5} fill="none" />
+        <circle
+          className="committee-seat__disc"
+          r={radius}
+          fill={isCounsel ? '#ebe4da' : '#fff'}
         />
-      ) : (
-        <text
-          className="committee-seat__initials"
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={isCounsel ? 9 : 12}
-        >
-          {isCounsel ? 'יועמ״ש' : initialsFromName(seat.label)}
-        </text>
-      )}
-      <title>
-        {isCounsel
-          ? 'ייעוץ משפטי (ללא תמונה)'
-          : isAbsent
-            ? `${seat.label} — לא נכח/ה בישיבה`
-            : seat.label}
-      </title>
+        {imageUrl && !isCounsel ? (
+          <image
+            className="committee-seat__photo"
+            href={imageUrl}
+            x={-radius}
+            y={-radius}
+            width={radius * 2}
+            height={radius * 2}
+            clipPath={`url(#${clipId})`}
+            preserveAspectRatio="xMidYMid slice"
+          />
+        ) : (
+          <text
+            className="committee-seat__initials"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={isCounsel ? 11 : 12}
+          >
+            {isCounsel ? 'יועמ״ש' : initialsFromName(seat.label)}
+          </text>
+        )}
+      </g>
     </g>
   )
 }
@@ -140,6 +157,27 @@ export function CommitteeTable({
     g.outerR,
   )
   const innerRim = voidPath
+
+  const [hoveredSeat, setHoveredSeat] = useState<LaidOutSeat | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    if (loading) {
+      setHoveredSeat(null)
+    }
+  }, [loading])
+
+  function handleHover(
+    seat: LaidOutSeat | null,
+    event: ReactMouseEvent<SVGGElement> | null,
+  ) {
+    setHoveredSeat(seat)
+    if (event) {
+      setTooltipPosition({ x: event.clientX, y: event.clientY })
+    }
+  }
+
+  const hoveredMember = hoveredSeat?.member ?? null
 
   return (
     <div className="committee-table" aria-busy={loading || undefined}>
@@ -242,9 +280,27 @@ export function CommitteeTable({
               seat.member != null && seat.member.personId === selectedPersonId
             }
             onSelect={onSelectPerson}
+            onHover={handleHover}
           />
         ))}
       </svg>
+
+      {hoveredMember ? (
+        <Tooltip
+          fullName={hoveredMember.fullName}
+          factionName={hoveredMember.factionName}
+          factionColor={null}
+          imageUrl={hoveredMember.imageUrl}
+          firstElectedYear={hoveredMember.firstElectedYear ?? null}
+          totalDaysInKnesset={hoveredMember.totalDaysInKnesset ?? 0}
+          totalYearsInKnesset={hoveredMember.totalYearsInKnesset ?? 0}
+          additionalRoles={
+            hoveredMember.roleDesc ? [hoveredMember.roleDesc] : []
+          }
+          x={tooltipPosition.x}
+          y={tooltipPosition.y}
+        />
+      ) : null}
 
       {overflowCount > 0 ? (
         <p className="committee-table__overflow">

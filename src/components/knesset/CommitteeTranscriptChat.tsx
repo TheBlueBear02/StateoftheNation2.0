@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import type { CommitteeMember } from '../../lib/committeeTypes'
 import type { CommitteeSession } from '../../lib/committeeTypes'
 import type { CommitteeTranscriptPart } from '../../lib/committeeTypes'
+import { formatCommitteeSessionWhen } from '../../hooks/useCommitteeSessions'
 import { initialsFromName } from '../../lib/committeeTableLayout'
 import {
   isBareChairHeader,
@@ -21,6 +22,7 @@ type CommitteeTranscriptChatProps = {
   selectedPersonId: number | null
   disabled?: boolean
   loading?: boolean
+  onBack?: () => void
   onPlayPause: () => void
   onPrev: () => void
   onNext: () => void
@@ -34,27 +36,31 @@ function formatChatHeaderTitle(committeeName: string | null): string {
   return name || 'תמליל הישיבה'
 }
 
-function formatChatHeaderSubtitle(session: CommitteeSession | null): string | null {
+function formatChatHeaderSubtitle(session: CommitteeSession | null): {
+  full: string | null
+  short: string | null
+} {
   if (!session) {
-    return null
+    return { full: null, short: null }
   }
+
+  const when = session.startAt ? formatCommitteeSessionWhen(session) : null
+  const protocolPart =
+    session.sessionNumber != null
+      ? `פרוטוקול ישיבה ${session.sessionNumber}`
+      : 'פרוטוקול'
+
   const parts: string[] = []
-  if (session.sessionNumber != null) {
-    parts.push(`ישיבה ${session.sessionNumber}`)
+  // Desktop RTL: day · time · date appears on the right, before protocol/session.
+  if (when) {
+    parts.push(when)
   }
-  if (session.startAt) {
-    parts.push(
-      new Intl.DateTimeFormat('he-IL', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(session.startAt)),
-    )
+  parts.push(protocolPart)
+
+  return {
+    full: parts.join(' · '),
+    short: when,
   }
-  return parts.length > 0 ? parts.join(' · ') : null
 }
 
 function ChatIconPrev() {
@@ -139,7 +145,7 @@ function isLikelySpeechPart(part: CommitteeTranscriptPart): boolean {
 }
 
 /** Attendance, agenda, staff, and all preamble before the first MK speech. */
-function isMetaPart(
+export function isMetaPart(
   part: CommitteeTranscriptPart,
   index: number,
   parts: CommitteeTranscriptPart[],
@@ -154,6 +160,13 @@ function isMetaPart(
     return true
   }
   return index < firstSpeechIdx
+}
+
+/** Index of the first real speech bubble; -1 if the transcript is only meta. */
+export function getFirstSpeechIndex(
+  parts: CommitteeTranscriptPart[],
+): number {
+  return parts.findIndex((part, index) => !isMetaPart(part, index, parts))
 }
 
 function metaTitle(part: CommitteeTranscriptPart): string {
@@ -175,7 +188,12 @@ function speakerLabel(
   if (member?.fullName) {
     return member.fullName
   }
-  if (part.fullName) {
+  // part.fullName comes from a people join on person_id — ignore it when that
+  // person is not on the session roster (false global name matches).
+  const linkedIsSeated =
+    part.personId != null &&
+    members.some((m) => m.personId === part.personId)
+  if (linkedIsSeated && part.fullName) {
     return part.fullName
   }
   if (isBareChairHeader(part.speakerHeader)) {
@@ -183,7 +201,7 @@ function speakerLabel(
   }
   return (
     speakerHeaderToName(part.speakerHeader) ??
-    part.speakerHeader ??
+    part.speakerHeader?.trim() ??
     'דובר/ת לא מזוהה'
   )
 }
@@ -205,11 +223,9 @@ function speakerImage(
 ): string | null {
   const personId = resolvePartPersonId(part, members)
   if (personId == null) {
-    return part.imageUrl
+    return null
   }
-  return (
-    members.find((m) => m.personId === personId)?.imageUrl ?? part.imageUrl
-  )
+  return members.find((m) => m.personId === personId)?.imageUrl ?? null
 }
 
 export function CommitteeTranscriptChat({
@@ -222,6 +238,7 @@ export function CommitteeTranscriptChat({
   selectedPersonId,
   disabled = false,
   loading = false,
+  onBack,
   onPlayPause,
   onPrev,
   onNext,
@@ -276,16 +293,51 @@ export function CommitteeTranscriptChat({
       aria-busy={loading || undefined}
     >
       <header className="committee-chat__header">
-        <div className="committee-chat__header-text">
-          <div className="committee-chat__header-main">
-            <h2 className="committee-chat__title">
-              {formatChatHeaderTitle(committeeName)}
-            </h2>
-            {headerSubtitle ? (
-              <p className="committee-chat__session-when">{headerSubtitle}</p>
-            ) : null}
+        <div className="committee-chat__header-bar">
+          {onBack ? (
+            <button
+              type="button"
+              className="committee-chat__back"
+              onClick={onBack}
+              aria-label="חזרה לישיבות"
+              title="חזרה"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="committee-chat__back-icon"
+              >
+                <path
+                  fill="currentColor"
+                  d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"
+                />
+              </svg>
+            </button>
+          ) : null}
+          <div className="committee-chat__header-text">
+            <div className="committee-chat__header-main">
+              <div className="committee-chat__title-row">
+                <h2 className="committee-chat__title">
+                  {formatChatHeaderTitle(committeeName)}
+                </h2>
+                <p className="committee-chat__subtitle">{progressLabel}</p>
+              </div>
+              {headerSubtitle.full || headerSubtitle.short ? (
+                <p className="committee-chat__session-when">
+                  {headerSubtitle.full ? (
+                    <span className="committee-chat__session-when-full">
+                      {headerSubtitle.full}
+                    </span>
+                  ) : null}
+                  {headerSubtitle.short ? (
+                    <span className="committee-chat__session-when-short">
+                      {headerSubtitle.short}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+            </div>
           </div>
-          <p className="committee-chat__subtitle">{progressLabel}</p>
         </div>
       </header>
 
@@ -338,11 +390,18 @@ export function CommitteeTranscriptChat({
           </p>
         ) : (
           parts.map((part, index) => {
+            const meta = isMetaPart(part, index, parts)
+            // During play: yellow protocol cards stay visible; only speech
+            // messages after the active cursor stay hidden.
+            if (playing && !meta && index > activeOrdinal) {
+              return null
+            }
+
             const personId = resolvePartPersonId(part, members)
-            const isActive = part.ordinal === activeOrdinal
+            const isActive = index === activeOrdinal
+            const justPopped = playing && isActive && !meta
             const isSelectedSpeaker =
               selectedPersonId != null && personId === selectedPersonId
-            const meta = isMetaPart(part, index, parts)
             const dimmed =
               selectedPersonId != null && !isSelectedSpeaker && !meta
             const name = speakerLabel(part, members)
@@ -366,7 +425,7 @@ export function CommitteeTranscriptChat({
                   <button
                     type="button"
                     className="committee-chat__system-btn"
-                    onClick={() => onJumpToOrdinal(part.ordinal)}
+                    onClick={() => onJumpToOrdinal(index)}
                     ref={isActive ? bindActiveRef : undefined}
                   >
                     <strong>{title}</strong>
@@ -382,6 +441,7 @@ export function CommitteeTranscriptChat({
                 className={[
                   'committee-chat__row',
                   isActive ? 'committee-chat__row--active' : '',
+                  justPopped ? 'committee-chat__message--pop' : '',
                   isSelectedSpeaker ? 'committee-chat__row--selected-speaker' : '',
                   dimmed ? 'committee-chat__row--dimmed' : '',
                 ]
@@ -398,7 +458,7 @@ export function CommitteeTranscriptChat({
                 <button
                   type="button"
                   className="committee-chat__bubble"
-                  onClick={() => onJumpToOrdinal(part.ordinal)}
+                  onClick={() => onJumpToOrdinal(index)}
                   ref={isActive ? bindActiveRef : undefined}
                   aria-current={isActive ? 'true' : undefined}
                 >

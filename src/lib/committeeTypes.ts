@@ -8,6 +8,14 @@ export type KnessetCommittee = {
   committeeTypeId: number | null
   committeeTypeDesc: string | null
   isCurrent: boolean
+  /** Ready-transcript sessions for this committee. */
+  sessionCount: number
+  /** Latest ready-transcript session start time (ISO), if any. */
+  latestSessionAt: string | null
+  /** Current chair full name, when membership data exists. */
+  chairName: string | null
+  /** Current chair photo URL for the committee list avatar. */
+  chairImageUrl: string | null
 }
 
 export type KnessetCommitteeRow = {
@@ -31,6 +39,8 @@ export type CommitteeSession = {
   startAt: string | null
   finishAt: string | null
   hasTranscript: boolean
+  /** Agenda text from protocol part header סדר היום, when available. */
+  agenda: string | null
 }
 
 export type CommitteeSessionRow = {
@@ -56,6 +66,9 @@ export type CommitteeMember = {
   roleDesc: string | null
   startDate: string | null
   endDate: string | null
+  firstElectedYear?: number | null
+  totalDaysInKnesset?: number
+  totalYearsInKnesset?: number
 }
 
 export type CommitteeMembershipRow = {
