@@ -249,6 +249,7 @@ export function KnessetCommitteesPage() {
     () => coalesceTranscriptParts(rawParts, seatsMembers),
     [rawParts, seatsMembers],
   )
+  const firstSpeechIndex = useMemo(() => getFirstSpeechIndex(parts), [parts])
   const activePart = parts[activeOrdinal] ?? null
 
   // Speech bubbles per seated person — drives orbit order (most → top-right).
@@ -256,7 +257,7 @@ export function KnessetCommitteesPage() {
     const counts = new Map<number, number>()
     for (let index = 0; index < parts.length; index += 1) {
       const part = parts[index]!
-      if (isMetaPart(part, index, parts)) {
+      if (isMetaPart(part, index, parts, firstSpeechIndex)) {
         continue
       }
       const personId = resolvePartPersonId(part, seatsMembers)
@@ -266,7 +267,7 @@ export function KnessetCommitteesPage() {
       counts.set(personId, (counts.get(personId) ?? 0) + 1)
     }
     return counts
-  }, [parts, seatsMembers])
+  }, [parts, seatsMembers, firstSpeechIndex])
 
   const { seats, overflowCount } = useMemo(
     () =>
@@ -337,7 +338,7 @@ export function KnessetCommitteesPage() {
         let next = prev + 1
         while (
           next < parts.length &&
-          isMetaPart(parts[next]!, next, parts)
+          isMetaPart(parts[next]!, next, parts, firstSpeechIndex)
         ) {
           next += 1
         }
@@ -349,7 +350,7 @@ export function KnessetCommitteesPage() {
       })
     }, PLAY_INTERVAL_MS)
     return () => window.clearInterval(id)
-  }, [playing, parts])
+  }, [playing, parts, firstSpeechIndex])
 
   // Selection is driven by the URL so share links and back/forward stay in sync.
   useEffect(() => {

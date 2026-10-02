@@ -1,6 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import type { CommitteeMember } from '../../lib/committeeTypes'
 import type { CommitteeSession } from '../../lib/committeeTypes'
 import type { CommitteeTranscriptPart } from '../../lib/committeeTypes'
@@ -12,7 +20,6 @@ import {
   isBareChairHeader,
   isBareCounselHeader,
   isBareManagerHeader,
-  normalizeProtocolSectionHeader,
   resolvePartPersonId,
   speakerHeaderToName,
 } from '../../lib/committeeSpeakerMatch'
@@ -33,6 +40,11 @@ type CommitteeTranscriptChatProps = {
   onNext: () => void
   onJumpToOrdinal: (ordinal: number) => void
   onClearMemberFilter: () => void
+}
+
+type VisibleItem = {
+  part: CommitteeTranscriptPart
+  ordinal: number
 }
 
 function formatChatHeaderTitle(committeeName: string | null): string {
@@ -192,11 +204,6 @@ function partMatchesSearch(
   return haystack.includes(trimmed.toLowerCase())
 }
 
-/** Strip bidi marks / wrapping quotes so section labels like "סדר" still match. */
-function normalizeSectionHeader(header: string): string {
-  return normalizeProtocolSectionHeader(header)
-}
-
 function isStructuralMetaPart(part: CommitteeTranscriptPart): boolean {
   const header = (part.speakerHeader ?? '').trim()
   if (!header) {
@@ -239,29 +246,32 @@ function isLikelySpeechPart(part: CommitteeTranscriptPart): boolean {
   return speakerHeaderToName(header) != null
 }
 
-/** Attendance, agenda, staff, and all preamble before the first MK speech. */
+/**
+ * Attendance / agenda / staff, and all preamble before the first MK speech.
+ * Pass `firstSpeechIndex` (from getFirstSpeechIndex) to avoid O(n²) scans.
+ */
 export function isMetaPart(
   part: CommitteeTranscriptPart,
   index: number,
   parts: CommitteeTranscriptPart[],
+  firstSpeechIndex?: number,
 ): boolean {
   if (isStructuralMetaPart(part)) {
     return true
   }
-  const firstSpeechIdx = parts.findIndex((candidate) =>
-    isLikelySpeechPart(candidate),
-  )
-  if (firstSpeechIdx === -1) {
+  const first =
+    firstSpeechIndex ?? parts.findIndex((candidate) => isLikelySpeechPart(candidate))
+  if (first === -1) {
     return true
   }
-  return index < firstSpeechIdx
+  return index < first
 }
 
 /** Index of the first real speech bubble; -1 if the transcript is only meta. */
 export function getFirstSpeechIndex(
   parts: CommitteeTranscriptPart[],
 ): number {
-  return parts.findIndex((part, index) => !isMetaPart(part, index, parts))
+  return parts.findIndex((part) => isLikelySpeechPart(part))
 }
 
 function metaTitle(part: CommitteeTranscriptPart): string {
@@ -338,6 +348,113 @@ function speakerImage(
   return members.find((m) => m.personId === personId)?.imageUrl ?? null
 }
 
+type ChatMessageRowProps = {
+  part: CommitteeTranscriptPart
+  ordinal: number
+  members: CommitteeMember[]
+  meta: boolean
+  isActive: boolean
+  justPopped: boolean
+  selectedPersonId: number | null
+  searchQuery: string
+  searchActive: boolean
+  onJumpToOrdinal: (ordinal: number) => void
+}
+
+const ChatMessageRow = memo(function ChatMessageRow({
+  part,
+  ordinal,
+  members,
+  meta,
+  isActive,
+  justPopped,
+  selectedPersonId,
+  searchQuery,
+  searchActive,
+  onJumpToOrdinal,
+}: ChatMessageRowProps) {
+  const personId = resolvePartPersonId(part, members)
+  const isSelectedSpeaker =
+    selectedPersonId != null && personId === selectedPersonId
+  const matchesSearch = partMatchesSearch(part, searchQuery, members)
+  const dimmed =
+    (selectedPersonId != null && !isSelectedSpeaker && !meta) ||
+    (searchActive && !matchesSearch)
+  const name = speakerLabel(part, members)
+  const factionName = speakerFaction(part, members)
+  const imageUrl = speakerImage(part, members)
+
+  if (meta) {
+    const body = part.body.trim()
+    const title = metaTitle(part)
+    return (
+      <div
+        className={[
+          'committee-chat__system',
+          isActive ? 'committee-chat__system--active' : '',
+          dimmed ? 'committee-chat__system--dimmed' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <button
+          type="button"
+          className="committee-chat__system-btn"
+          onClick={() => onJumpToOrdinal(ordinal)}
+        >
+          <strong>{highlightSearchMatches(title, searchQuery)}</strong>
+          {body ? (
+            <span>{highlightSearchMatches(body, searchQuery)}</span>
+          ) : null}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={[
+        'committee-chat__row',
+        isActive ? 'committee-chat__row--active' : '',
+        justPopped ? 'committee-chat__message--pop' : '',
+        isSelectedSpeaker ? 'committee-chat__row--selected-speaker' : '',
+        dimmed ? 'committee-chat__row--dimmed' : '',
+        searchActive && matchesSearch ? 'committee-chat__row--search-match' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <div className="committee-chat__avatar" aria-hidden>
+        {imageUrl ? (
+          <img src={imageUrl} alt="" />
+        ) : (
+          <span>{initialsFromName(name)}</span>
+        )}
+      </div>
+      <button
+        type="button"
+        className="committee-chat__bubble"
+        onClick={() => onJumpToOrdinal(ordinal)}
+        aria-current={isActive ? 'true' : undefined}
+      >
+        <span className="committee-chat__bubble-meta">
+          <span className="committee-chat__bubble-name">
+            {highlightSearchMatches(name, searchQuery)}
+          </span>
+          {factionName ? (
+            <span className="committee-chat__bubble-party">
+              {highlightSearchMatches(factionName, searchQuery)}
+            </span>
+          ) : null}
+        </span>
+        <span className="committee-chat__bubble-body">
+          {highlightSearchMatches(part.body, searchQuery)}
+        </span>
+      </button>
+    </div>
+  )
+})
+
 export function CommitteeTranscriptChat({
   parts,
   members,
@@ -356,19 +473,13 @@ export function CommitteeTranscriptChat({
   onClearMemberFilter,
 }: CommitteeTranscriptChatProps) {
   const listRef = useRef<HTMLDivElement | null>(null)
-  const activeRef = useRef<HTMLElement | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [scrollProgress, setScrollProgress] = useState(0)
   const [summaryText, setSummaryText] = useState<string | null>(null)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
-  const partsLengthRef = useRef(parts.length)
-  partsLengthRef.current = parts.length
 
-  const bindActiveRef = (node: HTMLElement | null) => {
-    activeRef.current = node
-  }
+  const firstSpeechIndex = useMemo(() => getFirstSpeechIndex(parts), [parts])
 
   const selectedMember =
     selectedPersonId == null
@@ -399,6 +510,27 @@ export function CommitteeTranscriptChat({
   const trimmedSearch = searchQuery.trim()
   const searchActive = trimmedSearch.length > 0
 
+  // Play: keep meta cards + speech up to the active cursor (hide future speech).
+  const visibleItems = useMemo((): VisibleItem[] => {
+    const items: VisibleItem[] = []
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index]!
+      const meta = isMetaPart(part, index, parts, firstSpeechIndex)
+      if (playing && !meta && index > activeOrdinal) {
+        continue
+      }
+      items.push({ part, ordinal: index })
+    }
+    return items
+  }, [parts, playing, activeOrdinal, firstSpeechIndex])
+
+  const virtualizer = useVirtualizer({
+    count: visibleItems.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => 96,
+    overscan: 14,
+  })
+
   useEffect(() => {
     setSearchQuery('')
     setSummaryText(null)
@@ -407,39 +539,23 @@ export function CommitteeTranscriptChat({
     setSummaryOpen(false)
   }, [session?.id])
 
+  // Keep the active bubble in view without mounting every row.
   useEffect(() => {
-    const node = activeRef.current
-    if (!node || !listRef.current) {
+    if (visibleItems.length === 0) {
       return
     }
-    node.scrollIntoView({
-      behavior: playing ? 'smooth' : 'smooth',
-      block: 'nearest',
-    })
-  }, [activeOrdinal, playing, selectedPersonId])
-
-  // Sample scroll position once per second (not on every scroll event).
-  useEffect(() => {
-    const readProgress = () => {
-      const el = listRef.current
-      if (!el) {
-        setScrollProgress(0)
-        return
-      }
-      const maxScroll = el.scrollHeight - el.clientHeight
-      if (maxScroll <= 0) {
-        setScrollProgress(partsLengthRef.current > 0 ? 100 : 0)
-        return
-      }
-      setScrollProgress(
-        Math.min(100, Math.max(0, (el.scrollTop / maxScroll) * 100)),
-      )
+    const visibleIndex = visibleItems.findIndex(
+      (item) => item.ordinal === activeOrdinal,
+    )
+    if (visibleIndex < 0) {
+      return
     }
-
-    readProgress()
-    const id = window.setInterval(readProgress, 1000)
-    return () => window.clearInterval(id)
-  }, [session?.id])
+    virtualizer.scrollToIndex(visibleIndex, {
+      align: 'auto',
+      behavior: 'smooth',
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scroll when play/selection moves
+  }, [activeOrdinal, playing, selectedPersonId, visibleItems])
 
   async function requestSessionSummary() {
     if (session?.id == null || summaryLoading) {
@@ -500,6 +616,8 @@ export function CommitteeTranscriptChat({
     )
   }, [parts, members, searchActive, trimmedSearch])
 
+  const virtualItems = virtualizer.getVirtualItems()
+
   return (
     <section
       className="committee-chat"
@@ -555,20 +673,6 @@ export function CommitteeTranscriptChat({
         </div>
       </header>
 
-      <div
-        className="committee-chat__track"
-        role="progressbar"
-        aria-label="מיקום בגלילת התמליל"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(scrollProgress)}
-      >
-        <div
-          className="committee-chat__fill"
-          style={{ width: `${scrollProgress}%` }}
-        />
-      </div>
-
       {selectedMember ? (
         <div className="committee-chat__filter">
           <div className="committee-chat__filter-info">
@@ -611,113 +715,49 @@ export function CommitteeTranscriptChat({
               {loading ? 'טוען הודעות…' : 'אין הודעות להצגה'}
             </p>
           ) : (
-            parts.map((part, index) => {
-              const meta = isMetaPart(part, index, parts)
-              // During play: yellow protocol cards stay visible; only speech
-              // messages after the active cursor stay hidden.
-              if (playing && !meta && index > activeOrdinal) {
-                return null
-              }
-
-              const personId = resolvePartPersonId(part, members)
-              const isActive = index === activeOrdinal
-              const justPopped = playing && isActive && !meta
-              const isSelectedSpeaker =
-                selectedPersonId != null && personId === selectedPersonId
-              const matchesSearch = partMatchesSearch(
-                part,
-                trimmedSearch,
-                members,
-              )
-              const dimmed =
-                (selectedPersonId != null && !isSelectedSpeaker && !meta) ||
-                (searchActive && !matchesSearch)
-              const name = speakerLabel(part, members)
-              const factionName = speakerFaction(part, members)
-              const imageUrl = speakerImage(part, members)
-
-              if (meta) {
-                const body = part.body.trim()
-                const title = metaTitle(part)
+            <div
+              className="committee-chat__virtual"
+              style={{ height: `${virtualizer.getTotalSize()}px` }}
+            >
+              {virtualItems.map((virtualRow) => {
+                const item = visibleItems[virtualRow.index]
+                if (!item) {
+                  return null
+                }
+                const meta = isMetaPart(
+                  item.part,
+                  item.ordinal,
+                  parts,
+                  firstSpeechIndex,
+                )
+                const isActive = item.ordinal === activeOrdinal
+                const justPopped = playing && isActive && !meta
                 return (
                   <div
-                    key={part.id}
-                    className={[
-                      'committee-chat__system',
-                      isActive ? 'committee-chat__system--active' : '',
-                      dimmed ? 'committee-chat__system--dimmed' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
+                    key={item.part.id}
+                    className="committee-chat__virtual-item"
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                   >
-                    <button
-                      type="button"
-                      className="committee-chat__system-btn"
-                      onClick={() => onJumpToOrdinal(index)}
-                      ref={isActive ? bindActiveRef : undefined}
-                    >
-                      <strong>
-                        {highlightSearchMatches(title, trimmedSearch)}
-                      </strong>
-                      {body ? (
-                        <span>
-                          {highlightSearchMatches(body, trimmedSearch)}
-                        </span>
-                      ) : null}
-                    </button>
+                    <ChatMessageRow
+                      part={item.part}
+                      ordinal={item.ordinal}
+                      members={members}
+                      meta={meta}
+                      isActive={isActive}
+                      justPopped={justPopped}
+                      selectedPersonId={selectedPersonId}
+                      searchQuery={trimmedSearch}
+                      searchActive={searchActive}
+                      onJumpToOrdinal={onJumpToOrdinal}
+                    />
                   </div>
                 )
-              }
-
-              return (
-                <div
-                  key={part.id}
-                  className={[
-                    'committee-chat__row',
-                    isActive ? 'committee-chat__row--active' : '',
-                    justPopped ? 'committee-chat__message--pop' : '',
-                    isSelectedSpeaker
-                      ? 'committee-chat__row--selected-speaker'
-                      : '',
-                    dimmed ? 'committee-chat__row--dimmed' : '',
-                    searchActive && matchesSearch
-                      ? 'committee-chat__row--search-match'
-                      : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  <div className="committee-chat__avatar" aria-hidden>
-                    {imageUrl ? (
-                      <img src={imageUrl} alt="" />
-                    ) : (
-                      <span>{initialsFromName(name)}</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="committee-chat__bubble"
-                    onClick={() => onJumpToOrdinal(index)}
-                    ref={isActive ? bindActiveRef : undefined}
-                    aria-current={isActive ? 'true' : undefined}
-                  >
-                    <span className="committee-chat__bubble-meta">
-                      <span className="committee-chat__bubble-name">
-                        {highlightSearchMatches(name, trimmedSearch)}
-                      </span>
-                      {factionName ? (
-                        <span className="committee-chat__bubble-party">
-                          {highlightSearchMatches(factionName, trimmedSearch)}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="committee-chat__bubble-body">
-                      {highlightSearchMatches(part.body, trimmedSearch)}
-                    </span>
-                  </button>
-                </div>
-              )
-            })
+              })}
+            </div>
           )}
         </div>
 
