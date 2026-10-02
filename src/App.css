@@ -279,31 +279,12 @@
 
 .hero__bear {
   display: block;
-  width: min(110%, 560px);
+  width: min(100%, 400px);
   max-width: none;
   height: auto;
-  /* Cover + slight overscale crop encoded / compositor black edges */
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   background-color: #3083f0;
-  transform: scale(1.12) translateX(28px);
-  transform-origin: center center;
-  /* Trim hairline black bars that show on the right/bottom when scaled */
-  clip-path: inset(0.5% 1.25% 1.25% 0.5%);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.hero__bear--ready {
-  opacity: 1;
-}
-
-@media (max-width: 1100px) and (min-width: 901px) {
-  .hero__bear {
-    /* Narrower hero column: crop a bit more so edge bars stay hidden */
-    transform: scale(1.16) translateX(18px);
-    clip-path: inset(0.75% 1.5% 1.5% 0.5%);
-  }
 }
 
 /* ── News strip ── */

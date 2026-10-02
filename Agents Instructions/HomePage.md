@@ -60,8 +60,8 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `public/header-logo 3.svg` | Header logo (desktop / non-home) |
 | `public/while-logo-nobg.svg` | White logo used as homepage hero title |
 | `public/white logo.svg` | White footer logo |
-| `public/hero-bear-image.svg` | Hero video poster + load-error fallback |
-| Supabase `site-assets/bear-hero-video2.mp4` | Desktop hero bear video (not in git) |
+| `public/hero-bear-image2.png` | Desktop hero bear illustration (static; replaces former Supabase video) |
+| `public/hero-bear-image.svg` | Legacy hero poster (unused while static PNG is active) |
 
 ## Layout primitive: `.container`
 
@@ -106,9 +106,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Blue background (`#3083F0`).
 - Taller section: `min-height: clamp(460px, 64vh, 600px)` with `48px` vertical padding.
 - `.hero__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, visual second — in RTL this places text on the right and bear on the left.
-- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center), nudged up with `translateY(-20px)` (video column stays put). Column `gap: 16px` between title logo, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
+- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center), nudged up with `translateY(-20px)` (bear column stays put). Column `gap: 16px` between title logo, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
 - Bear column: `justify-content: flex-start` (faces toward center).
-- **Visual (desktop):** muted `<video>` from Supabase Storage (`site-assets/bear-hero-video2.mp4`), plays once (no loop). Poster `/hero-bear-image.svg`. Video stays `opacity: 0` until ready (`onLoadedMetadata` / `onLoadedData` / `onCanPlay` / `onPlaying`, plus a mount-time `readyState` check so cached videos do not miss the event). On load error, falls back to the poster `<img>`. Explicit `play()` on mount/`loadeddata` so autoplay is reliable. File is large (~17MB), so first paint can take a moment. Autoplay + `playsInline` + `preload="auto"`. Sized larger than the grid column (`width: min(110%, 560px)`, `scale(1.12) translateX(28px)` + light `clip-path` inset) with `object-fit: cover` and hero-blue video background so scaled/narrow viewports do not show black letterbox edges on the right/bottom. Overflow visible on `.hero__visual`. Still hidden on mobile via `.hero__visual` (`display: none` at ≤900px).
+- **Visual (desktop):** static `<img>` from `/hero-bear-image2.png` (served from the app, not Supabase Storage — avoids Cached Egress). Sized with `width: min(100%, 400px)` and `object-fit: contain` on a hero-blue background. Still hidden on mobile via `.hero__visual` (`display: none` at ≤900px).
 - **Title:** `/while-logo-nobg.svg` inside the `h1` (desktop and mobile) — brand mark replaces the text headline; `alt="מצב האומה"`.
 - **Subtitle:** הבית של המידע הפוליטי בישראל
 - **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): 2×2 grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (640px) so buttons read wider.

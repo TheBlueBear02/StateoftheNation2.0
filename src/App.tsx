@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from './components/SiteLayout'
 import { ListsGamePromo } from './components/elections/ListsGamePromo'
@@ -19,31 +18,12 @@ const HERO_BUTTONS = [
 /** Homepage live hot-indexes carousel (office KPI charts). */
 const SHOW_GOVERNMENT_DASHBOARD = true
 
-const HERO_VIDEO_SRC =
-  'https://tawfpzpikbxvgsqrtvpm.supabase.co/storage/v1/object/public/site-assets/bear-hero-video2.mp4'
+const HERO_BEAR_SRC = '/hero-bear-image2.png'
 
 function App() {
-  const heroVideoRef = useRef<HTMLVideoElement>(null)
-  const [heroVideoReady, setHeroVideoReady] = useState(false)
-  const [heroVideoFailed, setHeroVideoFailed] = useState(false)
   const { items: newsItems } = useSiteUpdates()
   const { dateLabel: pollsUpdatedLabel } = useLatestPollDate()
 
-  useEffect(() => {
-    const video = heroVideoRef.current
-    if (!video) return
-
-    video.muted = true
-
-    // Cached videos may already be past loadeddata before React listeners attach
-    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      setHeroVideoReady(true)
-    }
-
-    void video.play().catch(() => {})
-  }, [])
-
-  const revealHeroVideo = () => setHeroVideoReady(true)
   const tickerItems =
     newsItems.length > 0 ? [...newsItems, ...newsItems] : []
 
@@ -79,40 +59,13 @@ function App() {
             </div>
 
             <div className="hero__visual">
-              {heroVideoFailed ? (
-                <img
-                  className="hero__bear hero__bear--ready"
-                  src="/hero-bear-image.svg"
-                  alt="דוב מצב האומה מאחורי דוכן נאומים"
-                  width={419}
-                  height={320}
-                />
-              ) : (
-                <video
-                  ref={heroVideoRef}
-                  className={`hero__bear${heroVideoReady ? ' hero__bear--ready' : ''}`}
-                  src={HERO_VIDEO_SRC}
-                  poster="/hero-bear-image.svg"
-                  autoPlay
-                  muted
-                  playsInline
-                  preload="auto"
-                  aria-label="דוב מצב האומה מאחורי דוכן נאומים"
-                  width={419}
-                  height={320}
-                  onLoadedData={(event) => {
-                    revealHeroVideo()
-                    void event.currentTarget.play().catch(() => {})
-                  }}
-                  onLoadedMetadata={revealHeroVideo}
-                  onCanPlay={revealHeroVideo}
-                  onPlaying={revealHeroVideo}
-                  onError={() => {
-                    setHeroVideoFailed(true)
-                    setHeroVideoReady(true)
-                  }}
-                />
-              )}
+              <img
+                className="hero__bear"
+                src={HERO_BEAR_SRC}
+                alt="דוב מצב האומה מאחורי דוכן נאומים"
+                width={1024}
+                height={1024}
+              />
             </div>
           </div>
         </section>
