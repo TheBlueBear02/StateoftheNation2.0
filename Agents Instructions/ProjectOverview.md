@@ -148,7 +148,7 @@ NEXT_PUBLIC_PIPELINE_EDIT_SECRET=...  # shared unlock for /piplines + all /edit 
 NEXT_PUBLIC_ELECTIONS_EDIT_SECRET=... # fallback alias (or VITE_ / ELECTIONS_EDIT_SECRET)
 NEXT_PUBLIC_KNESSET_EDIT_SECRET=...   # fallback alias (or VITE_ / KNESSET_EDIT_SECRET)
 SUPABASE_SERVICE_KEY=...              # pipelines + local edit APIs
-OPENAI_API_KEY=...                    # elections enrichment + homepage site_updates headlines
+OPENAI_API_KEY=...                    # elections enrichment + homepage site_updates + committee session AI summary
 ENABLE_PIPELINE_API=1                 # optional: allow Python APIs outside development
 ```
 
@@ -184,6 +184,7 @@ npm run lint
 | [HomePage.md](./HomePage.md) | `/` |
 | [LegalPages.md](./LegalPages.md) | `/about`, `/terms` (footer only) |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` + `/knesset/edit` |
+| [KnessetCommitteesPage.md](./KnessetCommitteesPage.md) | `/knesset/committees` — K25 committees table + transcript Play |
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` dashboard + `/piplines/docs` |
 | [ElectionsPage.md](./ElectionsPage.md) | `/elections` module |
 | [PollsPage.md](./PollsPage.md) | `/elections/polls` |
