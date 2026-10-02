@@ -10,9 +10,36 @@ export function normalizeSpeakerText(value: string): string {
 }
 
 const SPEAKER_PREFIX_RE =
-  /^(?:היו"?ר|יו"?ר|מ"?מ היו"?ר|חברת?\s+הכנסת|ח"?כ|השרה?|שרת?|עו"?ד|ד"?ר|פרופ'?|גב'?|מר)\s+/u
+  /^(?:היו"?ר|יו"?ר|מ"?מ היו"?ר|חברת?\s+הכנסת|ח"?כ|השרה?|שרת?|ה?יועצ[ת]?\s+המשפטי[ת]?|יועמ"?ש|עו"?ד|ד"?ר|פרופ'?|גב'?|מר)\s+/u
 
 const BARE_CHAIR_RE = /^(?:היו"?ר|יו"?ר)$/u
+
+/** Synthetic id when counsel has no people-row match in the transcript. */
+export const LEGAL_COUNSEL_FALLBACK_PERSON_ID = -900_001
+/** Synthetic id for מנהל/ת הוועדה seat / chat linking. */
+export const COMMITTEE_MANAGER_FALLBACK_PERSON_ID = -900_002
+
+const COUNSEL_SECTION_HEADER_RE =
+  /^(?:ייעוץ משפטי|יועץ משפטי|יועצת משפטית)(?=\s|$|[:：])/u
+
+const BARE_COUNSEL_RE =
+  /^(?:ה?יועצ[ת]?\s*המשפטי[ת]?|יועמ"?ש)$/u
+
+const COUNSEL_ROLE_IN_HEADER_RE =
+  /ה?יועצ[ת]?\s*המשפטי[ת]?|יועמ"?ש|ייעוץ\s*משפטי/u
+
+/** מנהל הוועדה / מנהלת הוועדה / מנהל/ת הוועדה */
+const MANAGER_SECTION_HEADER_RE =
+  /^(?:מנהל(?:ת)?(?:\s*\/\s*ת)?\s+הוו?עדה)(?=\s|$|[:：])/u
+
+const BARE_MANAGER_RE =
+  /^(?:מנהל(?:ת)?(?:\s*\/\s*ת)?\s+הוו?עדה)$/u
+
+const MANAGER_ROLE_IN_HEADER_RE =
+  /מנהל(?:ת)?(?:\s*\/\s*ת)?\s+הוו?עדה/u
+
+const STAFF_SECTION_SKIP_RE =
+  /^(?:ייעוץ משפטי|יועץ משפטי|יועצת משפטית|מנהל(?:ת)?(?:\s*\/\s*ת)?\s+הוו?עדה|מוזמנים|מוזמנות|רישום|קצרנ)/u
 
 /** Lines that are speech content, not a new speaker attribution. */
 const SPEECH_CONTINUATION_HEADER_RE =
@@ -33,7 +60,12 @@ export function speakerHeaderToName(header: string | null | undefined): string |
   text = text.replace(/[:：\-–—].*$/u, '').trim()
   text = text.replace(SPEAKER_PREFIX_RE, '').trim()
   text = normalizeSpeakerText(text)
-  if (!text || BARE_CHAIR_RE.test(text)) {
+  if (
+    !text ||
+    BARE_CHAIR_RE.test(text) ||
+    BARE_COUNSEL_RE.test(text) ||
+    BARE_MANAGER_RE.test(text)
+  ) {
     return null
   }
   return text
@@ -47,6 +79,219 @@ export function isBareChairHeader(header: string | null | undefined): boolean {
     header.trim().replace(/[:：\-–—].*$/u, ''),
   )
   return BARE_CHAIR_RE.test(stripped)
+}
+
+export function isBareCounselHeader(header: string | null | undefined): boolean {
+  if (!header) {
+    return false
+  }
+  const stripped = normalizeSpeakerText(
+    header.trim().replace(/[:：\-–—].*$/u, ''),
+  )
+  return BARE_COUNSEL_RE.test(stripped)
+}
+
+export function isBareManagerHeader(header: string | null | undefined): boolean {
+  if (!header) {
+    return false
+  }
+  const stripped = normalizeSpeakerText(
+    header.trim().replace(/[:：\-–—].*$/u, ''),
+  )
+  return BARE_MANAGER_RE.test(stripped)
+}
+
+function headerMatchesStaffName(
+  header: string,
+  staffName: string | null | undefined,
+  fallbackLabel: string,
+): boolean {
+  const normalizedHeader = normalizeSpeakerText(header)
+  const name = staffName?.trim() ? normalizeSpeakerText(staffName) : ''
+  if (!name || name === normalizeSpeakerText(fallbackLabel)) {
+    return false
+  }
+  if (normalizedHeader.includes(name) || name.includes(normalizedHeader)) {
+    return true
+  }
+  const fromHeader = speakerHeaderToName(header)
+  return Boolean(fromHeader && namesLooselyMatch(fromHeader, name))
+}
+
+/** True when a speech header belongs to the session's legal counsel. */
+export function headerMatchesLegalCounsel(
+  header: string | null | undefined,
+  counselName: string | null | undefined,
+): boolean {
+  if (!header?.trim()) {
+    return false
+  }
+  const raw = header.trim()
+  // The yellow "ייעוץ משפטי" attendance card is not a speech turn.
+  if (/^(?:ייעוץ משפטי|יועץ משפטי|יועצת משפטית)\s*$/u.test(raw)) {
+    return false
+  }
+  if (isBareCounselHeader(raw)) {
+    return true
+  }
+  if (headerMatchesStaffName(raw, counselName, 'יועמ״ש')) {
+    return true
+  }
+  // Role title with an optional name still counts as counsel speech.
+  if (COUNSEL_ROLE_IN_HEADER_RE.test(raw) && !COUNSEL_SECTION_HEADER_RE.test(raw)) {
+    return true
+  }
+  return false
+}
+
+/** True when a speech header belongs to מנהל/ת הוועדה. */
+export function headerMatchesCommitteeManager(
+  header: string | null | undefined,
+  managerName: string | null | undefined,
+): boolean {
+  if (!header?.trim()) {
+    return false
+  }
+  const raw = header.trim()
+  if (BARE_MANAGER_RE.test(normalizeSpeakerText(raw.replace(/[:：\-–—].*$/u, '')))) {
+    return true
+  }
+  // Exact section label is the yellow card, not a speech.
+  if (MANAGER_SECTION_HEADER_RE.test(raw) && /הוו?עדה\s*$/u.test(raw)) {
+    return false
+  }
+  if (headerMatchesStaffName(raw, managerName, 'מנהל/ת')) {
+    return true
+  }
+  if (MANAGER_ROLE_IN_HEADER_RE.test(raw) && !MANAGER_SECTION_HEADER_RE.test(raw)) {
+    return true
+  }
+  return false
+}
+
+function firstStaffNameFromBody(body: string): string | null {
+  for (const rawLine of body.split(/\n+/u)) {
+    let text = rawLine.trim()
+    if (!text) {
+      continue
+    }
+    // Drop trailing role notes ("שם – יועמ״ש").
+    text = text.replace(/\s*[–—\-].*$/u, '').trim()
+    text = text.replace(SPEAKER_PREFIX_RE, '').trim()
+    text = normalizeSpeakerText(text)
+    if (!text || text.length < 2) {
+      continue
+    }
+    // Skip section leftovers that are not names.
+    if (
+      STAFF_SECTION_SKIP_RE.test(text) ||
+      BARE_COUNSEL_RE.test(text) ||
+      BARE_MANAGER_RE.test(text)
+    ) {
+      continue
+    }
+    return text
+  }
+  return null
+}
+
+/**
+ * Build a seat/chat identity for the session's legal counsel from the
+ * "ייעוץ משפטי" protocol block (and matching speech parts for photo/name).
+ * Always returns a counsel row so the יועמ״ש circle stays selectable.
+ */
+export function extractLegalCounselMember(
+  parts: CommitteeTranscriptPart[],
+  committeeId: number,
+): CommitteeMember {
+  const section = parts.find((part) => {
+    const header = (part.speakerHeader ?? '').trim()
+    return COUNSEL_SECTION_HEADER_RE.test(header)
+  })
+
+  let fullName = section ? firstStaffNameFromBody(section.body) : null
+  let imageUrl: string | null = null
+
+  if (fullName) {
+    for (const part of parts) {
+      if (!headerMatchesLegalCounsel(part.speakerHeader, fullName)) {
+        continue
+      }
+      if (part.fullName?.trim()) {
+        fullName = part.fullName.trim()
+      }
+      if (part.imageUrl) {
+        imageUrl = part.imageUrl
+        break
+      }
+    }
+  }
+
+  if (!fullName) {
+    fullName = 'יועמ״ש'
+  }
+
+  return {
+    id: LEGAL_COUNSEL_FALLBACK_PERSON_ID,
+    committeeId,
+    personId: LEGAL_COUNSEL_FALLBACK_PERSON_ID,
+    fullName,
+    imageUrl,
+    factionName: null,
+    seatRole: 'legal_counsel',
+    roleDesc: 'ייעוץ משפטי',
+    startDate: null,
+    endDate: null,
+  }
+}
+
+/**
+ * Build a seat/chat identity for מנהל/ת הוועדה from the protocol block.
+ * Always returns a manager row so the circle stays selectable.
+ */
+export function extractCommitteeManagerMember(
+  parts: CommitteeTranscriptPart[],
+  committeeId: number,
+): CommitteeMember {
+  const section = parts.find((part) => {
+    const header = (part.speakerHeader ?? '').trim()
+    return MANAGER_SECTION_HEADER_RE.test(header)
+  })
+
+  let fullName = section ? firstStaffNameFromBody(section.body) : null
+  let imageUrl: string | null = null
+
+  if (fullName) {
+    for (const part of parts) {
+      if (!headerMatchesCommitteeManager(part.speakerHeader, fullName)) {
+        continue
+      }
+      if (part.fullName?.trim()) {
+        fullName = part.fullName.trim()
+      }
+      if (part.imageUrl) {
+        imageUrl = part.imageUrl
+        break
+      }
+    }
+  }
+
+  if (!fullName) {
+    fullName = 'מנהל/ת'
+  }
+
+  return {
+    id: COMMITTEE_MANAGER_FALLBACK_PERSON_ID,
+    committeeId,
+    personId: COMMITTEE_MANAGER_FALLBACK_PERSON_ID,
+    fullName,
+    imageUrl,
+    factionName: null,
+    seatRole: 'committee_manager',
+    roleDesc: 'מנהל/ת הוועדה',
+    startDate: null,
+    endDate: null,
+  }
 }
 
 function namesLooselyMatch(a: string, b: string): boolean {
@@ -102,6 +347,10 @@ export function isCredibleSpeakerHeader(
   if (!raw) {
     return false
   }
+  // Agenda / סדר היום must never count as a speaker turn.
+  if (isAgendaSectionHeader(raw) || isStructuralMetaHeader(raw)) {
+    return false
+  }
   if (isBareChairHeader(raw)) {
     return true
   }
@@ -131,15 +380,72 @@ export function isCredibleSpeakerHeader(
   return !hasOfficialPrefix && looksLikePersonName(name)
 }
 
+/** Strip bidi / zero-width / niqqud / wrapping punct from protocol section labels. */
+export function normalizeProtocolSectionHeader(header: string): string {
+  return header
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/gu, '')
+    .replace(/[\u0591-\u05C7]/gu, '')
+    .replace(/^[\s<"«『【\[]+|[\s>"»』】\]]+$/gu, '')
+    .replace(/[:：.。־–—-]+$/gu, '')
+    .trim()
+}
+
+/**
+ * Agenda section labels: "סדר", "סדר היום", "סדר-היום", "סדר: …".
+ * Also "מסדר היום …" removal-from-agenda headers.
+ */
+export function isAgendaSectionHeader(header: string): boolean {
+  const text = normalizeProtocolSectionHeader(header)
+  if (!text) {
+    return false
+  }
+  return /^(?:מ?סדר)(?:[\s\-־–—:].*)?$/u.test(text) || text.startsWith('סדר')
+}
+
+/**
+ * Protocol attendance blocks (נכחו / חברי הכנסת) — shown on the table, not
+ * as chat cards.
+ */
+export function isAttendanceProtocolHeader(
+  header: string | null | undefined,
+): boolean {
+  const text = normalizeProtocolSectionHeader((header ?? '').trim())
+  if (!text) {
+    return false
+  }
+  if (text === 'נכחו') {
+    return true
+  }
+  // Exact guest-MK attendance labels (avoid stripping every "חברי …" header).
+  return /^(?:חברי|חברות)\s+הכנסת$/u.test(text)
+}
+
+/**
+ * Staff roster section cards (ייעוץ משפטי / מנהל/ת הוועדה) — used to build
+ * table seats, omitted from the chat like attendance blocks. Does not match
+ * named speech turns (e.g. "היועץ המשפטי איתי עצמון").
+ */
+export function isStaffRosterProtocolHeader(
+  header: string | null | undefined,
+): boolean {
+  const text = normalizeProtocolSectionHeader((header ?? '').trim())
+  if (!text) {
+    return false
+  }
+  if (/^(?:ייעוץ משפטי|יועץ משפטי|יועצת משפטית)$/u.test(text)) {
+    return true
+  }
+  return BARE_MANAGER_RE.test(text)
+}
+
 function isStructuralMetaHeader(header: string | null | undefined): boolean {
   const text = (header ?? '').trim()
   if (!text) {
     return true
   }
   if (
-    text === 'נכחו' ||
-    text === 'סדר היום' ||
-    text.startsWith('סדר היום') ||
+    isAttendanceProtocolHeader(text) ||
+    isAgendaSectionHeader(text) ||
     text.startsWith('חברי ') ||
     text.startsWith('חברות ')
   ) {
@@ -211,6 +517,24 @@ export function resolvePartPersonId(
   part: CommitteeTranscriptPart,
   members: CommitteeMember[],
 ): number | null {
+  const counsel = members.find((m) => m.seatRole === 'legal_counsel') ?? null
+  const manager =
+    members.find((m) => m.seatRole === 'committee_manager') ?? null
+
+  // Staff speeches first — titles/names often don't share the people-row id.
+  if (
+    counsel &&
+    headerMatchesLegalCounsel(part.speakerHeader, counsel.fullName)
+  ) {
+    return counsel.personId
+  }
+  if (
+    manager &&
+    headerMatchesCommitteeManager(part.speakerHeader, manager.fullName)
+  ) {
+    return manager.personId
+  }
+
   if (part.personId != null) {
     const known = members.find((m) => m.personId === part.personId)
     if (known) {

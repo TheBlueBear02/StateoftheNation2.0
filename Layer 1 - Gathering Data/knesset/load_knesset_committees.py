@@ -11,6 +11,8 @@ Sources:
       members/mk_individual/*.csv
       committees/kns_committeesession/*.csv
       committees/meeting_protocols_{text,parts}/...
+  - Self-parse fallback: download protocol DOC/DOCX from FilePath when
+    Hasadna has no text/parts (requires `antiword` for .doc; WSL/Linux)
 
 Tables written:
   knesset_committees
@@ -58,6 +60,11 @@ from load_all_knesset_data import (  # noqa: E402
     get_supabase,
     load_id_map,
     upsert,
+)
+
+from committee_protocol_parse import (  # noqa: E402
+    ProtocolParseError,
+    parse_protocol_url,
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -902,7 +909,8 @@ def sync_documents(sb: Client, knesset_num: int) -> dict:
             "skipped": 0,
         }
 
-    # Prefer the dataservice / parsed dump; fall back to the older mirror name.
+    # Prefer the live dataservice dump (updated daily) for FilePath coverage;
+    # fall back to the older mirror, then OData.
     urls = [
         f"{HASADNA_BASE}/committees/kns_documentcommitteesession_dataservice/"
         "kns_documentcommitteesession_dataservice.csv",
@@ -954,12 +962,18 @@ def sync_documents(sb: Client, knesset_num: int) -> dict:
         if session_id is None:
             continue
         file_url = (r.get("FilePath") or r.get("file_path") or "").strip() or None
+        if not file_url:
+            continue
+        lower_url = file_url.lower()
+        if not (lower_url.endswith(".doc") or lower_url.endswith(".docx")):
+            continue
+        app_desc = (r.get("ApplicationDesc") or "").strip() or None
         by_doc[doc_id] = {
             "knesset_document_id": doc_id,
             "session_id": session_id,
             "group_type_id": group_type if group_type is not None else PROTOCOL_GROUP_TYPE_ID,
             "group_type_desc": group_desc or "פרוטוקול ועדה",
-            "application_desc": (r.get("ApplicationDesc") or "").strip() or None,
+            "application_desc": app_desc,
             "file_url": file_url,
         }
 
@@ -1011,6 +1025,43 @@ def load_ready_transcript_session_ids(sb: Client) -> set[int]:
             break
         offset += page_size
     return ready
+
+
+def load_protocol_docs_by_session(sb: Client) -> dict[int, dict]:
+    """
+    session_id → {id, file_url} for protocol DOC/DOCX rows.
+    When several docs exist for one session, keep the first DOC-like URL.
+    """
+    by_session: dict[int, dict] = {}
+    page_size = 1000
+    offset = 0
+    while True:
+        batch = (
+            sb.table("knesset_committee_session_documents")
+            .select("id, session_id, file_url, application_desc, group_type_id")
+            .eq("group_type_id", PROTOCOL_GROUP_TYPE_ID)
+            .range(offset, offset + page_size - 1)
+            .execute()
+            .data
+        )
+        for row in batch:
+            file_url = (row.get("file_url") or "").strip()
+            if not file_url:
+                continue
+            lower = file_url.lower()
+            if not (lower.endswith(".doc") or lower.endswith(".docx")):
+                continue
+            session_id = row["session_id"]
+            if session_id in by_session:
+                continue
+            by_session[session_id] = {
+                "id": row["id"],
+                "file_url": file_url,
+            }
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return by_session
 
 
 def load_hasadna_session_file_index(knesset_num: int) -> dict[int, dict]:
@@ -1107,6 +1158,7 @@ def upsert_transcript_row(
     parse_status: str,
     error: str | None = None,
     source: str = "hasadna",
+    document_id: int | None = None,
 ) -> int:
     existing = (
         sb.table("knesset_committee_session_transcripts")
@@ -1125,6 +1177,8 @@ def upsert_transcript_row(
         "parsed_at": now if parse_status in ("ready", "partial", "failed") else None,
         "error": error,
     }
+    if document_id is not None:
+        row["document_id"] = document_id
     if existing:
         tid = existing[0]["id"]
         sb.table("knesset_committee_session_transcripts").update(row).eq(
@@ -1164,66 +1218,99 @@ def sync_transcripts(
         }
 
     file_index = load_hasadna_session_file_index(knesset_num)
+    docs_by_session = load_protocol_docs_by_session(sb)
     sessions = load_session_rows(sb)
     ready_ids = load_ready_transcript_session_ids(sb) if mode == "missing" else set()
     name_index = build_people_name_index(sb)
 
     candidates = []
     for sess in sessions:
-        oid = sess["knesset_session_id"]
-        if oid not in file_index:
-            continue
         if mode == "missing" and sess["id"] in ready_ids:
+            continue
+        oid = sess["knesset_session_id"]
+        has_hasadna = oid in file_index
+        has_doc = sess["id"] in docs_by_session
+        if not has_hasadna and not has_doc:
             continue
         candidates.append(sess)
 
     if limit is not None:
         candidates = candidates[: max(0, limit)]
 
-    log.info("  transcript candidates this run: %d", len(candidates))
+    log.info(
+        "  transcript candidates this run: %d "
+        "(Hasadna index %d; protocol DOCs %d)",
+        len(candidates),
+        len(file_index),
+        len(docs_by_session),
+    )
 
     ok = 0
     failed = 0
     parts_written = 0
     attendance_matched = 0
     skipped = 0
+    from_hasadna = 0
+    from_self_parse = 0
 
     for i, sess in enumerate(candidates, start=1):
         session_id = sess["id"]
         oid = sess["knesset_session_id"]
-        meta = file_index[oid]
-        parts_path = meta.get("parts_parsed_filename")
-        text_path = meta.get("text_parsed_filename")
+        meta = file_index.get(oid)
+        doc = docs_by_session.get(session_id)
 
         log.info(
-            "  [%d/%d] session oid=%s db_id=%s",
+            "  [%d/%d] session oid=%s db_id=%s source=%s",
             i,
             len(candidates),
             oid,
             session_id,
+            "hasadna" if meta else "parsed_file",
         )
 
         full_text = None
         parts_rows: list[dict] = []
         errors: list[str] = []
+        source = "hasadna"
+        document_id: int | None = None
 
-        try:
-            if text_path:
-                text_url = (
-                    f"{HASADNA_BASE}/committees/meeting_protocols_text/"
-                    f"{quote(text_path, safe='/')}"
-                )
-                full_text = http_get_text(text_url, timeout=120)
-            if parts_path:
-                parts_url = (
-                    f"{HASADNA_BASE}/committees/meeting_protocols_parts/"
-                    f"{quote(parts_path, safe='/')}"
-                )
-                parts_text = http_get_text(parts_url, timeout=120)
-                parts_rows = list(csv.DictReader(io.StringIO(parts_text)))
-        except Exception as exc:
-            errors.append(str(exc))
-            log.warning("    fetch failed: %s", exc)
+        if meta:
+            parts_path = meta.get("parts_parsed_filename")
+            text_path = meta.get("text_parsed_filename")
+            try:
+                if text_path:
+                    text_url = (
+                        f"{HASADNA_BASE}/committees/meeting_protocols_text/"
+                        f"{quote(text_path, safe='/')}"
+                    )
+                    full_text = http_get_text(text_url, timeout=120)
+                if parts_path:
+                    parts_url = (
+                        f"{HASADNA_BASE}/committees/meeting_protocols_parts/"
+                        f"{quote(parts_path, safe='/')}"
+                    )
+                    parts_text = http_get_text(parts_url, timeout=120)
+                    parts_rows = list(csv.DictReader(io.StringIO(parts_text)))
+            except Exception as exc:
+                errors.append(str(exc))
+                log.warning("    Hasadna fetch failed: %s", exc)
+
+            # If Hasadna files are listed but empty/broken, fall through to DOC.
+            if not full_text and not parts_rows and doc:
+                log.info("    Hasadna empty — falling back to DOC self-parse")
+                meta = None
+
+        if not meta and doc:
+            source = "parsed_file"
+            document_id = doc["id"]
+            try:
+                full_text, parts_rows = parse_protocol_url(doc["file_url"])
+            except ProtocolParseError as exc:
+                errors.append(str(exc))
+                log.warning("    self-parse failed: %s", exc)
+            except Exception as exc:
+                errors.append(str(exc))
+                log.warning("    self-parse error: %s", exc)
 
         if not full_text and not parts_rows:
             upsert_transcript_row(
@@ -1232,6 +1319,8 @@ def sync_transcripts(
                 full_text=None,
                 parse_status="failed",
                 error="; ".join(errors) or "no text/parts available",
+                source=source,
+                document_id=document_id,
             )
             failed += 1
             time.sleep(0.15)
@@ -1247,6 +1336,8 @@ def sync_transcripts(
             full_text=full_text,
             parse_status=status,
             error="; ".join(errors) if errors else None,
+            source=source,
+            document_id=document_id,
         )
 
         if parts_rows:
@@ -1260,15 +1351,20 @@ def sync_transcripts(
             parts_written += n
             attendance_matched += att_stats.get("matched", 0)
             log.info(
-                "    → %d parts (%s); attendance matched %d/%d",
+                "    → %d parts (%s, %s); attendance matched %d/%d",
                 n,
                 status,
+                source,
                 att_stats.get("matched", 0),
                 att_stats.get("names", 0),
             )
         else:
-            log.info("    → text only (%s)", status)
+            log.info("    → text only (%s, %s)", status, source)
 
+        if source == "hasadna":
+            from_hasadna += 1
+        else:
+            from_self_parse += 1
         ok += 1
         time.sleep(0.15)
 
@@ -1282,6 +1378,8 @@ def sync_transcripts(
         "parts_written": parts_written,
         "attendance_matched": attendance_matched,
         "candidates": len(candidates),
+        "from_hasadna": from_hasadna,
+        "from_self_parse": from_self_parse,
     }
 
 # ── Orchestration ─────────────────────────────────────────────────────────────

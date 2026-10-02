@@ -42,7 +42,30 @@ function normalizeCommittee(
   }
 }
 
+function committeeTypeRank(desc: string | null | undefined): number {
+  const text = (desc ?? '').trim()
+  if (text === 'ועדה ראשית') {
+    return 0
+  }
+  if (text === 'ועדת הכנסת') {
+    return 1
+  }
+  if (text === 'ועדה מיוחדת') {
+    return 2
+  }
+  if (text === 'ועדת משנה') {
+    return 3
+  }
+  return 4
+}
+
 function sortCommittees(a: KnessetCommittee, b: KnessetCommittee): number {
+  const typeRank =
+    committeeTypeRank(a.committeeTypeDesc) -
+    committeeTypeRank(b.committeeTypeDesc)
+  if (typeRank !== 0) {
+    return typeRank
+  }
   const aTs = a.latestSessionAt ? Date.parse(a.latestSessionAt) : 0
   const bTs = b.latestSessionAt ? Date.parse(b.latestSessionAt) : 0
   if (aTs !== bTs) {

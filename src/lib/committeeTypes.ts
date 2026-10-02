@@ -1,4 +1,10 @@
-export type CommitteeSeatRole = 'chair' | 'member' | 'alternate' | 'observer'
+export type CommitteeSeatRole =
+  | 'chair'
+  | 'member'
+  | 'alternate'
+  | 'observer'
+  | 'legal_counsel'
+  | 'committee_manager'
 
 export type KnessetCommittee = {
   id: number
@@ -41,6 +47,8 @@ export type CommitteeSession = {
   hasTranscript: boolean
   /** Agenda text from protocol part header סדר היום, when available. */
   agenda: string | null
+  /** Transcript parts count (chat messages), when known. */
+  messageCount: number | null
 }
 
 export type CommitteeSessionRow = {
@@ -66,6 +74,8 @@ export type CommitteeMember = {
   roleDesc: string | null
   startDate: string | null
   endDate: string | null
+  /** Guest MK from protocol attendance who is not a committee member. */
+  isGuestMk?: boolean
   firstElectedYear?: number | null
   totalDaysInKnesset?: number
   totalYearsInKnesset?: number

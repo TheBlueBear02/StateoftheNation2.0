@@ -9,6 +9,7 @@ import {
   roundedRectPath,
   type LaidOutSeat,
 } from '../../lib/committeeTableLayout'
+import { LEGAL_COUNSEL_FALLBACK_PERSON_ID, COMMITTEE_MANAGER_FALLBACK_PERSON_ID } from '../../lib/committeeSpeakerMatch'
 import { Tooltip } from './Tooltip'
 
 type CommitteeSeatProps = {
@@ -22,6 +23,16 @@ type CommitteeSeatProps = {
   ) => void
 }
 
+function staffFallbackPersonId(kind: LaidOutSeat['kind']): number | null {
+  if (kind === 'legal_counsel') {
+    return LEGAL_COUNSEL_FALLBACK_PERSON_ID
+  }
+  if (kind === 'committee_manager') {
+    return COMMITTEE_MANAGER_FALLBACK_PERSON_ID
+  }
+  return null
+}
+
 function CommitteeSeat({
   seat,
   isSpeaking,
@@ -29,13 +40,22 @@ function CommitteeSeat({
   onSelect,
   onHover,
 }: CommitteeSeatProps) {
-  const isCounsel = seat.kind === 'legal_counsel'
-  const isAbsent = !isCounsel && !seat.attended
-  const personId = seat.member?.personId ?? null
-  const interactive = !isCounsel && personId != null
+  const isStaff =
+    seat.kind === 'legal_counsel' || seat.kind === 'committee_manager'
+  const isAbsent = !isStaff && !seat.attended
+  const personId =
+    seat.member?.personId ?? staffFallbackPersonId(seat.kind)
+  // Staff seats are always selectable once a session is open.
+  const interactive = isStaff || personId != null
   const radius = 24
   const imageUrl = seat.member?.imageUrl
   const clipId = `seat-clip-${seat.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+  const placeholderLabel =
+    seat.kind === 'legal_counsel'
+      ? 'יועמ״ש'
+      : seat.kind === 'committee_manager'
+        ? 'מנהל/ת'
+        : null
 
   return (
     <g
@@ -43,7 +63,9 @@ function CommitteeSeat({
         'committee-seat',
         isSpeaking ? 'committee-seat--speaking' : '',
         isSelected ? 'committee-seat--selected' : '',
-        isCounsel ? 'committee-seat--counsel' : '',
+        isStaff ? 'committee-seat--staff' : '',
+        seat.kind === 'legal_counsel' ? 'committee-seat--counsel' : '',
+        seat.kind === 'committee_manager' ? 'committee-seat--manager' : '',
         isAbsent ? 'committee-seat--absent' : '',
       ]
         .filter(Boolean)
@@ -55,12 +77,12 @@ function CommitteeSeat({
         isAbsent ? `${seat.label} (לא נכח/ה)` : seat.label
       }
       onClick={() => {
-        if (interactive) {
+        if (interactive && personId != null) {
           onSelect(personId)
         }
       }}
       onKeyDown={(event) => {
-        if (!interactive) {
+        if (!interactive || personId == null) {
           return
         }
         if (event.key === 'Enter' || event.key === ' ') {
@@ -95,9 +117,9 @@ function CommitteeSeat({
         <circle
           className="committee-seat__disc"
           r={radius}
-          fill={isCounsel ? '#ebe4da' : '#fff'}
+          fill={isStaff ? '#ebe4da' : '#fff'}
         />
-        {imageUrl && !isCounsel ? (
+        {imageUrl && !isStaff ? (
           <image
             className="committee-seat__photo"
             href={imageUrl}
@@ -113,9 +135,9 @@ function CommitteeSeat({
             className="committee-seat__initials"
             textAnchor="middle"
             dominantBaseline="central"
-            fontSize={isCounsel ? 11 : 12}
+            fontSize={placeholderLabel ? 9 : 12}
           >
-            {isCounsel ? 'יועמ״ש' : initialsFromName(seat.label)}
+            {placeholderLabel ?? initialsFromName(seat.label)}
           </text>
         )}
       </g>
@@ -269,20 +291,29 @@ export function CommitteeTable({
           fill="none"
         />
 
-        {seats.map((seat) => (
-          <CommitteeSeat
-            key={seat.key}
-            seat={seat}
-            isSpeaking={
-              seat.member != null && seat.member.personId === speakingPersonId
-            }
-            isSelected={
-              seat.member != null && seat.member.personId === selectedPersonId
-            }
-            onSelect={onSelectPerson}
-            onHover={handleHover}
-          />
-        ))}
+        {seats.map((seat) => {
+          const seatPersonId =
+            seat.member?.personId ??
+            (seat.kind === 'legal_counsel'
+              ? LEGAL_COUNSEL_FALLBACK_PERSON_ID
+              : seat.kind === 'committee_manager'
+                ? COMMITTEE_MANAGER_FALLBACK_PERSON_ID
+                : null)
+          return (
+            <CommitteeSeat
+              key={seat.key}
+              seat={seat}
+              isSpeaking={
+                seatPersonId != null && seatPersonId === speakingPersonId
+              }
+              isSelected={
+                seatPersonId != null && seatPersonId === selectedPersonId
+              }
+              onSelect={onSelectPerson}
+              onHover={handleHover}
+            />
+          )
+        })}
       </svg>
 
       {hoveredMember ? (
@@ -304,7 +335,7 @@ export function CommitteeTable({
 
       {overflowCount > 0 ? (
         <p className="committee-table__overflow">
-          ועוד {overflowCount} חברים שאינם מוצגים סביב השולחן
+          ועוד {overflowCount} חברי ועדה שאינם מוצגים סביב השולחן
         </p>
       ) : null}
     </div>

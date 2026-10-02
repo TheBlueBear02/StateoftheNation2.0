@@ -34,8 +34,13 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PIPELINE_RUN_SOURCE: github-actions
 
+      # antiword: convert Knesset .doc protocols when Hasadna has no parsed parts.
+      - name: Install antiword for committee protocol self-parse
+        run: sudo apt-get update && sudo apt-get install -y antiword
+
       # Committees: OData metadata + Hasadna memberships/transcripts (Knesset 25).
-      # Transcripts sync newest missing sessions first (default limit 200/run).
+      # Transcripts: Hasadna parts when available, else self-parse DOC FilePath.
+      # Newest missing sessions first (default limit 200/run).
       - name: Run knesset committees pipeline
         run: python load_knesset_committees.py --knesset 25 --transcripts-mode missing --transcripts-limit 200
         working-directory: 'Layer 1 - Gathering Data/knesset'

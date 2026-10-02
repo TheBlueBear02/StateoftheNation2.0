@@ -164,6 +164,9 @@ create table if not exists public.knesset_committee_session_transcripts (
     check (parse_status in ('pending', 'ready', 'failed', 'partial')),
   parsed_at timestamptz,
   error text,
+  ai_summary text,
+  ai_summary_at timestamptz,
+  ai_summary_model text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint knesset_committee_session_transcripts_session_id_key unique (session_id)
@@ -175,6 +178,14 @@ create trigger set_updated_at_knesset_committee_session_transcripts
   before update on public.knesset_committee_session_transcripts
   for each row
   execute function public.set_updated_at();
+
+-- AI session summary cache (idempotent for existing DBs)
+alter table public.knesset_committee_session_transcripts
+  add column if not exists ai_summary text;
+alter table public.knesset_committee_session_transcripts
+  add column if not exists ai_summary_at timestamptz;
+alter table public.knesset_committee_session_transcripts
+  add column if not exists ai_summary_model text;
 
 -- ── Transcript parts (speaker turns) ─────────────────────────────────────────
 create table if not exists public.knesset_committee_transcript_parts (

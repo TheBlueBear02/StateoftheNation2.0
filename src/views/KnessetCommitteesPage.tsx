@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
 import { CommitteeChatPicker } from '../components/knesset/CommitteeChatPicker'
@@ -25,6 +26,10 @@ import {
   partBelongsToPerson,
   resolvePartPersonId,
   coalesceTranscriptParts,
+  extractLegalCounselMember,
+  extractCommitteeManagerMember,
+  isAttendanceProtocolHeader,
+  isStaffRosterProtocolHeader,
 } from '../lib/committeeSpeakerMatch'
 import './KnessetCommitteesPage.css'
 
@@ -32,7 +37,32 @@ const PLAY_INTERVAL_MS = 3000
 
 type ChatNav = 'committees' | 'sessions' | 'transcript'
 
+function parsePositiveInt(raw: string | null): number | null {
+  if (!raw) {
+    return null
+  }
+  const n = Number(raw)
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+function buildCommitteesQuery(
+  committeeId: number | null,
+  sessionId: number | null,
+): string {
+  const params = new URLSearchParams()
+  if (committeeId != null) {
+    params.set('committee', String(committeeId))
+  }
+  if (sessionId != null) {
+    params.set('session', String(sessionId))
+  }
+  return params.toString()
+}
+
 export function KnessetCommitteesPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { committees, loading: committeesLoading, error: committeesError } =
     useKnessetCommittees()
 
@@ -45,6 +75,8 @@ export function KnessetCommitteesPage() {
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null)
   const [activeOrdinal, setActiveOrdinal] = useState(0)
   const [playing, setPlaying] = useState(false)
+  const urlCommitteeId = parsePositiveInt(searchParams.get('committee'))
+  const urlSessionId = parsePositiveInt(searchParams.get('session'))
 
   const {
     sessions,
@@ -75,21 +107,52 @@ export function KnessetCommitteesPage() {
     error: transcriptError,
   } = useCommitteeTranscript(selectedSession?.id ?? null)
 
-  const rawParts = useMemo(() => {
+  const protocolParts = useMemo(() => {
     const raw = transcript?.parts ?? []
-    // Drop the leading untitled "פרוטוקול" preamble card from every session.
-    const firstProtocolIdx = raw.findIndex(
-      (part) => !(part.speakerHeader ?? '').trim(),
-    )
-    if (firstProtocolIdx < 0) {
-      return raw
-    }
-    return raw.filter((_, index) => index !== firstProtocolIdx)
+    // Drop the leading untitled "פרוטוקול" preamble and attendance blocks —
+    // נכחו / חברי הכנסת are already reflected on the table seats.
+    // Keep staff roster blocks here so seat names can still be extracted.
+    return raw.filter((part, index) => {
+      const header = (part.speakerHeader ?? '').trim()
+      if (!header) {
+        // Keep only if it is not the first untitled preamble card.
+        const firstProtocolIdx = raw.findIndex(
+          (candidate) => !(candidate.speakerHeader ?? '').trim(),
+        )
+        return index !== firstProtocolIdx
+      }
+      return !isAttendanceProtocolHeader(header)
+    })
   }, [transcript?.parts])
 
-  // Full committee roster around the table. When protocol attendance exists,
-  // guests listed in נכחו but not in memberships are still added; absentees
-  // stay on the roster and render gray.
+  // Legal counsel + committee manager come from protocol staff blocks and
+  // link to the flanking seats beside the chair.
+  const legalCounsel = useMemo(() => {
+    if (protocolParts.length === 0) {
+      return null
+    }
+    return extractLegalCounselMember(protocolParts, selectedCommittee?.id ?? 0)
+  }, [protocolParts, selectedCommittee?.id])
+
+  const committeeManager = useMemo(() => {
+    if (protocolParts.length === 0) {
+      return null
+    }
+    return extractCommitteeManagerMember(
+      protocolParts,
+      selectedCommittee?.id ?? 0,
+    )
+  }, [protocolParts, selectedCommittee?.id])
+
+  // Chat hides ייעוץ משפטי / מנהל/ת הוועדה roster cards (seats already show them).
+  const rawParts = useMemo(
+    () =>
+      protocolParts.filter(
+        (part) => !isStaffRosterProtocolHeader(part.speakerHeader),
+      ),
+    [protocolParts],
+  )
+
   const seatsMembersBase = useMemo((): CommitteeMember[] => {
     const byPerson = new Map(members.map((m) => [m.personId, m]))
     const result: CommitteeMember[] = [...members]
@@ -107,25 +170,54 @@ export function KnessetCommitteesPage() {
           imageUrl: attendee.imageUrl,
           factionName: null,
           seatRole: 'member',
-          roleDesc: 'חבר כנסת (לא חבר הועדה)',
+          roleDesc: 'חבר כנסת (לא חבר הוועדה)',
+          isGuestMk: true,
           startDate: null,
           endDate: null,
         })
+        byPerson.set(attendee.personId, result[result.length - 1]!)
       }
     }
 
-    return result.sort((a, b) => {
-      const rank = (role: string) => (role === 'chair' ? 0 : 1)
+    const withoutStaff = result.filter(
+      (member) =>
+        member.seatRole !== 'legal_counsel' &&
+        member.seatRole !== 'committee_manager',
+    )
+    if (legalCounsel) {
+      withoutStaff.push(legalCounsel)
+    }
+    if (committeeManager) {
+      withoutStaff.push(committeeManager)
+    }
+
+    return withoutStaff.sort((a, b) => {
+      const rank = (role: string) => {
+        if (role === 'chair') return 0
+        if (role === 'legal_counsel') return 1
+        if (role === 'committee_manager') return 2
+        return 3
+      }
       const d = rank(a.seatRole) - rank(b.seatRole)
       if (d !== 0) {
         return d
       }
       return a.fullName.localeCompare(b.fullName, 'he')
     })
-  }, [hasAttendanceData, members, attendees, selectedCommittee?.id])
+  }, [
+    hasAttendanceData,
+    members,
+    attendees,
+    selectedCommittee?.id,
+    legalCounsel,
+    committeeManager,
+  ])
 
   const seatPersonIds = useMemo(
-    () => seatsMembersBase.map((member) => member.personId),
+    () =>
+      seatsMembersBase
+        .map((member) => member.personId)
+        .filter((personId) => personId > 0),
     [seatsMembersBase],
   )
 
@@ -159,13 +251,36 @@ export function KnessetCommitteesPage() {
   )
   const activePart = parts[activeOrdinal] ?? null
 
+  // Speech bubbles per seated person — drives orbit order (most → top-right).
+  const messageCountByPersonId = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index]!
+      if (isMetaPart(part, index, parts)) {
+        continue
+      }
+      const personId = resolvePartPersonId(part, seatsMembers)
+      if (personId == null) {
+        continue
+      }
+      counts.set(personId, (counts.get(personId) ?? 0) + 1)
+    }
+    return counts
+  }, [parts, seatsMembers])
+
   const { seats, overflowCount } = useMemo(
     () =>
       layoutCommitteeSeats(
         seatsMembers,
         hasAttendanceData ? attendeePersonIds : null,
+        messageCountByPersonId,
       ),
-    [seatsMembers, hasAttendanceData, attendeePersonIds],
+    [
+      seatsMembers,
+      hasAttendanceData,
+      attendeePersonIds,
+      messageCountByPersonId,
+    ],
   )
 
   const speakingPersonId = useMemo(
@@ -236,6 +351,102 @@ export function KnessetCommitteesPage() {
     return () => window.clearInterval(id)
   }, [playing, parts])
 
+  // Selection is driven by the URL so share links and back/forward stay in sync.
+  useEffect(() => {
+    if (committeesLoading) {
+      return
+    }
+
+    if (urlCommitteeId == null) {
+      setSelectedCommittee(null)
+      setSelectedSession(null)
+      setChatNav('committees')
+      return
+    }
+
+    const committee =
+      committees.find((item) => item.id === urlCommitteeId) ?? null
+    if (!committee) {
+      setSelectedCommittee(null)
+      setSelectedSession(null)
+      setChatNav('committees')
+      return
+    }
+
+    setSelectedCommittee((prev) =>
+      prev?.id === committee.id ? prev : committee,
+    )
+
+    if (urlSessionId == null) {
+      setSelectedSession(null)
+      setChatNav('sessions')
+      return
+    }
+
+    // Sessions hook keys off selectedCommittee; wait until it matches the URL.
+    if (selectedCommittee?.id !== committee.id || sessionsLoading) {
+      setSelectedSession(null)
+      setChatNav('sessions')
+      return
+    }
+
+    const session = sessions.find((item) => item.id === urlSessionId) ?? null
+    if (!session) {
+      setSelectedSession(null)
+      setChatNav('sessions')
+      return
+    }
+
+    setSelectedSession((prev) => (prev?.id === session.id ? prev : session))
+    setChatNav('transcript')
+  }, [
+    committees,
+    committeesLoading,
+    selectedCommittee?.id,
+    sessions,
+    sessionsLoading,
+    urlCommitteeId,
+    urlSessionId,
+  ])
+
+  // Drop invalid ids from the address bar once lists have loaded.
+  useEffect(() => {
+    if (committeesLoading) {
+      return
+    }
+
+    if (
+      urlCommitteeId != null &&
+      !committees.some((item) => item.id === urlCommitteeId)
+    ) {
+      router.replace(pathname, { scroll: false })
+      return
+    }
+
+    if (
+      urlCommitteeId != null &&
+      urlSessionId != null &&
+      selectedCommittee?.id === urlCommitteeId &&
+      !sessionsLoading &&
+      !sessions.some((item) => item.id === urlSessionId)
+    ) {
+      router.replace(
+        `${pathname}?${buildCommitteesQuery(urlCommitteeId, null)}`,
+        { scroll: false },
+      )
+    }
+  }, [
+    committees,
+    committeesLoading,
+    pathname,
+    router,
+    selectedCommittee?.id,
+    sessions,
+    sessionsLoading,
+    urlCommitteeId,
+    urlSessionId,
+  ])
+
   const pageError =
     committeesError ||
     sessionsError ||
@@ -251,45 +462,73 @@ export function KnessetCommitteesPage() {
     setSelectedPersonId((prev) => (prev === personId ? null : personId))
   }
 
-  function jumpToNextSelectedMemberMessage() {
-    if (selectedMemberIndexes.length === 0) {
+  function goToAdjacentMessage(direction: -1 | 1) {
+    setPlaying(false)
+    if (selectedPersonId != null && selectedMemberIndexes.length > 0) {
+      if (direction > 0) {
+        const next = selectedMemberIndexes.find(
+          (index) => index > activeOrdinal,
+        )
+        if (next != null) {
+          setActiveOrdinal(next)
+        }
+        return
+      }
+      const prev = [...selectedMemberIndexes]
+        .reverse()
+        .find((index) => index < activeOrdinal)
+      if (prev != null) {
+        setActiveOrdinal(prev)
+      }
       return
     }
-    setPlaying(false)
-    const next =
-      selectedMemberIndexes.find((index) => index > activeOrdinal) ??
-      selectedMemberIndexes[0]!
-    setActiveOrdinal(next)
+    setActiveOrdinal((prev) =>
+      direction > 0
+        ? Math.min(parts.length - 1, prev + 1)
+        : Math.max(0, prev - 1),
+    )
   }
 
   function openCommittee(committee: KnessetCommittee) {
     setPlaying(false)
     setSelectedPersonId(null)
-    setSelectedSession(null)
-    setSelectedCommittee(committee)
-    setChatNav('sessions')
+    router.replace(
+      `${pathname}?${buildCommitteesQuery(committee.id, null)}`,
+      { scroll: false },
+    )
   }
 
   function openSession(session: CommitteeSession) {
+    const committeeId = selectedCommittee?.id ?? urlCommitteeId
     setPlaying(false)
     setSelectedPersonId(null)
-    setSelectedSession(session)
-    setChatNav('transcript')
+    if (committeeId == null) {
+      return
+    }
+    router.replace(
+      `${pathname}?${buildCommitteesQuery(committeeId, session.id)}`,
+      { scroll: false },
+    )
   }
 
   function backFromTranscript() {
+    const committeeId = selectedCommittee?.id ?? urlCommitteeId
     setPlaying(false)
     setSelectedPersonId(null)
-    setSelectedSession(null)
-    setChatNav('sessions')
+    if (committeeId != null) {
+      router.replace(
+        `${pathname}?${buildCommitteesQuery(committeeId, null)}`,
+        { scroll: false },
+      )
+      return
+    }
+    router.replace(pathname, { scroll: false })
   }
 
   function backFromSessions() {
     setPlaying(false)
     setSelectedPersonId(null)
-    setSelectedSession(null)
-    setSelectedCommittee(null)
-    setChatNav('committees')
+    router.replace(pathname, { scroll: false })
   }
 
   return (
@@ -344,77 +583,70 @@ export function KnessetCommitteesPage() {
                 </div>
               </div>
 
-              {chatNav === 'committees' ? (
-                <CommitteeChatPicker
-                  mode="committees"
-                  committees={committees}
-                  loading={committeesLoading}
-                  onSelectCommittee={openCommittee}
-                />
-              ) : null}
+              <div className="committees-page__stage-chat">
+                {chatNav === 'committees' ? (
+                  <CommitteeChatPicker
+                    mode="committees"
+                    committees={committees}
+                    loading={committeesLoading}
+                    onSelectCommittee={openCommittee}
+                  />
+                ) : null}
 
-              {chatNav === 'sessions' && selectedCommittee ? (
-                <CommitteeChatPicker
-                  mode="sessions"
-                  committeeName={selectedCommittee.name}
-                  sessions={sessions}
-                  loading={sessionsLoading}
-                  onSelectSession={openSession}
-                  onBack={backFromSessions}
-                />
-              ) : null}
+                {chatNav === 'sessions' && selectedCommittee ? (
+                  <CommitteeChatPicker
+                    mode="sessions"
+                    committeeName={selectedCommittee.name}
+                    sessions={sessions}
+                    loading={sessionsLoading}
+                    onSelectSession={openSession}
+                    onBack={backFromSessions}
+                  />
+                ) : null}
 
-              {chatNav === 'transcript' ? (
-                <CommitteeTranscriptChat
-                  parts={parts}
-                  members={seatsMembers}
-                  session={selectedSession}
-                  committeeName={selectedCommittee?.name ?? null}
-                  activeOrdinal={activeOrdinal}
-                  playing={playing}
-                  selectedPersonId={selectedPersonId}
-                  disabled={!hasParts || transcriptLoading}
-                  loading={transcriptLoading}
-                  onBack={backFromTranscript}
-                  onPlayPause={() => {
-                    if (!hasParts) {
-                      return
-                    }
-                    if (playing) {
+                {chatNav === 'transcript' ? (
+                  <CommitteeTranscriptChat
+                    parts={parts}
+                    members={seatsMembers}
+                    session={selectedSession}
+                    committeeName={selectedCommittee?.name ?? null}
+                    activeOrdinal={activeOrdinal}
+                    playing={playing}
+                    selectedPersonId={selectedPersonId}
+                    disabled={!hasParts || transcriptLoading}
+                    loading={transcriptLoading}
+                    onBack={backFromTranscript}
+                    onPlayPause={() => {
+                      if (!hasParts) {
+                        return
+                      }
+                      if (playing) {
+                        setPlaying(false)
+                        return
+                      }
+                      // Resume from the current message; only restart after finishing.
+                      const firstSpeech = getFirstSpeechIndex(parts)
+                      const atEnd = activeOrdinal >= parts.length - 1
+                      if (atEnd) {
+                        setActiveOrdinal(firstSpeech >= 0 ? firstSpeech : 0)
+                      } else if (
+                        firstSpeech >= 0 &&
+                        activeOrdinal < firstSpeech
+                      ) {
+                        setActiveOrdinal(firstSpeech)
+                      }
+                      setPlaying(true)
+                    }}
+                    onPrev={() => goToAdjacentMessage(-1)}
+                    onNext={() => goToAdjacentMessage(1)}
+                    onJumpToOrdinal={(ordinal) => {
                       setPlaying(false)
-                      return
-                    }
-                    // Resume from the current message; only restart after finishing.
-                    const firstSpeech = getFirstSpeechIndex(parts)
-                    const atEnd = activeOrdinal >= parts.length - 1
-                    if (atEnd) {
-                      setActiveOrdinal(firstSpeech >= 0 ? firstSpeech : 0)
-                    } else if (
-                      firstSpeech >= 0 &&
-                      activeOrdinal < firstSpeech
-                    ) {
-                      setActiveOrdinal(firstSpeech)
-                    }
-                    setPlaying(true)
-                  }}
-                  onPrev={() => {
-                    setPlaying(false)
-                    setActiveOrdinal((prev) => Math.max(0, prev - 1))
-                  }}
-                  onNext={() => {
-                    setPlaying(false)
-                    setActiveOrdinal((prev) =>
-                      Math.min(parts.length - 1, prev + 1),
-                    )
-                  }}
-                  onJumpToOrdinal={(ordinal) => {
-                    setPlaying(false)
-                    setActiveOrdinal(ordinal)
-                  }}
-                  onNextSelectedMemberMessage={jumpToNextSelectedMemberMessage}
-                  onClearMemberFilter={() => setSelectedPersonId(null)}
-                />
-              ) : null}
+                      setActiveOrdinal(ordinal)
+                    }}
+                    onClearMemberFilter={() => setSelectedPersonId(null)}
+                  />
+                ) : null}
+              </div>
             </div>
           </div>
         </section>

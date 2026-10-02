@@ -15,6 +15,7 @@ function normalizeSession(
   row: CommitteeSessionRow,
   hasTranscript: boolean,
   agenda: string | null,
+  messageCount: number | null,
 ): CommitteeSession {
   return {
     id: row.id,
@@ -28,6 +29,7 @@ function normalizeSession(
     finishAt: row.finish_at,
     hasTranscript,
     agenda,
+    messageCount,
   }
 }
 
@@ -89,6 +91,8 @@ function compactAgenda(body: string): string {
   return body
     .replace(/\s+/g, ' ')
     .replace(/^סדר היום\s*:?\s*/u, '')
+    .replace(/^סדר-היום\s*:?\s*/u, '')
+    .replace(/^סדר\s*:?\s*/u, '')
     .trim()
 }
 
@@ -119,6 +123,37 @@ async function fetchReadySessionIds(
   return ready
 }
 
+/** Exact transcript-part counts per session (chat message totals). */
+async function fetchMessageCountsBySessionIds(
+  sessionIds: number[],
+): Promise<Map<number, number>> {
+  const counts = new Map<number, number>()
+  if (!supabase || sessionIds.length === 0) {
+    return counts
+  }
+
+  const concurrency = 12
+  for (let i = 0; i < sessionIds.length; i += concurrency) {
+    const chunk = sessionIds.slice(i, i + concurrency)
+    const results = await Promise.all(
+      chunk.map(async (sessionId) => {
+        const { count, error } = await supabase!
+          .from('knesset_committee_transcript_parts')
+          .select('*', { count: 'exact', head: true })
+          .eq('session_id', sessionId)
+        if (error) {
+          throw error
+        }
+        return [sessionId, count ?? 0] as const
+      }),
+    )
+    for (const [sessionId, count] of results) {
+      counts.set(sessionId, count)
+    }
+  }
+  return counts
+}
+
 /** First סדר היום body per session, from transcript parts. */
 async function fetchAgendaBySessionIds(
   sessionIds: number[],
@@ -135,7 +170,9 @@ async function fetchAgendaBySessionIds(
       .from('knesset_committee_transcript_parts')
       .select('session_id, speaker_header, body, ordinal')
       .in('session_id', chunk)
-      .or('speaker_header.eq.סדר היום,speaker_header.like.סדר היום%')
+      .or(
+        'speaker_header.eq.סדר,speaker_header.eq.סדר היום,speaker_header.like.סדר%',
+      )
       .order('ordinal', { ascending: true })
 
     if (error) {
@@ -216,7 +253,10 @@ export function useCommitteeSessions(
           .filter((row) => !withTranscriptOnly || readyIds.has(row.id))
           .map((row) => row.id)
 
-        const agendas = await fetchAgendaBySessionIds(candidateIds)
+        const [agendas, messageCounts] = await Promise.all([
+          fetchAgendaBySessionIds(candidateIds),
+          fetchMessageCountsBySessionIds(candidateIds),
+        ])
 
         if (cancelled) {
           return
@@ -227,6 +267,7 @@ export function useCommitteeSessions(
             row,
             readyIds.has(row.id),
             agendas.get(row.id) ?? null,
+            messageCounts.has(row.id) ? messageCounts.get(row.id)! : null,
           ),
         )
         if (withTranscriptOnly) {

@@ -148,7 +148,7 @@ NEXT_PUBLIC_PIPELINE_EDIT_SECRET=...  # shared unlock for /piplines + all /edit 
 NEXT_PUBLIC_ELECTIONS_EDIT_SECRET=... # fallback alias (or VITE_ / ELECTIONS_EDIT_SECRET)
 NEXT_PUBLIC_KNESSET_EDIT_SECRET=...   # fallback alias (or VITE_ / KNESSET_EDIT_SECRET)
 SUPABASE_SERVICE_KEY=...              # pipelines + local edit APIs
-OPENAI_API_KEY=...                    # elections enrichment + homepage site_updates headlines
+OPENAI_API_KEY=...                    # elections enrichment + homepage site_updates + committee session AI summary
 ENABLE_PIPELINE_API=1                 # optional: allow Python APIs outside development
 ```
 

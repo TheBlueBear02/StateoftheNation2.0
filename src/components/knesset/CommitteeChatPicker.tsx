@@ -110,8 +110,22 @@ export function CommitteeChatPicker(props: CommitteeChatPickerProps) {
                     <span className="committee-chat-picker__name">
                       {title}
                     </span>
-                    <span className="committee-chat-picker__when">
-                      {formatCommitteeSessionWhen(session)}
+                    <span className="committee-chat-picker__session-bottom">
+                      <span className="committee-chat-picker__when">
+                        {formatCommitteeSessionWhen(session)}
+                      </span>
+                      {session.messageCount != null ? (
+                        <span
+                          className="committee-chat-picker__msg-count"
+                          aria-label={
+                            session.messageCount === 1
+                              ? 'הודעה אחת'
+                              : `${session.messageCount} הודעות`
+                          }
+                        >
+                          {session.messageCount.toLocaleString('he-IL')}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
                 </button>

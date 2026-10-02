@@ -175,9 +175,9 @@ Schema file: `Layer 1 - Gathering Data/knesset/schema_knesset_committees.sql` (a
 | Data | Source | Notes |
 |------|--------|-------|
 | Committees, sessions | Knesset OData `ParliamentInfo.svc` | `KNS_Committee`, `KNS_CommitteeSession` |
-| Protocol file URLs | Hasadna document dump (`GroupTypeID=23`); OData fallback | `FilePath` / `file_url` |
+| Protocol file URLs | Hasadna **dataservice** document dump (`GroupTypeID=23`, `.doc`/`.docx`); OData fallback | `FilePath` / `file_url` |
 | Committee seat membership + roles | Hasadna `mk_individual_committees.csv` | Live OData `KNS_PersonToPosition.CommitteeID` / committee PositionIDs are **empty** for K20–25 |
-| Full transcript text + speaker parts | Hasadna `meeting_protocols_text` / `meeting_protocols_parts` | Via `kns_committeesession` filename columns |
+| Full transcript text + speaker parts | **Hasadna first** (`meeting_protocols_text` / `meeting_protocols_parts` via stale joined `kns_committeesession.csv`); **else self-parse** DOC from `file_url` (`committee_protocol_parse.py` + `antiword`) → `source=parsed_file` | Hasadna joined dump lagged after ~Aug 2025; DOC URLs stay fresh via dataservice |
 | Attendance | Protocol `נכחו` + `חברי הכנסת` parts (parsed into `knesset_committee_session_attendance`; includes guest MKs) | Not in OData; filled on transcript sync / `--table attendance` |
 
 **RLS:** anon SELECT on all committees tables; writes via `SUPABASE_SERVICE_KEY` only.
@@ -267,10 +267,13 @@ One normalized full-text transcript per session.
 | `session_id` | bigint | FK → sessions. UNIQUE (one transcript per session). |
 | `document_id` | bigint | FK → documents ON DELETE SET NULL |
 | `full_text` | text | Entire protocol text |
-| `source` | text | `hasadna` \| `parsed_file` \| `manual` |
+| `source` | text | `hasadna` (pre-parsed dump) \| `parsed_file` (local DOC/DOCX self-parse) \| `manual` |
 | `parse_status` | text | `pending` \| `ready` \| `failed` \| `partial` |
 | `parsed_at` | timestamptz | |
 | `error` | text | Failure detail when `failed` / `partial` |
+| `ai_summary` | text | Cached Hebrew AI session summary (null until first generate) |
+| `ai_summary_at` | timestamptz | When `ai_summary` was written |
+| `ai_summary_model` | text | Model id used for the cached summary |
 | `created_at` / `updated_at` | timestamptz | |
 
 ### `knesset_committee_transcript_parts`
@@ -794,7 +797,7 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 | Script | Tables updated | Trigger |
 |--------|---------------|---------|
 | `load_all_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Weekly Saturday midnight Israel (GitHub Actions: `.github/workflows/knesset-pipeline.yml`) |
-| `load_knesset_committees.py` | `knesset_committees` · `knesset_committee_memberships` · `knesset_committee_sessions` · `knesset_committee_session_documents` · `knesset_committee_session_transcripts` · `knesset_committee_transcript_parts` | Same weekly workflow (after main knesset sync). OData + Hasadna. Default: newest **200** missing transcripts/run |
+| `load_knesset_committees.py` | `knesset_committees` · `knesset_committee_memberships` · `knesset_committee_sessions` · `knesset_committee_session_documents` · `knesset_committee_session_transcripts` · `knesset_committee_transcript_parts` | Same weekly workflow (after main knesset sync). OData + Hasadna + **DOC self-parse** (`committee_protocol_parse.py`; CI installs `antiword`). Default: newest **200** missing transcripts/run |
 | `seed_office_dashboard.py` | `offices.is_shown` / `info` · `indexes` · `index_data` | Manual — migrate curated KPI data from old sn.db |
 | `insert_raw_list.py` | `raw_candidate_lists` | Manual — when a party publishes their list |
 | `run_pipeline.py` | `election_candidates` · `people` (enrichment) | Manual — after each `insert_raw_list.py` run |
@@ -859,7 +862,7 @@ Unique constraints also provide leading-column indexes for several keys (e.g. `e
 | Party color / logo | Ballot: `election_parties`; chamber: `knesset_factions` | Intentional dual branding — do not auto-overwrite either from the other |
 | Election → Knesset | `elections.knesset_number` FK → `knessets.knesset_number` | Applied |
 | Committee seats | `knesset_committee_memberships` (Hasadna) | Do **not** use `knesset_memberships.committee_role` or empty OData `CommitteeID` |
-| Committee protocols | OData docs (`GroupTypeID=23`) + Hasadna text/parts | File URL from OData; body/parts from Hasadna or self-parse |
+| Committee protocols | DOC `FilePath` (dataservice/OData) + Hasadna text/parts when present, else local antiword/docx parse | `source` = `hasadna` or `parsed_file` |
 | Cross-election party identity | Deferred — use `election_parties` + `party_lineage` | A stable `parties` master table is not needed until multi-election trends are productized |
 | Pollsters / Wikidata / KPI numeric | Applied on Supabase | `pollsters`, `people.wikidata_id`, `index_data.value` numeric |
 

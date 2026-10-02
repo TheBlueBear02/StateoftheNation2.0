@@ -151,9 +151,11 @@ export function useCommitteeMemberships(
 
       const seatRank: Record<CommitteeSeatRole, number> = {
         chair: 0,
-        member: 1,
-        alternate: 2,
-        observer: 3,
+        legal_counsel: 1,
+        committee_manager: 2,
+        member: 3,
+        alternate: 4,
+        observer: 5,
       }
       const list = [...byPerson.values()].sort((a, b) => {
         const rank = seatRank[a.seatRole] - seatRank[b.seatRole]

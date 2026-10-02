@@ -1,6 +1,6 @@
 import type { CommitteeMember, CommitteeSeatRole } from './committeeTypes'
 
-export type LaidOutSeatKind = 'member' | 'legal_counsel'
+export type LaidOutSeatKind = 'member' | 'legal_counsel' | 'committee_manager'
 
 export type LaidOutSeat = {
   key: string
@@ -56,14 +56,18 @@ function roleRank(role: CommitteeSeatRole): number {
   switch (role) {
     case 'chair':
       return 0
-    case 'member':
+    case 'legal_counsel':
       return 1
-    case 'alternate':
+    case 'committee_manager':
       return 2
-    case 'observer':
+    case 'member':
       return 3
-    default:
+    case 'alternate':
       return 4
+    case 'observer':
+      return 5
+    default:
+      return 6
   }
 }
 
@@ -161,8 +165,13 @@ function seatOrbitRect(): RoundedRect {
 }
 
 /**
- * Place chair at the head (top), legal counsel on the MK orbit beside them,
- * remaining members around the racetrack perimeter (vertical / portrait).
+ * Place chair at the head (top), legal counsel and committee manager on the
+ * MK orbit beside them, remaining members around the racetrack perimeter.
+ *
+ * Orbit MKs (everyone except chair / יועמ״ש / מנהל/ת) are ordered clockwise
+ * from the top-right by session message count (most speeches first). Ties
+ * break by committee membership (חברי ועדה before guests), then attendance,
+ * then role, then Hebrew name.
  *
  * When `attendedPersonIds` is provided, seats whose person is not in the set
  * are marked `attended: false` (gray photo in the UI). When null, everyone
@@ -171,6 +180,7 @@ function seatOrbitRect(): RoundedRect {
 export function layoutCommitteeSeats(
   members: CommitteeMember[],
   attendedPersonIds: Set<number> | null = null,
+  messageCountByPersonId: Map<number, number> | null = null,
 ): {
   seats: LaidOutSeat[]
   overflowCount: number
@@ -182,12 +192,20 @@ export function layoutCommitteeSeats(
     return attendedPersonIds.has(personId)
   }
 
-  const sorted = [...members].sort((a, b) => {
-    const rank = roleRank(a.seatRole) - roleRank(b.seatRole)
-    if (rank !== 0) {
-      return rank
+  const messageCount = (personId: number): number =>
+    messageCountByPersonId?.get(personId) ?? 0
+
+  const compareMembers = (a: CommitteeMember, b: CommitteeMember): number => {
+    const byMessages = messageCount(b.personId) - messageCount(a.personId)
+    if (byMessages !== 0) {
+      return byMessages
     }
-    // Present members first within the same role, then Hebrew name.
+    // Same speech volume: חברי ועדה before guest MKs.
+    const aGuest = a.isGuestMk ? 1 : 0
+    const bGuest = b.isGuestMk ? 1 : 0
+    if (aGuest !== bGuest) {
+      return aGuest - bGuest
+    }
     if (attendedPersonIds != null) {
       const aPresent = attendedPersonIds.has(a.personId) ? 0 : 1
       const bPresent = attendedPersonIds.has(b.personId) ? 0 : 1
@@ -195,11 +213,27 @@ export function layoutCommitteeSeats(
         return aPresent - bPresent
       }
     }
+    const rank = roleRank(a.seatRole) - roleRank(b.seatRole)
+    if (rank !== 0) {
+      return rank
+    }
     return a.fullName.localeCompare(b.fullName, 'he')
-  })
+  }
 
-  const chair = sorted.find((m) => m.seatRole === 'chair') ?? null
-  const others = sorted.filter((m) => m.personId !== chair?.personId)
+  const chair = members.find((m) => m.seatRole === 'chair') ?? null
+  const counsel =
+    members.find((m) => m.seatRole === 'legal_counsel') ?? null
+  const manager =
+    members.find((m) => m.seatRole === 'committee_manager') ?? null
+  // Clockwise from top-right: highest message count first.
+  const others = members
+    .filter(
+      (m) =>
+        m.personId !== chair?.personId &&
+        m.seatRole !== 'legal_counsel' &&
+        m.seatRole !== 'committee_manager',
+    )
+    .sort(compareMembers)
   const orbit = seatOrbitRect()
   const seats: LaidOutSeat[] = []
 
@@ -214,16 +248,28 @@ export function layoutCommitteeSeats(
     attended: isAttended(chair?.personId),
   })
 
-  // Legal counsel sits on the same MK orbit, just left of the chair (RTL head).
-  const counselT = 1 - 0.042
+  // Staff seats flank the chair on the MK orbit (manager left, counsel right).
+  const managerT = 1 - 0.042
+  const managerPos = pointOnRoundedRect(orbit, managerT)
+  seats.push({
+    key: manager ? `person-${manager.personId}` : 'committee-manager',
+    kind: 'committee_manager',
+    x: managerPos.x,
+    y: managerPos.y,
+    member: manager,
+    label: manager?.fullName ?? 'מנהל/ת',
+    attended: true,
+  })
+
+  const counselT = 0.042
   const counselPos = pointOnRoundedRect(orbit, counselT)
   seats.push({
-    key: 'legal-counsel',
+    key: counsel ? `person-${counsel.personId}` : 'legal-counsel',
     kind: 'legal_counsel',
     x: counselPos.x,
     y: counselPos.y,
-    member: null,
-    label: 'יועמ״ש',
+    member: counsel,
+    label: counsel?.fullName ?? 'יועמ״ש',
     attended: true,
   })
 
@@ -234,8 +280,9 @@ export function layoutCommitteeSeats(
     return { seats, overflowCount }
   }
 
-  // Clear arc at the head for chair + counsel so member seats don't collide.
-  const headGap = 0.09
+  // Clear arc at the head for chair + staff so member seats don't collide.
+  // Staff sit at ±0.042; keep members just past them so the ring feels tight.
+  const headGap = 0.088
   const start = headGap
   const sweep = 1 - headGap * 2
   const n = displayOthers.length
