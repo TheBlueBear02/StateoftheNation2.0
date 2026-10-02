@@ -73,7 +73,7 @@ export function KnessetCommitteesPage() {
   const [chatNav, setChatNav] = useState<ChatNav>('committees')
   const [withTranscriptOnly] = useState(true)
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null)
-  const [activeOrdinal, setActiveOrdinal] = useState(0)
+  const [activeOrdinal, setActiveOrdinal] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
   const urlCommitteeId = parsePositiveInt(searchParams.get('committee'))
   const urlSessionId = parsePositiveInt(searchParams.get('session'))
@@ -250,7 +250,8 @@ export function KnessetCommitteesPage() {
     [rawParts, seatsMembers],
   )
   const firstSpeechIndex = useMemo(() => getFirstSpeechIndex(parts), [parts])
-  const activePart = parts[activeOrdinal] ?? null
+  const activePart =
+    activeOrdinal != null ? (parts[activeOrdinal] ?? null) : null
 
   // Speech bubbles per seated person — drives orbit order (most → top-right).
   const messageCountByPersonId = useMemo(() => {
@@ -302,9 +303,9 @@ export function KnessetCommitteesPage() {
       .map(({ index }) => index)
   }, [parts, selectedPersonId, seatsMembers])
 
-  // Reset play state when session changes.
+  // Reset play state when session changes (no message highlighted on load).
   useEffect(() => {
-    setActiveOrdinal(0)
+    setActiveOrdinal(null)
     setPlaying(false)
     setSelectedPersonId(null)
   }, [selectedSession?.id])
@@ -335,7 +336,13 @@ export function KnessetCommitteesPage() {
     }
     const id = window.setInterval(() => {
       setActiveOrdinal((prev) => {
-        let next = prev + 1
+        const start =
+          prev == null
+            ? firstSpeechIndex >= 0
+              ? firstSpeechIndex
+              : 0
+            : prev + 1
+        let next = start
         while (
           next < parts.length &&
           isMetaPart(parts[next]!, next, parts, firstSpeechIndex)
@@ -344,7 +351,7 @@ export function KnessetCommitteesPage() {
         }
         if (next >= parts.length) {
           setPlaying(false)
-          return Math.max(prev, parts.length - 1)
+          return prev == null ? null : Math.max(prev, parts.length - 1)
         }
         return next
       })
@@ -468,11 +475,14 @@ export function KnessetCommitteesPage() {
     if (selectedPersonId != null && selectedMemberIndexes.length > 0) {
       if (direction > 0) {
         const next = selectedMemberIndexes.find(
-          (index) => index > activeOrdinal,
+          (index) => activeOrdinal == null || index > activeOrdinal,
         )
         if (next != null) {
           setActiveOrdinal(next)
         }
+        return
+      }
+      if (activeOrdinal == null) {
         return
       }
       const prev = [...selectedMemberIndexes]
@@ -483,11 +493,14 @@ export function KnessetCommitteesPage() {
       }
       return
     }
-    setActiveOrdinal((prev) =>
-      direction > 0
+    setActiveOrdinal((prev) => {
+      if (prev == null) {
+        return direction > 0 ? 0 : null
+      }
+      return direction > 0
         ? Math.min(parts.length - 1, prev + 1)
-        : Math.max(0, prev - 1),
-    )
+        : Math.max(0, prev - 1)
+    })
   }
 
   function openCommittee(committee: KnessetCommittee) {
@@ -627,8 +640,10 @@ export function KnessetCommitteesPage() {
                       }
                       // Resume from the current message; only restart after finishing.
                       const firstSpeech = getFirstSpeechIndex(parts)
-                      const atEnd = activeOrdinal >= parts.length - 1
-                      if (atEnd) {
+                      const atEnd =
+                        activeOrdinal != null &&
+                        activeOrdinal >= parts.length - 1
+                      if (activeOrdinal == null || atEnd) {
                         setActiveOrdinal(firstSpeech >= 0 ? firstSpeech : 0)
                       } else if (
                         firstSpeech >= 0 &&

@@ -29,7 +29,7 @@ type CommitteeTranscriptChatProps = {
   members: CommitteeMember[]
   session: CommitteeSession | null
   committeeName: string | null
-  activeOrdinal: number
+  activeOrdinal: number | null
   playing: boolean
   selectedPersonId: number | null
   disabled?: boolean
@@ -397,16 +397,12 @@ const ChatMessageRow = memo(function ChatMessageRow({
           .filter(Boolean)
           .join(' ')}
       >
-        <button
-          type="button"
-          className="committee-chat__system-btn"
-          onClick={() => onJumpToOrdinal(ordinal)}
-        >
+        <div className="committee-chat__system-card">
           <strong>{highlightSearchMatches(title, searchQuery)}</strong>
           {body ? (
             <span>{highlightSearchMatches(body, searchQuery)}</span>
           ) : null}
-        </button>
+        </div>
       </div>
     )
   }
@@ -500,23 +496,34 @@ export function CommitteeTranscriptChat({
   const selectedMessageCount = selectedMemberIndexes.length
   const canGoPrev =
     selectedPersonId != null
-      ? selectedMemberIndexes.some((index) => index < activeOrdinal)
-      : activeOrdinal > 0
+      ? selectedMemberIndexes.some(
+          (index) => activeOrdinal != null && index < activeOrdinal,
+        )
+      : activeOrdinal != null && activeOrdinal > 0
   const canGoNext =
     selectedPersonId != null
-      ? selectedMemberIndexes.some((index) => index > activeOrdinal)
-      : activeOrdinal < parts.length - 1
+      ? selectedMemberIndexes.some(
+          (index) => activeOrdinal == null || index > activeOrdinal,
+        )
+      : parts.length > 0 &&
+        (activeOrdinal == null || activeOrdinal < parts.length - 1)
 
   const trimmedSearch = searchQuery.trim()
   const searchActive = trimmedSearch.length > 0
 
   // Play: keep meta cards + speech up to the active cursor (hide future speech).
+  // Before Play starts (no active message), show the full transcript.
   const visibleItems = useMemo((): VisibleItem[] => {
     const items: VisibleItem[] = []
     for (let index = 0; index < parts.length; index += 1) {
       const part = parts[index]!
       const meta = isMetaPart(part, index, parts, firstSpeechIndex)
-      if (playing && !meta && index > activeOrdinal) {
+      if (
+        playing &&
+        activeOrdinal != null &&
+        !meta &&
+        index > activeOrdinal
+      ) {
         continue
       }
       items.push({ part, ordinal: index })
@@ -541,7 +548,7 @@ export function CommitteeTranscriptChat({
 
   // Keep the active bubble in view without mounting every row.
   useEffect(() => {
-    if (visibleItems.length === 0) {
+    if (activeOrdinal == null || visibleItems.length === 0) {
       return
     }
     const visibleIndex = visibleItems.findIndex(
@@ -600,7 +607,7 @@ export function CommitteeTranscriptChat({
   const headerSubtitle = formatChatHeaderSubtitle(session)
   const progressLabel =
     parts.length > 0
-      ? `${activeOrdinal + 1} / ${parts.length}`
+      ? `${activeOrdinal != null ? activeOrdinal + 1 : '—'} / ${parts.length}`
       : loading
         ? 'טוען תמליל…'
         : 'אין תמליל לישיבה זו'
@@ -730,7 +737,8 @@ export function CommitteeTranscriptChat({
                   parts,
                   firstSpeechIndex,
                 )
-                const isActive = item.ordinal === activeOrdinal
+                const isActive =
+                  activeOrdinal != null && item.ordinal === activeOrdinal
                 const justPopped = playing && isActive && !meta
                 return (
                   <div

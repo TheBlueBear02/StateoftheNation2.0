@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import {
   COMMITTEE_TABLE_GEOMETRY,
   COMMITTEE_TABLE_VIEWBOX,
@@ -47,7 +48,7 @@ function CommitteeSeat({
     seat.member?.personId ?? staffFallbackPersonId(seat.kind)
   // Staff seats are always selectable once a session is open.
   const interactive = isStaff || personId != null
-  const radius = 24
+  const radius = 28
   const imageUrl = seat.member?.imageUrl
   const clipId = `seat-clip-${seat.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`
   const placeholderLabel =
@@ -135,7 +136,7 @@ function CommitteeSeat({
             className="committee-seat__initials"
             textAnchor="middle"
             dominantBaseline="central"
-            fontSize={placeholderLabel ? 9 : 12}
+            fontSize={placeholderLabel ? 10 : 13}
           >
             {placeholderLabel ?? initialsFromName(seat.label)}
           </text>
@@ -195,7 +196,11 @@ export function CommitteeTable({
   ) {
     setHoveredSeat(seat)
     if (event) {
-      setTooltipPosition({ x: event.clientX, y: event.clientY })
+      const seatRect = event.currentTarget.getBoundingClientRect()
+      setTooltipPosition({
+        x: seatRect.left + seatRect.width / 2,
+        y: seatRect.top,
+      })
     }
   }
 
@@ -316,22 +321,26 @@ export function CommitteeTable({
         })}
       </svg>
 
-      {hoveredMember ? (
-        <Tooltip
-          fullName={hoveredMember.fullName}
-          factionName={hoveredMember.factionName}
-          factionColor={null}
-          imageUrl={hoveredMember.imageUrl}
-          firstElectedYear={hoveredMember.firstElectedYear ?? null}
-          totalDaysInKnesset={hoveredMember.totalDaysInKnesset ?? 0}
-          totalYearsInKnesset={hoveredMember.totalYearsInKnesset ?? 0}
-          additionalRoles={
-            hoveredMember.roleDesc ? [hoveredMember.roleDesc] : []
-          }
-          x={tooltipPosition.x}
-          y={tooltipPosition.y}
-        />
-      ) : null}
+      {hoveredMember
+        ? createPortal(
+            <Tooltip
+              fullName={hoveredMember.fullName}
+              factionName={hoveredMember.factionName}
+              factionColor={null}
+              imageUrl={hoveredMember.imageUrl}
+              firstElectedYear={hoveredMember.firstElectedYear ?? null}
+              totalDaysInKnesset={hoveredMember.totalDaysInKnesset ?? 0}
+              totalYearsInKnesset={hoveredMember.totalYearsInKnesset ?? 0}
+              additionalRoles={
+                hoveredMember.roleDesc ? [hoveredMember.roleDesc] : []
+              }
+              x={tooltipPosition.x}
+              y={tooltipPosition.y}
+              anchor="above"
+            />,
+            document.body,
+          )
+        : null}
 
       {overflowCount > 0 ? (
         <p className="committee-table__overflow">
