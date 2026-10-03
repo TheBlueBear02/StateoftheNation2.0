@@ -51,10 +51,12 @@ function compactAgenda(body: string | null | undefined): string | null {
 export async function loadCommitteeShareMeta(searchParams: {
   committee?: string | string[]
   session?: string | string[]
+  message?: string | string[]
 }): Promise<CommitteeShareMeta> {
   const committeeId = parsePositiveInt(searchParams.committee)
   const sessionId = parsePositiveInt(searchParams.session)
-  const path = buildCommitteesSharePath(committeeId, sessionId)
+  const messageId = parsePositiveInt(searchParams.message)
+  const path = buildCommitteesSharePath(committeeId, sessionId, messageId)
 
   if (committeeId == null) {
     return {

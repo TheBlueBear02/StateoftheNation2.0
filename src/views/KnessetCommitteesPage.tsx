@@ -63,6 +63,7 @@ export function KnessetCommitteesPage() {
   const [playing, setPlaying] = useState(false)
   const urlCommitteeId = parsePositiveInt(searchParams.get('committee'))
   const urlSessionId = parsePositiveInt(searchParams.get('session'))
+  const urlMessageId = parsePositiveInt(searchParams.get('message'))
 
   const {
     sessions,
@@ -289,12 +290,36 @@ export function KnessetCommitteesPage() {
       .map(({ index }) => index)
   }, [parts, selectedPersonId, seatsMembers])
 
-  // Reset play state when session changes (no message highlighted on load).
+  // Reset play state when session changes (no message highlighted on load,
+  // unless a message deep link is present — that effect runs after parts load).
   useEffect(() => {
     setActiveOrdinal(null)
     setPlaying(false)
     setSelectedPersonId(null)
   }, [selectedSession?.id])
+
+  // Deep link: ?message=<transcript_part.id> → highlight + scroll to that bubble.
+  useEffect(() => {
+    if (
+      urlMessageId == null ||
+      selectedSession == null ||
+      transcriptLoading ||
+      parts.length === 0
+    ) {
+      return
+    }
+    const index = parts.findIndex((part) => part.id === urlMessageId)
+    if (index < 0) {
+      return
+    }
+    setActiveOrdinal(index)
+    setPlaying(false)
+  }, [
+    urlMessageId,
+    selectedSession?.id,
+    transcriptLoading,
+    parts,
+  ])
 
   // When an MK is selected, jump to their first message in the chat.
   useEffect(() => {
@@ -450,6 +475,10 @@ export function KnessetCommitteesPage() {
   const hasParts = parts.length > 0
   const loadingTable = membersLoading || attendanceLoading || committeesLoading
   const sessionOpen = chatNav === 'transcript' && selectedSession != null
+  // Wait for memberships + attendance + transcript so seats mount once in
+  // final orbit order (avoids a second enter wave when chat messages arrive).
+  const tableSeatsReady =
+    sessionOpen && !loadingTable && !transcriptLoading
 
   function selectPerson(personId: number | null) {
     setPlaying(false)
@@ -573,14 +602,19 @@ export function KnessetCommitteesPage() {
                     בחרו ישיבת וועדה על מנת להראות את המשתתפים מסביב לשולחן
                   </p>
                   <CommitteeTable
-                    seats={sessionOpen ? seats : []}
-                    overflowCount={sessionOpen ? overflowCount : 0}
+                    seats={tableSeatsReady ? seats : []}
+                    overflowCount={tableSeatsReady ? overflowCount : 0}
                     speakingPersonId={
-                      sessionOpen && playing ? speakingPersonId : null
+                      tableSeatsReady && playing ? speakingPersonId : null
                     }
-                    selectedPersonId={sessionOpen ? selectedPersonId : null}
+                    selectedPersonId={
+                      tableSeatsReady ? selectedPersonId : null
+                    }
                     onSelectPerson={selectPerson}
-                    loading={sessionOpen ? loadingTable : false}
+                    loading={sessionOpen && !tableSeatsReady}
+                    enterKey={
+                      tableSeatsReady ? selectedSession?.id ?? null : null
+                    }
                   />
                 </div>
               </div>
@@ -612,6 +646,7 @@ export function KnessetCommitteesPage() {
                     members={seatsMembers}
                     session={selectedSession}
                     committeeName={selectedCommittee?.name ?? null}
+                    committeeId={selectedCommittee?.id ?? null}
                     shareUrl={sessionSharePath}
                     activeOrdinal={activeOrdinal}
                     playing={playing}

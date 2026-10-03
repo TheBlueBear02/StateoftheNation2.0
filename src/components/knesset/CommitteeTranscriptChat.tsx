@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react'
 import type { CommitteeMember } from '../../lib/committeeTypes'
@@ -23,13 +24,17 @@ import {
   resolvePartPersonId,
   speakerHeaderToName,
 } from '../../lib/committeeSpeakerMatch'
-import { sharePageLink } from '../../lib/committeeShare'
+import {
+  buildCommitteesSharePath,
+  sharePageLink,
+} from '../../lib/committeeShare'
 
 type CommitteeTranscriptChatProps = {
   parts: CommitteeTranscriptPart[]
   members: CommitteeMember[]
   session: CommitteeSession | null
   committeeName: string | null
+  committeeId?: number | null
   shareUrl?: string | null
   activeOrdinal: number | null
   playing: boolean
@@ -371,6 +376,8 @@ type ChatMessageRowProps = {
   selectedPersonId: number | null
   searchQuery: string
   searchActive: boolean
+  messageSharePath: string | null
+  shareTitle: string
   onJumpToOrdinal: (ordinal: number) => void
 }
 
@@ -384,8 +391,13 @@ const ChatMessageRow = memo(function ChatMessageRow({
   selectedPersonId,
   searchQuery,
   searchActive,
+  messageSharePath,
+  shareTitle,
   onJumpToOrdinal,
 }: ChatMessageRowProps) {
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'failed'>(
+    'idle',
+  )
   const personId = resolvePartPersonId(part, members)
   const isSelectedSpeaker =
     selectedPersonId != null && personId === selectedPersonId
@@ -396,6 +408,38 @@ const ChatMessageRow = memo(function ChatMessageRow({
   const name = speakerLabel(part, members)
   const factionName = speakerFaction(part, members)
   const imageUrl = speakerImage(part, members)
+
+  useEffect(() => {
+    if (shareStatus === 'idle') {
+      return
+    }
+    const timer = window.setTimeout(() => setShareStatus('idle'), 2000)
+    return () => window.clearTimeout(timer)
+  }, [shareStatus])
+
+  async function handleMessageShare(
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!messageSharePath) {
+      return
+    }
+    const absoluteUrl = messageSharePath.startsWith('http')
+      ? messageSharePath
+      : `${window.location.origin}${messageSharePath}`
+    const text = `${shareTitle} · ${name}`
+    const result = await sharePageLink({
+      url: absoluteUrl,
+      title: shareTitle,
+      text,
+    })
+    if (result === 'copied') {
+      setShareStatus('copied')
+    } else if (result === 'failed') {
+      setShareStatus('failed')
+    }
+  }
 
   if (meta) {
     const body = part.body.trim()
@@ -440,26 +484,73 @@ const ChatMessageRow = memo(function ChatMessageRow({
           <span>{initialsFromName(name)}</span>
         )}
       </div>
-      <button
-        type="button"
-        className="committee-chat__bubble"
-        onClick={() => onJumpToOrdinal(ordinal)}
-        aria-current={isActive ? 'true' : undefined}
-      >
-        <span className="committee-chat__bubble-meta">
-          <span className="committee-chat__bubble-name">
-            {highlightSearchMatches(name, searchQuery)}
-          </span>
-          {factionName ? (
-            <span className="committee-chat__bubble-party">
-              {highlightSearchMatches(factionName, searchQuery)}
+      <div className="committee-chat__bubble-wrap">
+        <button
+          type="button"
+          className="committee-chat__bubble"
+          onClick={() => onJumpToOrdinal(ordinal)}
+          aria-current={isActive ? 'true' : undefined}
+        >
+          <span className="committee-chat__bubble-meta">
+            <span className="committee-chat__bubble-name">
+              {highlightSearchMatches(name, searchQuery)}
             </span>
-          ) : null}
-        </span>
-        <span className="committee-chat__bubble-body">
-          {highlightSearchMatches(part.body, searchQuery)}
-        </span>
-      </button>
+            {factionName ? (
+              <span className="committee-chat__bubble-party">
+                {highlightSearchMatches(factionName, searchQuery)}
+              </span>
+            ) : null}
+          </span>
+          <span className="committee-chat__bubble-body">
+            {highlightSearchMatches(part.body, searchQuery)}
+          </span>
+        </button>
+        {messageSharePath ? (
+          <button
+            type="button"
+            className={[
+              'committee-chat__msg-share',
+              shareStatus === 'copied'
+                ? 'committee-chat__msg-share--copied'
+                : '',
+              shareStatus === 'failed'
+                ? 'committee-chat__msg-share--failed'
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            onClick={(event) => {
+              void handleMessageShare(event)
+            }}
+            aria-label={
+              shareStatus === 'copied'
+                ? 'הקישור להודעה הועתק'
+                : shareStatus === 'failed'
+                  ? 'שיתוף ההודעה נכשל'
+                  : 'שתפו את ההודעה'
+            }
+            title={
+              shareStatus === 'copied'
+                ? 'הועתק'
+                : shareStatus === 'failed'
+                  ? 'שגיאה'
+                  : 'שתפו הודעה'
+            }
+          >
+            {shareStatus === 'copied' ? (
+              <span className="committee-chat__share-status" role="status">
+                ✓
+              </span>
+            ) : shareStatus === 'failed' ? (
+              <span className="committee-chat__share-status" role="status">
+                !
+              </span>
+            ) : (
+              <ChatIconShare />
+            )}
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 })
@@ -469,6 +560,7 @@ export function CommitteeTranscriptChat({
   members,
   session,
   committeeName,
+  committeeId = null,
   shareUrl = null,
   activeOrdinal,
   playing,
@@ -573,12 +665,20 @@ export function CommitteeTranscriptChat({
   }, [shareStatus])
 
   const headerSubtitle = formatChatHeaderSubtitle(session)
+  const shareTitle = formatChatHeaderTitle(committeeName)
   const progressLabel =
     parts.length > 0
       ? `${activeOrdinal != null ? activeOrdinal + 1 : '—'} / ${parts.length}`
       : loading
         ? 'טוען תמליל…'
         : 'אין תמליל לישיבה זו'
+
+  function messageSharePathFor(partId: number): string | null {
+    if (committeeId == null || session?.id == null) {
+      return null
+    }
+    return buildCommitteesSharePath(committeeId, session.id, partId)
+  }
 
   async function handleShare() {
     if (!shareUrl) {
@@ -587,10 +687,13 @@ export function CommitteeTranscriptChat({
     const absoluteUrl = shareUrl.startsWith('http')
       ? shareUrl
       : `${window.location.origin}${shareUrl}`
-    const title = formatChatHeaderTitle(committeeName)
     const when = headerSubtitle.short
-    const text = when ? `${title} · ${when}` : title
-    const result = await sharePageLink({ url: absoluteUrl, title, text })
+    const text = when ? `${shareTitle} · ${when}` : shareTitle
+    const result = await sharePageLink({
+      url: absoluteUrl,
+      title: shareTitle,
+      text,
+    })
     if (result === 'copied') {
       setShareStatus('copied')
     } else if (result === 'failed') {
@@ -845,6 +948,8 @@ export function CommitteeTranscriptChat({
                       selectedPersonId={selectedPersonId}
                       searchQuery={trimmedSearch}
                       searchActive={searchActive}
+                      messageSharePath={messageSharePathFor(item.part.id)}
+                      shareTitle={shareTitle}
                       onJumpToOrdinal={onJumpToOrdinal}
                     />
                   </div>

@@ -10,6 +10,7 @@ type PageProps = {
   searchParams: Promise<{
     committee?: string | string[]
     session?: string | string[]
+    message?: string | string[]
   }>
 }
 

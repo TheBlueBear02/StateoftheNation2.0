@@ -1,6 +1,13 @@
 'use client'
 
-import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type AnimationEvent as ReactAnimationEvent,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
 import {
   COMMITTEE_TABLE_GEOMETRY,
@@ -15,6 +22,7 @@ import { Tooltip } from './Tooltip'
 
 type CommitteeSeatProps = {
   seat: LaidOutSeat
+  index: number
   isSpeaking: boolean
   isSelected: boolean
   onSelect: (personId: number | null) => void
@@ -36,11 +44,13 @@ function staffFallbackPersonId(kind: LaidOutSeat['kind']): number | null {
 
 function CommitteeSeat({
   seat,
+  index,
   isSpeaking,
   isSelected,
   onSelect,
   onHover,
 }: CommitteeSeatProps) {
+  const [enterDone, setEnterDone] = useState(false)
   const isStaff =
     seat.kind === 'legal_counsel' || seat.kind === 'committee_manager'
   const isAbsent = !isStaff && !seat.attended
@@ -57,6 +67,13 @@ function CommitteeSeat({
       : seat.kind === 'committee_manager'
         ? 'מנהל/ת'
         : null
+
+  function handleEnterEnd(event: ReactAnimationEvent<SVGGElement>) {
+    if (event.animationName !== 'committee-seat-enter') {
+      return
+    }
+    setEnterDone(true)
+  }
 
   return (
     <g
@@ -106,14 +123,27 @@ function CommitteeSeat({
           onHover(null, null)
         }
       }}
-      style={interactive ? { cursor: 'pointer' } : undefined}
+      style={
+        {
+          '--seat-i': index,
+          ...(interactive ? { cursor: 'pointer' } : {}),
+        } as CSSProperties
+      }
     >
       <defs>
         <clipPath id={clipId}>
           <circle r={radius} cx={0} cy={0} />
         </clipPath>
       </defs>
-      <g className="committee-seat__visual">
+      <g
+        className={[
+          'committee-seat__visual',
+          enterDone ? '' : 'committee-seat__visual--enter',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        onAnimationEnd={handleEnterEnd}
+      >
         <circle className="committee-seat__ring" r={radius + 3.5} fill="none" />
         <circle
           className="committee-seat__disc"
@@ -153,6 +183,8 @@ type CommitteeTableProps = {
   selectedPersonId: number | null
   onSelectPerson: (personId: number | null) => void
   loading?: boolean
+  /** Remount seats (replay enter animation) when the open session changes. */
+  enterKey?: number | string | null
 }
 
 export function CommitteeTable({
@@ -162,6 +194,7 @@ export function CommitteeTable({
   selectedPersonId,
   onSelectPerson,
   loading = false,
+  enterKey = null,
 }: CommitteeTableProps) {
   const g = COMMITTEE_TABLE_GEOMETRY
   const ringPath = committeeTableRingPath()
@@ -183,6 +216,21 @@ export function CommitteeTable({
 
   const [hoveredSeat, setHoveredSeat] = useState<LaidOutSeat | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+
+  // Clockwise from the chair (top), so the stagger sweeps the rim cleanly.
+  const staggerIndexByKey = useMemo(() => {
+    const { cx, cy } = COMMITTEE_TABLE_GEOMETRY
+    const ranked = seats
+      .map((seat) => {
+        let angle = Math.atan2(seat.x - cx, cy - seat.y)
+        if (angle < 0) {
+          angle += Math.PI * 2
+        }
+        return { key: seat.key, angle }
+      })
+      .sort((a, b) => a.angle - b.angle)
+    return new Map(ranked.map((item, index) => [item.key, index]))
+  }, [seats])
 
   useEffect(() => {
     if (loading) {
@@ -306,8 +354,11 @@ export function CommitteeTable({
                 : null)
           return (
             <CommitteeSeat
-              key={seat.key}
+              key={
+                enterKey != null ? `${enterKey}-${seat.key}` : seat.key
+              }
               seat={seat}
+              index={staggerIndexByKey.get(seat.key) ?? 0}
               isSpeaking={
                 seatPersonId != null && seatPersonId === speakingPersonId
               }

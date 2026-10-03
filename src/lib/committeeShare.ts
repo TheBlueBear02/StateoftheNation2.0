@@ -3,6 +3,7 @@
 export function buildCommitteesSharePath(
   committeeId: number | null,
   sessionId: number | null = null,
+  messageId: number | null = null,
 ): string {
   const params = new URLSearchParams()
   if (committeeId != null) {
@@ -10,6 +11,10 @@ export function buildCommitteesSharePath(
   }
   if (sessionId != null) {
     params.set('session', String(sessionId))
+  }
+  // Message deep links require a session; ids are transcript part PKs.
+  if (messageId != null && sessionId != null) {
+    params.set('message', String(messageId))
   }
   const query = params.toString()
   return query ? `/knesset/committees?${query}` : '/knesset/committees'
