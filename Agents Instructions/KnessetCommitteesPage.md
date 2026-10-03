@@ -28,7 +28,8 @@ Mobile: no breadcrumb; chat/list flush under the site header (no top padding/gap
 
 | File | Role |
 |------|------|
-| `src/app/knesset/committees/page.tsx` | Metadata + view |
+| `src/app/knesset/committees/page.tsx` | Metadata + view (OG/Twitter share image: `public/images/Knesset Committees/knesset-commiettees-thumbnail.png`) |
+| `public/images/Knesset Committees/knesset-commiettees-thumbnail.png` | Link-preview thumbnail for `/knesset/committees` |
 | `src/views/KnessetCommitteesPage.tsx` | Shell, chat nav, Play state, MK selection |
 | `src/views/KnessetCommitteesPage.css` | Page + table + chat + picker styles |
 | `src/components/knesset/CommitteeTable.tsx` | SVG table + seats |
@@ -47,7 +48,7 @@ Mobile: no breadcrumb; chat/list flush under the site header (no top padding/gap
 | `src/hooks/useCommitteeTranscript.ts` | Transcript + ordered parts |
 | `src/components/knesset/Tooltip.tsx` | Shared MK hover card (photo, name, party, tenure) |
 
-Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includes `/knesset/committees`. No page H1/subtitle; desktop top nav is `PageBreadcrumb` (`הכנסת` → `/knesset`, current `ועדות הכנסת`); hidden on mobile (`max-width: 959px`).
+Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includes `/knesset/committees`. Share previews (Open Graph / Twitter) use `knesset-commiettees-thumbnail.png` (1060×739). No page H1/subtitle; desktop top nav is `PageBreadcrumb` (`הכנסת` → `/knesset`, current `ועדות הכנסת`); hidden on mobile (`max-width: 959px`).
 
 ## Behavior
 
@@ -107,6 +108,23 @@ Transcript sync is **hybrid**:
 1. Prefer Hasadna parsed text/parts when the joined dump lists filenames for the session.
 2. Otherwise download the protocol DOC/DOCX `FilePath` (from dataservice document dump / OData) and split speakers locally (`source=parsed_file`).
 3. Sessions with neither Hasadna parts nor a DOC URL are skipped until a protocol file appears (Knesset often publishes DOCs days/weeks after the sitting).
+
+### Targeted fetch (one sitting)
+
+To pull a specific committee session by name + calendar day without waiting for the weekly newest-200 batch:
+
+```bash
+cd "Layer 1 - Gathering Data/knesset"
+python load_knesset_committees.py --committee "ועדת הכספים" --date 2024-03-12
+```
+
+- `--committee` — Hebrew name (exact, else unique case-insensitive substring) **or** numeric `knesset_committee_id`
+- `--date YYYY-MM-DD` — sitting day in **Asia/Jerusalem** (matches `start_at` on that calendar day)
+- `--session-oid` — optional Knesset `CommitteeSessionID` when several sittings share that day
+- With `--table all` (default) + both flags: runs **sessions → documents → transcripts** only (skips committees/memberships refresh). `--transcripts-limit` is ignored.
+- Transcript-only if metadata already synced: `--table transcripts --committee … --date …`
+- Default `--transcripts-mode missing` skips the sitting if a ready transcript already exists; use `--transcripts-mode all` to re-parse.
+- Needs `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` in `.env`, and `antiword` (or WSL) for `.doc` self-parse.
 
 Attendance is extracted from transcript parts with headers `נכחו` (committee members) and `חברי הכנסת` (guest MKs who are not committee members) whenever transcripts are synced, and can be backfilled with:
 
