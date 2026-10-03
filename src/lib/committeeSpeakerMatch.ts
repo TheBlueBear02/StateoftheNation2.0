@@ -321,10 +321,17 @@ function namesLooselyMatch(a: string, b: string): boolean {
 
 function looksLikePersonName(name: string): boolean {
   const parts = name.split(' ').filter(Boolean)
-  if (parts.length < 2 || parts.length > 4) {
+  // Guests often appear as a first name only ("דובי", "יוסי"); allow 1–4
+  // Hebrew name tokens. Reject 1-letter stubs and overly long "headers".
+  if (parts.length < 1 || parts.length > 4) {
     return false
   }
-  if (parts.some((part) => part.length < 2)) {
+  if (parts.length === 1) {
+    const sole = parts[0]!
+    if (sole.length < 3 || sole.length > 14) {
+      return false
+    }
+  } else if (parts.some((part) => part.length < 2)) {
     return false
   }
   // Reject obvious sentence fragments that slipped through.
@@ -376,7 +383,7 @@ export function isCredibleSpeakerHeader(
   if (hasOfficialPrefix && looksLikePersonName(name)) {
     return true
   }
-  // Guest / unidentified speaker: allow only clean multi-word names.
+  // Guest / unidentified speaker: clean Hebrew name (first-only or multi-word).
   return !hasOfficialPrefix && looksLikePersonName(name)
 }
 

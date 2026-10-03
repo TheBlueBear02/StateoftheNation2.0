@@ -29,6 +29,8 @@ Usage:
   python load_knesset_committees.py --table committees
   python load_knesset_committees.py --table memberships
   python load_knesset_committees.py --knesset 25
+  python load_knesset_committees.py --committee "ועדת הכספים" --date 2024-03-12
+  python load_knesset_committees.py --table transcripts --committee 977 --date 2024-03-12 --session-oid 2156789
 
 Env:
   SUPABASE_URL, SUPABASE_SERVICE_KEY
@@ -46,9 +48,10 @@ import re
 import sys
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import requests
 from dotenv import load_dotenv
@@ -91,6 +94,7 @@ RETRY_DELAY = 4
 
 DEFAULT_KNESSET_NUM = 25
 PROTOCOL_GROUP_TYPE_ID = 23
+ISRAEL_TZ = ZoneInfo("Asia/Jerusalem")
 
 POSITION_TO_SEAT_ROLE = {
     41: "chair",
@@ -986,8 +990,28 @@ def sync_documents(sb: Client, knesset_num: int) -> dict:
 
 # ── Sync: transcripts + parts (Hasadna) ───────────────────────────────────────
 
-def load_session_rows(sb: Client) -> list[dict]:
-    rows: list[dict] = []
+def load_session_rows(
+    sb: Client, *, session_ids: list[int] | None = None
+) -> list[dict]:
+    """Load session rows newest-first, optionally restricted to internal ids."""
+    if session_ids is not None:
+        if not session_ids:
+            return []
+        rows: list[dict] = []
+        for i in range(0, len(session_ids), 200):
+            chunk = session_ids[i : i + 200]
+            batch = (
+                sb.table("knesset_committee_sessions")
+                .select("id, knesset_session_id, start_at")
+                .in_("id", chunk)
+                .execute()
+                .data
+            )
+            rows.extend(batch)
+        rows.sort(key=lambda r: r.get("start_at") or "", reverse=True)
+        return rows
+
+    rows = []
     page_size = 1000
     offset = 0
     while True:
@@ -1004,6 +1028,190 @@ def load_session_rows(sb: Client) -> list[dict]:
             break
         offset += page_size
     return rows
+
+
+def _knesset_db_id(sb: Client, knesset_num: int) -> int:
+    knesset_map = load_id_map(sb, "knessets", "knesset_number")
+    knesset_id = knesset_map.get(knesset_num)
+    if knesset_id is None:
+        raise RuntimeError(
+            f"knessets row for knesset_number={knesset_num} not found — "
+            "run load_all_knesset_data.py first"
+        )
+    return knesset_id
+
+
+def load_committees_for_knesset(sb: Client, knesset_num: int) -> list[dict]:
+    knesset_id = _knesset_db_id(sb, knesset_num)
+    rows: list[dict] = []
+    page_size = 1000
+    offset = 0
+    while True:
+        batch = (
+            sb.table("knesset_committees")
+            .select("id, knesset_committee_id, name")
+            .eq("knesset_id", knesset_id)
+            .order("name")
+            .range(offset, offset + page_size - 1)
+            .execute()
+            .data
+        )
+        rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return rows
+
+
+def resolve_committee(
+    sb: Client, knesset_num: int, committee_arg: str
+) -> dict:
+    """
+    Resolve --committee to a knesset_committees row.
+    Accepts knesset_committee_id (digits) or Hebrew name (exact, else unique
+    case-insensitive substring).
+    """
+    committees = load_committees_for_knesset(sb, knesset_num)
+    if not committees:
+        raise RuntimeError(
+            f"no committees in DB for Knesset {knesset_num} — "
+            "run with --table committees first"
+        )
+
+    arg = (committee_arg or "").strip()
+    if not arg:
+        raise RuntimeError("--committee is empty")
+
+    if arg.isdigit():
+        oid = int(arg)
+        matches = [c for c in committees if c["knesset_committee_id"] == oid]
+        if not matches:
+            raise RuntimeError(
+                f"no committee with knesset_committee_id={oid} for Knesset {knesset_num}"
+            )
+        return matches[0]
+
+    exact = [c for c in committees if (c.get("name") or "") == arg]
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        raise RuntimeError(
+            f"multiple committees named exactly {arg!r}; "
+            "pass knesset_committee_id instead"
+        )
+
+    needle = arg.casefold()
+    substr = [
+        c
+        for c in committees
+        if needle in (c.get("name") or "").casefold()
+    ]
+    if len(substr) == 1:
+        return substr[0]
+    if not substr:
+        sample = ", ".join(
+            f"{c['name']} ({c['knesset_committee_id']})" for c in committees[:12]
+        )
+        raise RuntimeError(
+            f"no committee matching {arg!r} for Knesset {knesset_num}. "
+            f"Examples: {sample}"
+        )
+    listed = "; ".join(
+        f"{c['name']} (oid={c['knesset_committee_id']}, id={c['id']})"
+        for c in substr[:20]
+    )
+    raise RuntimeError(
+        f"ambiguous committee {arg!r} matched {len(substr)} rows — "
+        f"use a fuller name or knesset_committee_id. Matches: {listed}"
+    )
+
+
+def israel_day_bounds(day: date) -> tuple[datetime, datetime]:
+    """Inclusive start / exclusive end of a calendar day in Asia/Jerusalem."""
+    start = datetime(day.year, day.month, day.day, tzinfo=ISRAEL_TZ)
+    end = start + timedelta(days=1)
+    return start, end
+
+
+def find_sessions_for_committee_date(
+    sb: Client,
+    *,
+    committee_id: int,
+    day: date,
+    session_oid: int | None = None,
+) -> list[dict]:
+    start, end = israel_day_bounds(day)
+    rows = (
+        sb.table("knesset_committee_sessions")
+        .select(
+            "id, knesset_session_id, session_number, start_at, committee_id"
+        )
+        .eq("committee_id", committee_id)
+        .gte("start_at", start.isoformat())
+        .lt("start_at", end.isoformat())
+        .order("start_at")
+        .execute()
+        .data
+    )
+    if session_oid is not None:
+        pinned = [r for r in rows if r["knesset_session_id"] == session_oid]
+        if not pinned:
+            available = ", ".join(
+                f"oid={r['knesset_session_id']} start={r.get('start_at')}"
+                for r in rows
+            ) or "(none that day)"
+            raise RuntimeError(
+                f"no session with knesset_session_id={session_oid} for "
+                f"committee_id={committee_id} on {day.isoformat()}. "
+                f"That day: {available}"
+            )
+        return pinned
+    return rows
+
+
+def resolve_target_session_ids(
+    sb: Client,
+    *,
+    knesset_num: int,
+    committee_arg: str,
+    date_str: str,
+    session_oid: int | None = None,
+) -> tuple[dict, list[dict]]:
+    """
+    Resolve --committee + --date (+ optional --session-oid) to session rows.
+    All sittings that day are returned unless --session-oid pins one.
+    Raises RuntimeError when none match.
+    """
+    day = date.fromisoformat(date_str)
+    committee = resolve_committee(sb, knesset_num, committee_arg)
+    sessions = find_sessions_for_committee_date(
+        sb,
+        committee_id=committee["id"],
+        day=day,
+        session_oid=session_oid,
+    )
+    if not sessions:
+        raise RuntimeError(
+            f"no sessions for committee {committee['name']!r} "
+            f"(oid={committee['knesset_committee_id']}) on {day.isoformat()} "
+            f"(Israel time). Sync sessions first "
+            f"(`--table sessions`) or check the date."
+        )
+    listed = "; ".join(
+        f"oid={r['knesset_session_id']} number={r.get('session_number')} "
+        f"start={r.get('start_at')}"
+        for r in sessions
+    )
+    log.info(
+        "  target: committee %s (oid=%s, id=%s) on %s → %d session(s): %s",
+        committee["name"],
+        committee["knesset_committee_id"],
+        committee["id"],
+        day.isoformat(),
+        len(sessions),
+        listed,
+    )
+    return committee, sessions
 
 
 def load_ready_transcript_session_ids(sb: Client) -> set[int]:
@@ -1201,11 +1409,14 @@ def sync_transcripts(
     *,
     mode: str,
     limit: int | None,
+    session_ids: list[int] | None = None,
 ) -> dict:
+    targeted = session_ids is not None
     log.info(
-        "── syncing transcripts/parts (mode=%s, limit=%s) ──",
+        "── syncing transcripts/parts (mode=%s, limit=%s, targeted=%s) ──",
         mode,
-        limit if limit is not None else "none",
+        "n/a" if targeted else (limit if limit is not None else "none"),
+        targeted,
     )
     if mode == "none":
         return {
@@ -1219,22 +1430,33 @@ def sync_transcripts(
 
     file_index = load_hasadna_session_file_index(knesset_num)
     docs_by_session = load_protocol_docs_by_session(sb)
-    sessions = load_session_rows(sb)
+    sessions = load_session_rows(sb, session_ids=session_ids)
+    if targeted:
+        found = {s["id"] for s in sessions}
+        missing = [sid for sid in session_ids if sid not in found]
+        if missing:
+            raise RuntimeError(
+                f"targeted session id(s) not found in DB: {missing}"
+            )
     ready_ids = load_ready_transcript_session_ids(sb) if mode == "missing" else set()
     name_index = build_people_name_index(sb)
 
     candidates = []
+    already_ready = 0
+    no_source = 0
     for sess in sessions:
         if mode == "missing" and sess["id"] in ready_ids:
+            already_ready += 1
             continue
         oid = sess["knesset_session_id"]
         has_hasadna = oid in file_index
         has_doc = sess["id"] in docs_by_session
         if not has_hasadna and not has_doc:
+            no_source += 1
             continue
         candidates.append(sess)
 
-    if limit is not None:
+    if not targeted and limit is not None:
         candidates = candidates[: max(0, limit)]
 
     log.info(
@@ -1244,6 +1466,27 @@ def sync_transcripts(
         len(file_index),
         len(docs_by_session),
     )
+
+    if targeted and not candidates:
+        if already_ready and not no_source:
+            log.info(
+                "  targeted session(s) already have ready transcripts — nothing to do"
+            )
+            return {
+                "table": "knesset_committee_session_transcripts",
+                "upserted": 0,
+                "inserted": 0,
+                "updated": 0,
+                "skipped": already_ready,
+                "parts_written": 0,
+                "candidates": 0,
+                "already_ready": already_ready,
+            }
+        raise RuntimeError(
+            "targeted session(s) found but have neither Hasadna parts nor a "
+            "protocol DOC URL — wait for Knesset/Hasadna to publish the protocol, "
+            "or re-run after `--table documents`"
+        )
 
     ok = 0
     failed = 0
@@ -1402,15 +1645,28 @@ def run(
     transcripts_mode: str,
     transcripts_limit: int | None,
     skip_transcripts: bool,
+    committee: str | None = None,
+    session_date: str | None = None,
+    session_oid: int | None = None,
 ) -> dict:
     sb = get_supabase()
     started = datetime.now(timezone.utc)
     summary: dict = {"knesset_num": knesset_num, "steps": {}}
+    targeted = committee is not None and session_date is not None
 
-    want = set(TABLE_CHOICES) - {"all"} if table == "all" else {table}
+    if targeted and table == "all":
+        # Fast path: refresh sitting metadata, then fetch that transcript only.
+        want = {"sessions", "documents", "transcripts"}
+    elif table == "all":
+        want = set(TABLE_CHOICES) - {"all"}
+    else:
+        want = {table}
+
     if skip_transcripts:
         want.discard("transcripts")
         transcripts_mode = "none"
+
+    target_session_ids: list[int] | None = None
 
     try:
         if "committees" in want:
@@ -1421,12 +1677,34 @@ def run(
             summary["steps"]["sessions"] = sync_sessions(sb, knesset_num)
         if "documents" in want:
             summary["steps"]["documents"] = sync_documents(sb, knesset_num)
+
+        if targeted:
+            committee_row, session_rows = resolve_target_session_ids(
+                sb,
+                knesset_num=knesset_num,
+                committee_arg=committee,
+                date_str=session_date,
+                session_oid=session_oid,
+            )
+            target_session_ids = [r["id"] for r in session_rows]
+            summary["target"] = {
+                "committee_id": committee_row["id"],
+                "knesset_committee_id": committee_row["knesset_committee_id"],
+                "committee_name": committee_row["name"],
+                "date": session_date,
+                "session_ids": target_session_ids,
+                "knesset_session_ids": [
+                    r["knesset_session_id"] for r in session_rows
+                ],
+            }
+
         if "transcripts" in want:
             summary["steps"]["transcripts"] = sync_transcripts(
                 sb,
                 knesset_num,
                 mode=transcripts_mode,
                 limit=transcripts_limit,
+                session_ids=target_session_ids,
             )
         if "attendance" in want:
             summary["steps"]["attendance"] = sync_attendance_from_existing_parts(
@@ -1439,7 +1717,11 @@ def run(
             pipeline="knesset-committees",
             action="sync",
             status="success",
-            message=f"Knesset {knesset_num} committees sync complete",
+            message=(
+                f"Knesset {knesset_num} committees targeted sync complete"
+                if targeted
+                else f"Knesset {knesset_num} committees sync complete"
+            ),
             summary=summary,
             source=os.environ.get("PIPELINE_RUN_SOURCE", "cli"),
             started_at=started,
@@ -1497,19 +1779,64 @@ def main() -> None:
         default=200,
         help="Max sessions to fetch transcripts for this run (default 200; use 0 for no limit)",
     )
+    parser.add_argument(
+        "--committee",
+        type=str,
+        default=None,
+        help=(
+            "Target one sitting: committee Hebrew name (exact or unique substring) "
+            "or knesset_committee_id. Requires --date."
+        ),
+    )
+    parser.add_argument(
+        "--date",
+        dest="session_date",
+        type=str,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Target sitting calendar day in Asia/Jerusalem. Requires --committee.",
+    )
+    parser.add_argument(
+        "--session-oid",
+        type=int,
+        default=None,
+        help=(
+            "Optional: fetch only this Knesset CommitteeSessionID. "
+            "Without it, all sittings for --committee on --date are fetched."
+        ),
+    )
     args = parser.parse_args()
+
+    has_committee = args.committee is not None
+    has_date = args.session_date is not None
+    if has_committee != has_date:
+        parser.error("--committee and --date must be used together")
+    if args.session_oid is not None and not (has_committee and has_date):
+        parser.error("--session-oid requires --committee and --date")
+    if has_date:
+        try:
+            date.fromisoformat(args.session_date)
+        except ValueError:
+            parser.error("--date must be YYYY-MM-DD")
 
     limit = args.transcripts_limit
     if limit == 0:
         limit = None
 
-    run(
-        knesset_num=args.knesset,
-        table=args.table,
-        transcripts_mode=args.transcripts_mode,
-        transcripts_limit=limit,
-        skip_transcripts=args.skip_transcripts,
-    )
+    try:
+        run(
+            knesset_num=args.knesset,
+            table=args.table,
+            transcripts_mode=args.transcripts_mode,
+            transcripts_limit=limit,
+            skip_transcripts=args.skip_transcripts,
+            committee=args.committee,
+            session_date=args.session_date,
+            session_oid=args.session_oid,
+        )
+    except RuntimeError as exc:
+        log.error("%s", exc)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -797,7 +797,7 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 | Script | Tables updated | Trigger |
 |--------|---------------|---------|
 | `load_all_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Weekly Saturday midnight Israel (GitHub Actions: `.github/workflows/knesset-pipeline.yml`) |
-| `load_knesset_committees.py` | `knesset_committees` · `knesset_committee_memberships` · `knesset_committee_sessions` · `knesset_committee_session_documents` · `knesset_committee_session_transcripts` · `knesset_committee_transcript_parts` | Same weekly workflow (after main knesset sync). OData + Hasadna + **DOC self-parse** (`committee_protocol_parse.py`; CI installs `antiword`). Default: newest **200** missing transcripts/run |
+| `load_knesset_committees.py` | `knesset_committees` · `knesset_committee_memberships` · `knesset_committee_sessions` · `knesset_committee_session_documents` · `knesset_committee_session_transcripts` · `knesset_committee_transcript_parts` | Same weekly workflow (after main knesset sync). OData + Hasadna + **DOC self-parse** (`committee_protocol_parse.py`; CI installs `antiword`). Default: newest **200** missing transcripts/run. Targeted CLI: `--committee` + `--date YYYY-MM-DD` fetches **all** sittings that day (optional `--session-oid` pins one) |
 | `seed_office_dashboard.py` | `offices.is_shown` / `info` · `indexes` · `index_data` | Manual — migrate curated KPI data from old sn.db |
 | `insert_raw_list.py` | `raw_candidate_lists` | Manual — when a party publishes their list |
 | `run_pipeline.py` | `election_candidates` · `people` (enrichment) | Manual — after each `insert_raw_list.py` run |

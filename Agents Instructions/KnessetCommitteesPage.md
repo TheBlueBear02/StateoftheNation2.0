@@ -74,7 +74,7 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 - Click MK → selects them (blue-dark ring), highlights their chat messages, jumps chat to their first message. Click again clears selection.
 - Hover MK seat → blue ring (no scale); tooltip appears centered **above** the seat photo with name, party, committee role (if any), and Knesset tenure (days/years + first elected year when known).
 - Speaker attribution only uses `person_id` when that person is on the session roster (membership + attendance guests). Global ingest matches for people who were not at the sitting are ignored; the chat falls back to the protocol `speaker_header` text.
-- Consecutive Hasadna parts whose `speaker_header` is not a credible speaker turn (sentence fragments like "ואני אומר לבנימין נתניהו", tiny OCR stubs) are **merged** into the previous speech bubble so one oration stays one message.
+- Consecutive Hasadna parts whose `speaker_header` is not a credible speaker turn (sentence fragments like "ואני אומר לבנימין נתניהו", tiny OCR stubs of 1–2 letters) are **merged** into the previous speech bubble so one oration stays one message. Credible headers include role-prefixed speakers, seated MKs, multi-word Hebrew names, and **single first names** (e.g. guest "דובי") of 3–14 Hebrew letters — those stay as their own bubbles.
 - During **Play**, the currently speaking MK’s seat gets a **blue** ring.
 
 ### Transcript chat
@@ -109,9 +109,9 @@ Transcript sync is **hybrid**:
 2. Otherwise download the protocol DOC/DOCX `FilePath` (from dataservice document dump / OData) and split speakers locally (`source=parsed_file`).
 3. Sessions with neither Hasadna parts nor a DOC URL are skipped until a protocol file appears (Knesset often publishes DOCs days/weeks after the sitting).
 
-### Targeted fetch (one sitting)
+### Targeted fetch (committee + day)
 
-To pull a specific committee session by name + calendar day without waiting for the weekly newest-200 batch:
+To pull all sittings for a committee on a calendar day without waiting for the weekly newest-200 batch:
 
 ```bash
 cd "Layer 1 - Gathering Data/knesset"
@@ -119,11 +119,11 @@ python load_knesset_committees.py --committee "ועדת הכספים" --date 202
 ```
 
 - `--committee` — Hebrew name (exact, else unique case-insensitive substring) **or** numeric `knesset_committee_id`
-- `--date YYYY-MM-DD` — sitting day in **Asia/Jerusalem** (matches `start_at` on that calendar day)
-- `--session-oid` — optional Knesset `CommitteeSessionID` when several sittings share that day
+- `--date YYYY-MM-DD` — sitting day in **Asia/Jerusalem** (matches `start_at` on that calendar day). **All** sessions that day are fetched.
+- `--session-oid` — optional: pin a single Knesset `CommitteeSessionID` instead of every sitting that day
 - With `--table all` (default) + both flags: runs **sessions → documents → transcripts** only (skips committees/memberships refresh). `--transcripts-limit` is ignored.
 - Transcript-only if metadata already synced: `--table transcripts --committee … --date …`
-- Default `--transcripts-mode missing` skips the sitting if a ready transcript already exists; use `--transcripts-mode all` to re-parse.
+- Default `--transcripts-mode missing` skips sittings that already have a ready transcript; use `--transcripts-mode all` to re-parse.
 - Needs `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` in `.env`, and `antiword` (or WSL) for `.doc` self-parse.
 
 Attendance is extracted from transcript parts with headers `נכחו` (committee members) and `חברי הכנסת` (guest MKs who are not committee members) whenever transcripts are synced, and can be backfilled with:
