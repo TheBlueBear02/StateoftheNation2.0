@@ -378,9 +378,11 @@ export function KnessetCommitteesPage() {
     }
 
     // Sessions hook keys off selectedCommittee; wait until it matches the URL.
+    // Keep chat on transcript while resolving so deep links don't flash the
+    // sessions picker (and so we never treat "not loaded yet" as missing).
     if (selectedCommittee?.id !== committee.id || sessionsLoading) {
       setSelectedSession(null)
-      setChatNav('sessions')
+      setChatNav('transcript')
       return
     }
 

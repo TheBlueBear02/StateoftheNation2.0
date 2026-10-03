@@ -198,8 +198,14 @@ export function useCommitteeSessions(
   withTranscriptOnly: boolean,
 ): UseCommitteeSessionsResult {
   const [sessions, setSessions] = useState<CommitteeSession[]>([])
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Tracks which committeeId the current `sessions` belong to. Until this
+  // matches the requested id, callers must treat the hook as still loading —
+  // otherwise the first render after selecting a committee has loading=false
+  // and sessions=[] and deep links incorrectly strip `session` from the URL.
+  const [loadedCommitteeId, setLoadedCommitteeId] = useState<number | null>(
+    null,
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -207,18 +213,23 @@ export function useCommitteeSessions(
     async function fetchSessions() {
       if (committeeId == null) {
         setSessions([])
-        setLoading(false)
+        setLoadedCommitteeId(null)
         setError(null)
         return
       }
 
-      setLoading(true)
+      // Invalidate immediately so `loading` is true on this request before any
+      // await — critical for session deep links on first paint.
+      setLoadedCommitteeId(null)
       setError(null)
 
       if (supabaseConfigError || !supabase) {
+        if (cancelled) {
+          return
+        }
         setError(supabaseConfigError ?? 'Supabase client is not configured')
         setSessions([])
-        setLoading(false)
+        setLoadedCommitteeId(committeeId)
         return
       }
 
@@ -238,7 +249,7 @@ export function useCommitteeSessions(
         if (queryError) {
           setError(queryError.message)
           setSessions([])
-          setLoading(false)
+          setLoadedCommitteeId(committeeId)
           return
         }
 
@@ -275,14 +286,14 @@ export function useCommitteeSessions(
         }
 
         setSessions(normalized)
-        setLoading(false)
+        setLoadedCommitteeId(committeeId)
       } catch (err) {
         if (cancelled) {
           return
         }
         setError(err instanceof Error ? err.message : 'שגיאה בטעינת ישיבות')
         setSessions([])
-        setLoading(false)
+        setLoadedCommitteeId(committeeId)
       }
     }
 
@@ -293,5 +304,9 @@ export function useCommitteeSessions(
     }
   }, [committeeId, withTranscriptOnly])
 
-  return { sessions, loading, error }
+  const loading = committeeId != null && loadedCommitteeId !== committeeId
+  const readySessions =
+    committeeId != null && loadedCommitteeId === committeeId ? sessions : []
+
+  return { sessions: readySessions, loading, error }
 }

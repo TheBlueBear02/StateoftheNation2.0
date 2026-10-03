@@ -63,7 +63,7 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 - Click committee → **sessions list** for that committee (ready transcripts only), with header **back** to committees. URL updates to `?committee=<id>`.
   - Session row title = **סדר היום** when available (up to 2 lines, then ellipsis); otherwise **ישיבה N**. Datetime (**day · time · date**) under the title; **message count** (transcript parts) as a muted badge at the bottom-left of the row. Avatar still shows the session number.
 - Click session → **transcript chat** + committee table; chat header has **back** to sessions and a **share** button for the session deep link. URL updates to `?committee=<id>&session=<id>`.
-- Opening a shared URL restores the matching committee list / sessions list / transcript view once data loads.
+- Opening a shared URL restores the matching committee list / sessions list / transcript view once data loads. Session deep links stay on the transcript shell while sessions load (do not flash the picker). `useCommitteeSessions` reports `loading` until data for the requested committee arrives — avoids a race that used to strip `session` from the URL when `sessions=[]` and `loading=false` on the first render after selecting a committee.
 - Chat header subtitle on desktop: **day · time · date · פרוטוקול ישיבה N** (RTL — datetime on the right). On mobile: **day · time · date** only.
 - No top-of-page ועדה/ישיבה dropdowns.
 
