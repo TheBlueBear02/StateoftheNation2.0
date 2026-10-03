@@ -333,6 +333,16 @@
     height: 18px;
   }
 
+  .committee-chat__share {
+    width: 28px;
+    height: 28px;
+  }
+
+  .committee-chat__share .committee-chat__icon {
+    width: 16px;
+    height: 16px;
+  }
+
   .committee-chat__header-text {
     width: 100%;
     min-width: 0;
@@ -566,6 +576,51 @@
   width: 20px;
   height: 20px;
   display: block;
+}
+
+.committee-chat__share {
+  appearance: none;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.committee-chat__share:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.committee-chat__share:focus,
+.committee-chat__share:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.committee-chat__share .committee-chat__icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.committee-chat__share-status {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.committee-chat__share--copied {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.committee-chat__share--failed {
+  background: rgba(180, 40, 40, 0.35);
 }
 
 .committee-chat__header-text {

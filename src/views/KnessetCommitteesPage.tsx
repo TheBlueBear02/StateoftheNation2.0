@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
 import { CommitteeChatPicker } from '../components/knesset/CommitteeChatPicker'
@@ -21,6 +21,7 @@ import { usePersonTenures } from '../hooks/usePersonTenures'
 import type { CommitteeMember } from '../lib/committeeTypes'
 import type { KnessetCommittee } from '../lib/committeeTypes'
 import type { CommitteeSession } from '../lib/committeeTypes'
+import { buildCommitteesSharePath } from '../lib/committeeShare'
 import { layoutCommitteeSeats } from '../lib/committeeTableLayout'
 import {
   partBelongsToPerson,
@@ -45,23 +46,8 @@ function parsePositiveInt(raw: string | null): number | null {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
-function buildCommitteesQuery(
-  committeeId: number | null,
-  sessionId: number | null,
-): string {
-  const params = new URLSearchParams()
-  if (committeeId != null) {
-    params.set('committee', String(committeeId))
-  }
-  if (sessionId != null) {
-    params.set('session', String(sessionId))
-  }
-  return params.toString()
-}
-
 export function KnessetCommitteesPage() {
   const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
   const { committees, loading: committeesLoading, error: committeesError } =
     useKnessetCommittees()
@@ -427,7 +413,7 @@ export function KnessetCommitteesPage() {
       urlCommitteeId != null &&
       !committees.some((item) => item.id === urlCommitteeId)
     ) {
-      router.replace(pathname, { scroll: false })
+      router.replace(buildCommitteesSharePath(null), { scroll: false })
       return
     }
 
@@ -438,15 +424,13 @@ export function KnessetCommitteesPage() {
       !sessionsLoading &&
       !sessions.some((item) => item.id === urlSessionId)
     ) {
-      router.replace(
-        `${pathname}?${buildCommitteesQuery(urlCommitteeId, null)}`,
-        { scroll: false },
-      )
+      router.replace(buildCommitteesSharePath(urlCommitteeId, null), {
+        scroll: false,
+      })
     }
   }, [
     committees,
     committeesLoading,
-    pathname,
     router,
     selectedCommittee?.id,
     sessions,
@@ -506,10 +490,9 @@ export function KnessetCommitteesPage() {
   function openCommittee(committee: KnessetCommittee) {
     setPlaying(false)
     setSelectedPersonId(null)
-    router.replace(
-      `${pathname}?${buildCommitteesQuery(committee.id, null)}`,
-      { scroll: false },
-    )
+    router.replace(buildCommitteesSharePath(committee.id, null), {
+      scroll: false,
+    })
   }
 
   function openSession(session: CommitteeSession) {
@@ -519,10 +502,9 @@ export function KnessetCommitteesPage() {
     if (committeeId == null) {
       return
     }
-    router.replace(
-      `${pathname}?${buildCommitteesQuery(committeeId, session.id)}`,
-      { scroll: false },
-    )
+    router.replace(buildCommitteesSharePath(committeeId, session.id), {
+      scroll: false,
+    })
   }
 
   function backFromTranscript() {
@@ -530,20 +512,24 @@ export function KnessetCommitteesPage() {
     setPlaying(false)
     setSelectedPersonId(null)
     if (committeeId != null) {
-      router.replace(
-        `${pathname}?${buildCommitteesQuery(committeeId, null)}`,
-        { scroll: false },
-      )
+      router.replace(buildCommitteesSharePath(committeeId, null), {
+        scroll: false,
+      })
       return
     }
-    router.replace(pathname, { scroll: false })
+    router.replace(buildCommitteesSharePath(null), { scroll: false })
   }
 
   function backFromSessions() {
     setPlaying(false)
     setSelectedPersonId(null)
-    router.replace(pathname, { scroll: false })
+    router.replace(buildCommitteesSharePath(null), { scroll: false })
   }
+
+  const sessionSharePath =
+    selectedCommittee != null && selectedSession != null
+      ? buildCommitteesSharePath(selectedCommittee.id, selectedSession.id)
+      : null
 
   return (
     <SiteLayout className="committees-page">
@@ -624,6 +610,7 @@ export function KnessetCommitteesPage() {
                     members={seatsMembers}
                     session={selectedSession}
                     committeeName={selectedCommittee?.name ?? null}
+                    shareUrl={sessionSharePath}
                     activeOrdinal={activeOrdinal}
                     playing={playing}
                     selectedPersonId={selectedPersonId}

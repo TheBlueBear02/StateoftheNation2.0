@@ -5,7 +5,7 @@
 Visualization of **Knesset 25** committee sittings: pick a committee and session from a WhatsApp-style group list, see MKs around a hollow committee table, and play the transcript as a chat beside the table.
 
 Route: `/knesset/committees`  
-Shareable deep links: `/knesset/committees?committee=<id>` (sessions list) and `/knesset/committees?committee=<id>&session=<id>` (transcript + table). Ids are the internal Supabase PKs (`knesset_committees.id`, `knesset_committee_sessions.id`). Browser back/forward follows the query.
+Shareable deep links: `/knesset/committees?committee=<id>` (sessions list) and `/knesset/committees?committee=<id>&session=<id>` (transcript + table). Ids are the internal Supabase PKs (`knesset_committees.id`, `knesset_committee_sessions.id`). Browser back/forward follows the query. Open Graph / Twitter metadata is generated from those query params (committee name, session number/date, agenda when available), and `og:url` keeps the full deep link so WhatsApp/Facebook do not strip `session`. The transcript chat header has a **share** button (native share sheet, else copy URL).
 
 Status: **frontend MVP live** (schema + ingest + page). Full membership roster around the table; when protocol attendance exists, absentees render gray. Keyword search not built yet.
 
@@ -28,14 +28,16 @@ Mobile: no breadcrumb; chat/list flush under the site header (no top padding/gap
 
 | File | Role |
 |------|------|
-| `src/app/knesset/committees/page.tsx` | Metadata + view (OG/Twitter share image: `public/images/Knesset Committees/knesset-commiettees-thumbnail.png`) |
+| `src/app/knesset/committees/page.tsx` | Dynamic metadata + view (OG/Twitter share image: `public/images/Knesset Committees/knesset-commiettees-thumbnail.png`) |
 | `public/images/Knesset Committees/knesset-commiettees-thumbnail.png` | Link-preview thumbnail for `/knesset/committees` |
 | `src/views/KnessetCommitteesPage.tsx` | Shell, chat nav, Play state, MK selection |
 | `src/views/KnessetCommitteesPage.css` | Page + table + chat + picker styles |
 | `src/components/knesset/CommitteeTable.tsx` | SVG table + seats |
 | `src/components/knesset/CommitteeChatPicker.tsx` | WhatsApp-style committee / session lists |
-| `src/components/knesset/CommitteeTranscriptChat.tsx` | Full transcript as chat messages + play controls + AI summary |
+| `src/components/knesset/CommitteeTranscriptChat.tsx` | Full transcript as chat messages + play controls + AI summary + session share |
 | `src/app/api/knesset/committee-session-summary/route.ts` | OpenAI short session summary (agenda + discussion + votes) |
+| `src/lib/committeeShare.ts` | Deep-link path builder + `sharePageLink` (native share / clipboard) |
+| `src/lib/loadCommitteeShareMeta.ts` | Server metadata for committee/session share URLs |
 | `src/lib/committeeTypes.ts` | Shared TS types |
 | `src/lib/committeeTableLayout.ts` | Seat placement around the table |
 | `src/lib/committeeSpeakerMatch.ts` | Match parts → seated MKs by person_id / header |
@@ -60,7 +62,7 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
   - committee type (**ועדה ראשית** / **משנית**) sits beside the committee name
 - Click committee → **sessions list** for that committee (ready transcripts only), with header **back** to committees. URL updates to `?committee=<id>`.
   - Session row title = **סדר היום** when available (up to 2 lines, then ellipsis); otherwise **ישיבה N**. Datetime (**day · time · date**) under the title; **message count** (transcript parts) as a muted badge at the bottom-left of the row. Avatar still shows the session number.
-- Click session → **transcript chat** + committee table; chat header has **back** to sessions. URL updates to `?committee=<id>&session=<id>`.
+- Click session → **transcript chat** + committee table; chat header has **back** to sessions and a **share** button for the session deep link. URL updates to `?committee=<id>&session=<id>`.
 - Opening a shared URL restores the matching committee list / sessions list / transcript view once data loads.
 - Chat header subtitle on desktop: **day · time · date · פרוטוקול ישיבה N** (RTL — datetime on the right). On mobile: **day · time · date** only.
 - No top-of-page ועדה/ישיבה dropdowns.

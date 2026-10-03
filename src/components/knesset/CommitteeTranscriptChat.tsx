@@ -23,12 +23,14 @@ import {
   resolvePartPersonId,
   speakerHeaderToName,
 } from '../../lib/committeeSpeakerMatch'
+import { sharePageLink } from '../../lib/committeeShare'
 
 type CommitteeTranscriptChatProps = {
   parts: CommitteeTranscriptPart[]
   members: CommitteeMember[]
   session: CommitteeSession | null
   committeeName: string | null
+  shareUrl?: string | null
   activeOrdinal: number | null
   playing: boolean
   selectedPersonId: number | null
@@ -85,6 +87,17 @@ function ChatIconClose() {
       <path
         fill="currentColor"
         d="M18.3 5.71 12 12.01 5.7 5.7 4.29 7.11 10.59 13.4 4.29 19.7 5.7 21.11 12 14.81l6.3 6.3 1.41-1.41-6.3-6.3 6.3-6.29z"
+      />
+    </svg>
+  )
+}
+
+function ChatIconShare() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="committee-chat__icon">
+      <path
+        fill="currentColor"
+        d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11A2.99 2.99 0 0 0 18 7.91c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L7.04 9.81A2.99 2.99 0 0 0 6 9.09c-1.66 0-3 1.34-3 3s1.34 3 3 3c.76 0 1.44-.3 1.96-.77l7.12 4.16c-.05.21-.08.43-.08.61 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"
       />
     </svg>
   )
@@ -456,6 +469,7 @@ export function CommitteeTranscriptChat({
   members,
   session,
   committeeName,
+  shareUrl = null,
   activeOrdinal,
   playing,
   selectedPersonId,
@@ -474,6 +488,9 @@ export function CommitteeTranscriptChat({
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
+  const [shareStatus, setShareStatus] = useState<
+    'idle' | 'copied' | 'failed'
+  >('idle')
 
   const firstSpeechIndex = useMemo(() => getFirstSpeechIndex(parts), [parts])
 
@@ -544,7 +561,42 @@ export function CommitteeTranscriptChat({
     setSummaryError(null)
     setSummaryLoading(false)
     setSummaryOpen(false)
+    setShareStatus('idle')
   }, [session?.id])
+
+  useEffect(() => {
+    if (shareStatus === 'idle') {
+      return
+    }
+    const timer = window.setTimeout(() => setShareStatus('idle'), 2000)
+    return () => window.clearTimeout(timer)
+  }, [shareStatus])
+
+  const headerSubtitle = formatChatHeaderSubtitle(session)
+  const progressLabel =
+    parts.length > 0
+      ? `${activeOrdinal != null ? activeOrdinal + 1 : '—'} / ${parts.length}`
+      : loading
+        ? 'טוען תמליל…'
+        : 'אין תמליל לישיבה זו'
+
+  async function handleShare() {
+    if (!shareUrl) {
+      return
+    }
+    const absoluteUrl = shareUrl.startsWith('http')
+      ? shareUrl
+      : `${window.location.origin}${shareUrl}`
+    const title = formatChatHeaderTitle(committeeName)
+    const when = headerSubtitle.short
+    const text = when ? `${title} · ${when}` : title
+    const result = await sharePageLink({ url: absoluteUrl, title, text })
+    if (result === 'copied') {
+      setShareStatus('copied')
+    } else if (result === 'failed') {
+      setShareStatus('failed')
+    }
+  }
 
   // Keep the active bubble in view without mounting every row.
   useEffect(() => {
@@ -603,14 +655,6 @@ export function CommitteeTranscriptChat({
       setSummaryLoading(false)
     }
   }
-
-  const headerSubtitle = formatChatHeaderSubtitle(session)
-  const progressLabel =
-    parts.length > 0
-      ? `${activeOrdinal != null ? activeOrdinal + 1 : '—'} / ${parts.length}`
-      : loading
-        ? 'טוען תמליל…'
-        : 'אין תמליל לישיבה זו'
 
   const searchMatchCount = useMemo(() => {
     if (!searchActive) {
@@ -677,6 +721,47 @@ export function CommitteeTranscriptChat({
               ) : null}
             </div>
           </div>
+          {shareUrl ? (
+            <button
+              type="button"
+              className={[
+                'committee-chat__share',
+                shareStatus === 'copied' ? 'committee-chat__share--copied' : '',
+                shareStatus === 'failed' ? 'committee-chat__share--failed' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => {
+                void handleShare()
+              }}
+              aria-label={
+                shareStatus === 'copied'
+                  ? 'הקישור הועתק'
+                  : shareStatus === 'failed'
+                    ? 'שיתוף נכשל'
+                    : 'שתפו את הישיבה'
+              }
+              title={
+                shareStatus === 'copied'
+                  ? 'הועתק'
+                  : shareStatus === 'failed'
+                    ? 'שגיאה'
+                    : 'שתפו'
+              }
+            >
+              {shareStatus === 'copied' ? (
+                <span className="committee-chat__share-status" role="status">
+                  ✓
+                </span>
+              ) : shareStatus === 'failed' ? (
+                <span className="committee-chat__share-status" role="status">
+                  !
+                </span>
+              ) : (
+                <ChatIconShare />
+              )}
+            </button>
+          ) : null}
         </div>
       </header>
 
