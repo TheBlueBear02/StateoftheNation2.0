@@ -78,10 +78,10 @@ async function fetchPartyRows(
   return query
 }
 
-async function fetchPartyLeaders(
+export async function fetchPartyLeaders(
   client: SupabaseClient,
   partyIds: number[],
-) {
+): Promise<Map<number, ElectionPartyLeader>> {
   const leadersByPartyId = new Map<number, ElectionPartyLeader>()
 
   if (partyIds.length === 0) {

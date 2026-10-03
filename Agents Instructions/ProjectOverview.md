@@ -16,7 +16,7 @@ Central reference for agents working on this repository. Use this file to unders
 | תיעוד צינורות | `/piplines/docs` | Live (noindex) |
 | דשבורד ממשלה — Government structure | `/government` | Live |
 | דשבורד מדדים — Office KPI dashboard | `/government/dashboard` | Live |
-| בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls`, `/elections/lists`, `/elections/dream-government` | Live |
+| בחירות 2026 — Elections 2026 | `/elections`, `/elections/polls`, `/elections/lists`, `/elections/dream-government`, `/elections/government-borders` | Live |
 | סקרי מנדטים — Poll averages | `/elections/polls` | Live |
 | משחק הרשימות — List rating game | `/elections/lists` | Live |
 | ממשלת החלומות — Dream government | `/elections/dream-government` | Live |
@@ -80,6 +80,7 @@ StateoftheNation2.0/
 | `/elections/lists` | `src/app/elections/lists/page.tsx` |
 | `/elections/dream-government` | `src/app/elections/dream-government/page.tsx` |
 | `/elections/dream-government/dashboard` | `src/app/elections/dream-government/dashboard/page.tsx` (dev-only) |
+| `/elections/government-borders` | `src/app/elections/government-borders/page.tsx` |
 | `/elections/[partyId]` | `src/app/elections/[partyId]/page.tsx` |
 | `/government` | `src/app/government/page.tsx` |
 | `/government/dashboard` | `src/app/government/dashboard/page.tsx` |
@@ -188,5 +189,6 @@ npm run lint
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` dashboard + `/piplines/docs` |
 | [ElectionsPage.md](./ElectionsPage.md) | `/elections` module |
 | [PollsPage.md](./PollsPage.md) | `/elections/polls` |
+| [GovernmentBordersPage.md](./GovernmentBordersPage.md) | `/elections/government-borders` (ג"ג) |
 
 When adding a new major page or module, create a matching `Agents Instructions/{Feature}.md` and link it from this index.
