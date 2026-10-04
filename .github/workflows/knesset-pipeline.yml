@@ -13,7 +13,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -32,4 +32,19 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PIPELINE_RUN_SOURCE: github-actions
+
+      # antiword: convert Knesset .doc protocols when Hasadna has no parsed parts.
+      - name: Install antiword for committee protocol self-parse
+        run: sudo apt-get update && sudo apt-get install -y antiword
+
+      # Committees: OData metadata + Hasadna memberships/transcripts (Knesset 25).
+      # Transcripts: Hasadna parts when available, else self-parse DOC FilePath.
+      # Newest missing sessions first (default limit 200/run).
+      - name: Run knesset committees pipeline
+        run: python load_knesset_committees.py --knesset 25 --transcripts-mode missing --transcripts-limit 200
+        working-directory: 'Layer 1 - Gathering Data/knesset'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           PIPELINE_RUN_SOURCE: github-actions

@@ -132,18 +132,17 @@
   border-radius: 0 0 28px 28px;
   box-sizing: border-box;
   overflow: hidden;
-  /* Quieter wash so selected eras (compare wash) stand out */
+  /* Same wash + solid accent for every era (selected no longer brighter). */
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--era-accent, #4890fd) 14%, #fff) 0%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 7%, #fff) 55%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 2%, #fff) 85%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 42%, #fff) 0%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 22%, #fff) 55%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 8%, #fff) 85%,
     #fff 100%
   );
   /* 5px solid top accent (inset so bar height / photo fit stay intact) */
   box-shadow:
-    inset 0 5px 0 0
-      color-mix(in srgb, var(--era-accent, #4890fd) 72%, #fff),
+    inset 0 5px 0 0 var(--era-accent, #4890fd),
     inset -2px 0 0 #fff;
   cursor: pointer;
   z-index: 1;
@@ -158,45 +157,24 @@
 }
 
 .office-eras-bar__era:hover,
-.office-eras-bar__era--hovered {
+.office-eras-bar__era--hovered,
+.office-eras-bar__era--selected:hover,
+.office-eras-bar__era--selected.office-eras-bar__era--hovered {
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--era-accent, #4890fd) 20%, #fff) 0%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 10%, #fff) 55%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 3%, #fff) 85%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 48%, #fff) 0%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 26%, #fff) 55%,
+    color-mix(in srgb, var(--era-accent, #4890fd) 10%, #fff) 85%,
     #fff 100%
   );
   box-shadow:
-    inset 0 5px 0 0
-      color-mix(in srgb, var(--era-accent, #4890fd) 88%, #fff),
+    inset 0 5px 0 0 var(--era-accent, #4890fd),
     inset -2px 0 0 #fff;
   z-index: 2;
 }
 
 .office-eras-bar__era--selected {
   z-index: 4;
-  /* Exact same wash + solid accent as .office-eras-bar__detail-half */
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--era-accent, #4890fd) 26%, #fff) 0%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 12%, #fff) 55%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 4%, #fff) 85%,
-    #fff 100%
-  );
-  box-shadow:
-    inset 0 5px 0 0 var(--era-accent, #4890fd),
-    inset -2px 0 0 #fff;
-}
-
-.office-eras-bar__era--selected:hover,
-.office-eras-bar__era--selected.office-eras-bar__era--hovered {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--era-accent, #4890fd) 30%, #fff) 0%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 14%, #fff) 55%,
-    color-mix(in srgb, var(--era-accent, #4890fd) 5%, #fff) 85%,
-    #fff 100%
-  );
 }
 
 .office-eras-bar__era:focus-visible {
@@ -207,8 +185,10 @@
 
 .office-eras-bar__clip {
   display: flex;
+  flex-direction: row-reverse;
   align-items: center;
-  justify-content: flex-start;
+  /* Center photo / photo+name as a group (photo on the right). */
+  justify-content: center;
   gap: 8px;
   width: 100%;
   height: 100%;
@@ -221,7 +201,6 @@
 }
 
 .office-eras-bar__clip--photo-only {
-  justify-content: center;
   padding-inline: 4px;
 }
 
@@ -254,8 +233,7 @@
   align-items: flex-end;
   gap: 1px;
   min-width: 0;
-  flex: 1;
-  margin-inline-start: auto;
+  flex: 0 1 auto;
   text-align: right;
   direction: rtl;
 }
@@ -532,7 +510,8 @@
   width: 132px;
   height: 132px;
   margin: 0;
-  padding: 16px;
+  /* Keep padding under the formula's usable width so the delta never clips the rim */
+  padding: 16px 14px;
   border-radius: 50%;
   border: 3px solid #000;
   background: var(--color-white, #fff);
@@ -547,10 +526,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
   width: 100%;
   max-width: 100%;
-  font-size: 0.7rem;
+  font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.2;
   text-align: center;
@@ -569,18 +548,23 @@
   display: block;
   width: 100%;
   max-width: 100%;
-  /* Scale with digit count so long values (e.g. 44,099.5) stay inside the circle */
+  box-sizing: border-box;
+  padding-inline: 2px;
+  /* Usable width ≈ 94px after padding; bold tabular glyphs need ~0.72em each */
   font-size: clamp(
-    0.95rem,
-    calc(84px / (var(--delta-chars, 5) * 0.62)),
-    2.15rem
+    1.05rem,
+    calc(90px / (var(--delta-chars, 5) * 0.72)),
+    2.35rem
   );
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
   white-space: nowrap;
-  overflow: hidden;
+  /* Latin numerals: LTR so residual overflow doesn't clip only the physical left in RTL */
+  direction: ltr;
+  unicode-bidi: isolate;
+  overflow: visible;
 }
 
 .office-eras-bar__detail-delta-badge--up
@@ -678,18 +662,18 @@
   .office-eras-bar__detail-delta-badge {
     width: 112px;
     height: 112px;
-    padding: 12px;
+    padding: 14px 12px;
   }
 
   .office-eras-bar__detail-delta-badge-text {
-    font-size: 0.62rem;
+    font-size: 0.76rem;
   }
 
   .office-eras-bar__detail-delta-badge-value {
     font-size: clamp(
-      0.85rem,
-      calc(72px / (var(--delta-chars, 5) * 0.62)),
-      1.7rem
+      0.95rem,
+      calc(76px / (var(--delta-chars, 5) * 0.72)),
+      1.85rem
     );
   }
 

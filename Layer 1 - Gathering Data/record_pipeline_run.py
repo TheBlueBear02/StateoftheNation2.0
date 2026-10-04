@@ -23,8 +23,8 @@ def record_pipeline_run(
     source: str = "cli",
     started_at: datetime | None = None,
     finished_at: datetime | None = None,
-) -> None:
-    """Insert into pipeline_runs. Failures are logged and swallowed."""
+) -> int | None:
+    """Insert into pipeline_runs. Failures are logged and swallowed. Returns new row id."""
     now = datetime.now(timezone.utc)
     row = {
         "pipeline": pipeline,
@@ -38,6 +38,11 @@ def record_pipeline_run(
         "source": source,
     }
     try:
-        sb.table("pipeline_runs").insert(row).execute()
+        result = sb.table("pipeline_runs").insert(row).execute()
+        data = result.data or []
+        if data and data[0].get("id") is not None:
+            return int(data[0]["id"])
+        return None
     except Exception as exc:
         log.warning("Failed to record pipeline_runs row: %s", exc)
+        return None

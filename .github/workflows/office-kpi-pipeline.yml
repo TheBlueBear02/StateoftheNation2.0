@@ -1,0 +1,91 @@
+name: office-kpi-pipeline
+
+# One nightly workflow for every office KPI source. The planner inside
+# run_office_kpi_pipeline.py decides which indexes are due tonight.
+
+on:
+  schedule:
+    # 02:00 Israel in summer (IDT = UTC+3); 01:00 in winter
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      index:
+        description: 'Only this registry key (ignores release windows)'
+        required: false
+      force:
+        description: 'Check every index that has an adapter'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Plan + fetch + validate, write nothing'
+        type: boolean
+        default: false
+      date:
+        description: 'Pretend today is YYYY-MM-DD (use with dry run)'
+        required: false
+
+concurrency:
+  group: office-kpi-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: 'Layer 1 - Gathering Data/Offices'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python -m pytest -q tests
+
+      - name: Run pipeline
+        run: |
+          args=()
+          [ -n "${{ inputs.index }}" ] && args+=(--index "${{ inputs.index }}")
+          [ "${{ inputs.force }}" = "true" ] && args+=(--force)
+          [ "${{ inputs.dry_run }}" = "true" ] && args+=(--dry-run)
+          # Safety switch: nothing is written until the repo variable OFFICE_KPI_LIVE=true
+          # (Settings → Secrets and variables → Actions → Variables).
+          if [ "${{ vars.OFFICE_KPI_LIVE }}" != "true" ]; then
+            echo "OFFICE_KPI_LIVE is not 'true' — running in dry-run mode"
+            args+=(--dry-run)
+          fi
+          [ -n "${{ inputs.date }}" ] && args+=(--date "${{ inputs.date }}")
+          python run_office_kpi_pipeline.py "${args[@]}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PIPELINE_RUN_SOURCE: github-actions
+
+      - name: Update "needs attention" issue
+        if: always() && inputs.dry_run != true && vars.OFFICE_KPI_LIVE == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="Office KPIs: needs attention"
+          existing="$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')"
+          if [ -s attention.md ]; then
+            if [ -n "$existing" ]; then
+              gh issue edit "$existing" --body-file attention.md
+            else
+              gh issue create --title "$title" --body-file attention.md
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue close "$existing" --comment "All clear as of $(date -u +%F)."
+          fi

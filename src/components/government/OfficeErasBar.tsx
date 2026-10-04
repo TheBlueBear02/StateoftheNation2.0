@@ -71,6 +71,21 @@ const MINISTER_PLACEHOLDER_SRC = '/images/offices/minister_placeholder.svg'
 /** Approx tooltip half-width as % of the eras plot (keeps card inside the chart box). */
 const TOOLTIP_HALF_WIDTH_PCT = 14
 
+/**
+ * Per-minister circular crop tweaks when Knesset source photos are framed high
+ * (head clipped at the top of the circle). Keys match `people.full_name`.
+ */
+const ERA_PHOTO_OBJECT_POSITION: Record<string, string> = {
+  'נפתלי בנט': 'center 22%',
+}
+
+function eraPhotoStyle(
+  fullName: string,
+): { objectPosition: string } | undefined {
+  const objectPosition = ERA_PHOTO_OBJECT_POSITION[fullName.trim()]
+  return objectPosition ? { objectPosition } : undefined
+}
+
 function dateToMs(value: string): number {
   const t = Date.parse(value.slice(0, 10))
   return Number.isFinite(t) ? t : 0
@@ -765,6 +780,7 @@ export function OfficeErasBar({
             src={item.era.imageUrl}
             alt=""
             className="office-eras-bar__detail-avatar"
+            style={eraPhotoStyle(item.era.fullName)}
             width={72}
             height={72}
           />
@@ -843,6 +859,7 @@ export function OfficeErasBar({
                   src={hovered.era.imageUrl}
                   alt=""
                   className="office-eras-bar__tooltip-photo"
+                  style={eraPhotoStyle(hovered.era.fullName)}
                   width={56}
                   height={56}
                 />
@@ -950,6 +967,9 @@ export function OfficeErasBar({
                           ? ''
                           : ' office-eras-bar__photo--placeholder'
                       }`}
+                      style={
+                        era.imageUrl ? eraPhotoStyle(era.fullName) : undefined
+                      }
                       width={photoSizePx}
                       height={photoSizePx}
                       loading="lazy"

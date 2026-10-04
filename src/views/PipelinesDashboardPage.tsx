@@ -65,6 +65,14 @@ function PipelinesDashboardContent() {
                 <Link href={pipeline.docsPath} className="pipelines-dash__link">
                   תיעוד
                 </Link>
+                {pipeline.statusPath ? (
+                  <Link
+                    href={pipeline.statusPath}
+                    className="pipelines-dash__link"
+                  >
+                    לוח סטטוס
+                  </Link>
+                ) : null}
                 {pipeline.editPath ? (
                   <Link
                     href={pipeline.editPath}

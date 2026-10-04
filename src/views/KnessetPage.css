@@ -26,6 +26,25 @@
   gap: 12px 20px;
 }
 
+.knesset-page__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+.knesset-page__committees-link {
+  color: var(--color-blue);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.knesset-page__committees-link:hover {
+  color: var(--color-blue-dark);
+  text-decoration: underline;
+}
+
 .knesset-page__picker {
   display: inline-flex;
   align-items: center;

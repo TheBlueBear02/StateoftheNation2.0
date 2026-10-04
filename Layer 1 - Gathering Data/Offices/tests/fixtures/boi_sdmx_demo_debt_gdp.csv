@@ -1,0 +1,6 @@
+SERIES_CODE,FREQ,TIME_PERIOD,OBS_VALUE,UNIT_MULT,UNIT_MEASURE,ORIGINAL_CODE
+DEMO_DEBT_GDP_A,A,2020,70.9,0,PT,demo.public_debt_gdp
+DEMO_DEBT_GDP_A,A,2021,67.8,0,PT,demo.public_debt_gdp
+DEMO_DEBT_GDP_A,A,2022,60.5,0,PT,demo.public_debt_gdp
+DEMO_DEBT_GDP_A,A,2023,61.9,0,PT,demo.public_debt_gdp
+DEMO_DEBT_GDP_A,A,2024,69.0,0,PT,demo.public_debt_gdp

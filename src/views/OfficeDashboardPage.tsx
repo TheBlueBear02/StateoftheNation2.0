@@ -17,6 +17,7 @@ import { useOfficeDashboard } from '../hooks/useOfficeDashboard'
 import { exportOfficeChartImage } from '../lib/exportOfficeChartImage'
 import {
   type OfficeDashboardIndex,
+  type OfficeDashboardMinisterEra,
   type OfficeDashboardOffice,
 } from '../lib/fetchOfficeDashboard'
 import { getSiteUrl } from '../lib/runtimeEnv'
@@ -178,6 +179,7 @@ type DetailPanelProps = {
   offices: OfficeDashboardOffice[]
   office: OfficeDashboardOffice
   selectedIndex: OfficeDashboardIndex | null
+  primeMinisterHistory: OfficeDashboardMinisterEra[]
   onSelectOffice: (officeId: number) => void
   onSelectIndex: (index: OfficeDashboardIndex) => void
 }
@@ -186,6 +188,7 @@ function DetailPanel({
   offices,
   office,
   selectedIndex,
+  primeMinisterHistory,
   onSelectOffice,
   onSelectIndex,
 }: DetailPanelProps) {
@@ -217,6 +220,8 @@ function DetailPanel({
     }>
   >([])
   const [eraSelectedKeys, setEraSelectedKeys] = useState<string[]>([])
+  const [showPrimeMinisters, setShowPrimeMinisters] = useState(false)
+  const [showBarValues, setShowBarValues] = useState(true)
   const [chartMetrics, setChartMetrics] = useState<{
     uiScale: number
     tall: boolean
@@ -251,6 +256,14 @@ function DetailPanel({
   const tallChart = viewportTall || Boolean(chartMetrics?.tall)
   const layoutMode: 'mobile' | 'desktop' =
     tallChart || uiScale > 1.01 ? 'mobile' : 'desktop'
+  const canShowPmSwitch = primeMinisterHistory.length > 0
+  const erasForBar =
+    showPrimeMinisters && canShowPmSwitch
+      ? primeMinisterHistory
+      : office.ministerHistory
+  const erasSelectionResetKey = `${office.id}-${
+    showPrimeMinisters && canShowPmSwitch ? 'pm' : 'minister'
+  }`
 
   const onChartMetricsChange = useCallback(
     (metrics: { uiScale: number; tall: boolean; width: number }) => {
@@ -671,24 +684,90 @@ function DetailPanel({
                     מקור
                   </a>
                 ) : null}
+                {selectedIndex.chartType === 'bar' ? (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showBarValues}
+                    className={`office-dashboard__chart-switch${
+                      showBarValues
+                        ? ' office-dashboard__chart-switch--on'
+                        : ''
+                    }`}
+                    onClick={() => {
+                      setShowBarValues((prev) => !prev)
+                    }}
+                    aria-label={
+                      showBarValues
+                        ? 'מספרים על העמודות מוצגים — לחצו להסתרה'
+                        : 'מספרים על העמודות מוסתרים — לחצו להצגה'
+                    }
+                    title={
+                      showBarValues
+                        ? 'הסתרת מספרים על העמודות'
+                        : 'הצגת מספרים על העמודות'
+                    }
+                  >
+                    <span
+                      className="office-dashboard__chart-switch-knob"
+                      aria-hidden="true"
+                    >
+                      123
+                    </span>
+                  </button>
+                ) : null}
+                {canShowPmSwitch ? (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showPrimeMinisters}
+                    className={`office-dashboard__chart-switch office-dashboard__pm-switch${
+                      showPrimeMinisters
+                        ? ' office-dashboard__chart-switch--on office-dashboard__pm-switch--on'
+                        : ''
+                    }`}
+                    onClick={() => {
+                      setShowPrimeMinisters((prev) => !prev)
+                    }}
+                    aria-label={
+                      showPrimeMinisters
+                        ? 'הצגת ראשי ממשלה פעילה — לחצו לחזרה לשרים'
+                        : 'הצגת שרי המשרד — לחצו להצגת ראשי ממשלה'
+                    }
+                    title={
+                      showPrimeMinisters
+                        ? 'הצגת ראשי ממשלה'
+                        : 'הצגת ראשי ממשלה לפי תקופות'
+                    }
+                  >
+                    <span
+                      className="office-dashboard__chart-switch-knob office-dashboard__pm-switch-knob"
+                      aria-hidden="true"
+                    >
+                      PM
+                    </span>
+                  </button>
+                ) : null}
               </div>
             </div>
             <IndexTrendChart
               index={selectedIndex}
+              eras={erasForBar}
+              showBarValues={showBarValues}
               highlightBands={eraHighlightBands}
               uiScale={uiScale}
               tall={tallChart}
               onMetricsChange={onChartMetricsChange}
             />
             <OfficeErasBar
-              eras={office.ministerHistory}
+              eras={erasForBar}
               points={selectedIndex.points}
               chartType={selectedIndex.chartType}
               uiScale={uiScale}
               higherIsBetter={selectedIndex.higherIsBetter}
               selectedKeys={eraSelectedKeys}
               onSelectedKeysChange={setEraSelectedKeys}
-              selectionResetKey={office.id}
+              selectionResetKey={erasSelectionResetKey}
               onHoverBand={setEraHighlightBands}
             />
           </section>
@@ -716,19 +795,21 @@ function DetailPanel({
             </div>
             <IndexTrendChart
               index={selectedIndex}
+              eras={erasForBar}
+              showBarValues={showBarValues}
               highlightBands={eraHighlightBands}
               uiScale={1}
               tall={false}
               fixedLayout
             />
             <OfficeErasBar
-              eras={office.ministerHistory}
+              eras={erasForBar}
               points={selectedIndex.points}
               chartType={selectedIndex.chartType}
               uiScale={1}
               higherIsBetter={selectedIndex.higherIsBetter}
               selectedKeys={eraSelectedKeys}
-              selectionResetKey={office.id}
+              selectionResetKey={erasSelectionResetKey}
             />
           </section>
         </>
@@ -795,7 +876,7 @@ function DetailPanelSkeleton() {
 }
 
 export function OfficeDashboardPage() {
-  const { offices, loading, error } = useOfficeDashboard()
+  const { offices, primeMinisterHistory, loading, error } = useOfficeDashboard()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -908,6 +989,7 @@ export function OfficeDashboardPage() {
                 offices={offices}
                 office={selectedOffice}
                 selectedIndex={selectedIndex}
+                primeMinisterHistory={primeMinisterHistory}
                 onSelectOffice={setSelectedOfficeId}
                 onSelectIndex={(index) => setSelectedIndexId(index.id)}
               />

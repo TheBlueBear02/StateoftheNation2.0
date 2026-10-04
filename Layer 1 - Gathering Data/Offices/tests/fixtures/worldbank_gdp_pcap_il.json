@@ -1,0 +1,284 @@
+[
+  {
+    "page": 1,
+    "pages": 1,
+    "per_page": 30,
+    "total": 17,
+    "sourceid": "2",
+    "lastupdated": "2026-07-13"
+  },
+  [
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2025",
+      "value": 60336.8477964194,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2024",
+      "value": 54216.5218142787,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2023",
+      "value": 52126.4489280033,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2022",
+      "value": 54947.2091250715,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2021",
+      "value": 52258.4693499398,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2020",
+      "value": 44590.8237253282,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2019",
+      "value": 44091.8678022544,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2018",
+      "value": 42269.3770257585,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2017",
+      "value": 41013.2575323519,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2016",
+      "value": 37571.2561196275,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2015",
+      "value": 36138.13561386,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2014",
+      "value": 38265.3651949373,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2013",
+      "value": 36980.622214228,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2012",
+      "value": 33268.7066672115,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2011",
+      "value": 34476.7252065949,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2010",
+      "value": 31398.9266927022,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "NY.GDP.PCAP.CD",
+        "value": "GDP per capita (current US$)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2009",
+      "value": 28469.6817348489,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    }
+  ]
+]

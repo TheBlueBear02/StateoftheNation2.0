@@ -113,8 +113,9 @@ const CHART_EXPORT_CSS = `
   overflow: hidden;
   background: radial-gradient(#6ba4fa, #447dd3);
 }
+/* Policy matches KPI (blue); only alert is red — same as live index chips. */
 .office-dashboard__chart-export-index--policy {
-  background: radial-gradient(#e3e3e3, #c3c3c3);
+  background: radial-gradient(#6ba4fa, #447dd3);
 }
 .office-dashboard__chart-export-index--alert {
   background: radial-gradient(#ff5d5d, #ee3f33);

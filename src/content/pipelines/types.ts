@@ -29,6 +29,8 @@ export type PipelineDoc = {
   docsPath: string
   /** Optional edit / runner UI */
   editPath?: string
+  /** Optional ops status board (e.g. government dashboard coverage) */
+  statusPath?: string
   /** Automated schedule; null / placeholder when not timed yet */
   schedule: PipelineSchedule | null
 }

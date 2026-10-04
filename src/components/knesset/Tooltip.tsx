@@ -14,6 +14,8 @@ type TooltipProps = {
   additionalRoles: string[]
   x: number
   y: number
+  /** `cursor` (default): offset from pointer. `above`: centered above the given point. */
+  anchor?: 'cursor' | 'above'
 }
 
 export function Tooltip({
@@ -27,17 +29,26 @@ export function Tooltip({
   additionalRoles,
   x,
   y,
+  anchor = 'cursor',
 }: TooltipProps) {
-  if (!fullName || !factionName) {
+  if (!fullName) {
     return null
   }
 
   const color = factionColor ?? '#c8c8c8'
+  const style =
+    anchor === 'above'
+      ? {
+          left: x,
+          top: y,
+          transform: 'translate(-50%, calc(-100% - 10px))',
+        }
+      : { left: x + 14, top: y + 14 }
 
   return (
     <div
       className="knesset-tooltip"
-      style={{ left: x + 14, top: y + 14 }}
+      style={style}
       role="tooltip"
     >
       <div className="knesset-tooltip__inner">
@@ -63,7 +74,9 @@ export function Tooltip({
 
           <div className="knesset-tooltip__identity">
             <div className="knesset-tooltip__name">{fullName}</div>
-            <div className="knesset-tooltip__faction">{factionName}</div>
+            {factionName ? (
+              <div className="knesset-tooltip__faction">{factionName}</div>
+            ) : null}
             {additionalRoles.length > 0 ? (
               <div className="knesset-tooltip__roles">
                 {additionalRoles.join(' · ')}

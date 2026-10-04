@@ -60,8 +60,8 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `public/header-logo 3.svg` | Header logo (desktop / non-home) |
 | `public/while-logo-nobg.svg` | White logo used as homepage hero title |
 | `public/white logo.svg` | White footer logo |
-| `public/hero-bear-image.svg` | Hero video poster + load-error fallback |
-| Supabase `site-assets/bear-hero-video2.mp4` | Desktop hero bear video (not in git) |
+| `public/hero-bear-image2.png` | Desktop hero bear illustration (static; replaces former Supabase video) |
+| `public/hero-bear-image.svg` | Legacy hero poster (unused while static PNG is active) |
 
 ## Layout primitive: `.container`
 
@@ -106,9 +106,9 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Blue background (`#3083F0`).
 - Taller section: `min-height: clamp(460px, 64vh, 600px)` with `48px` vertical padding.
 - `.hero__inner.container`: balanced `1fr 1fr` grid. DOM order is content first, visual second — in RTL this places text on the right and bear on the left.
-- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center), nudged up with `translateY(-20px)` (video column stays put). Column `gap: 16px` between title logo, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
+- Text column: `align-items: flex-start` (RTL right-aligned), capped at `--hero-text-max`, `justify-self: end` (faces toward center), nudged up with `translateY(-20px)` (bear column stays put). Column `gap: 16px` between title logo, subtitle, and nav; buttons add `12px` top margin so spacing below the subtitle stays unchanged.
 - Bear column: `justify-content: flex-start` (faces toward center).
-- **Visual (desktop):** muted `<video>` from Supabase Storage (`site-assets/bear-hero-video2.mp4`), plays once (no loop). Poster `/hero-bear-image.svg`. Video stays `opacity: 0` until ready (`onLoadedMetadata` / `onLoadedData` / `onCanPlay` / `onPlaying`, plus a mount-time `readyState` check so cached videos do not miss the event). On load error, falls back to the poster `<img>`. Explicit `play()` on mount/`loadeddata` so autoplay is reliable. File is large (~17MB), so first paint can take a moment. Autoplay + `playsInline` + `preload="auto"`. Sized larger than the grid column (`width: min(110%, 560px)`, `scale(1.12) translateX(28px)` + light `clip-path` inset) with `object-fit: cover` and hero-blue video background so scaled/narrow viewports do not show black letterbox edges on the right/bottom. Overflow visible on `.hero__visual`. Still hidden on mobile via `.hero__visual` (`display: none` at ≤900px).
+- **Visual (desktop):** static `<img>` from `/hero-bear-image2.png` (served from the app, not Supabase Storage — avoids Cached Egress). Sized with `width: min(100%, 400px)` and `object-fit: contain` on a hero-blue background. Still hidden on mobile via `.hero__visual` (`display: none` at ≤900px).
 - **Title:** `/while-logo-nobg.svg` inside the `h1` (desktop and mobile) — brand mark replaces the text headline; `alt="מצב האומה"`.
 - **Subtitle:** הבית של המידע הפוליטי בישראל
 - **Nav buttons** (`HERO_BUTTONS` in `App.tsx`): auto-flow grid; each `.hero__button` is `min-height: 56px`, `padding: 12px 24px`, `font-size: 1.125rem`, `border-radius: 14px`. Text column capped at `--hero-text-max` (640px) so buttons read wider.
@@ -132,7 +132,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Feed: up to **10** latest DB rows (`occurred_at` desc). On query failure, missing Supabase config, or an empty table, the strip is **hidden** (not padded with placeholders).
 - The track renders `newsItems` twice for a seamless CSS marquee loop — that is intentional duplication for animation, not a second fetch.
 - Dot separators (`.news-strip__item::after`) use equal `margin-inline: 24px` on both sides so each dot sits centered in the gap between two headlines.
-- CSS marquee animation (`ticker` keyframes); disabled when `prefers-reduced-motion: reduce`.
+- CSS marquee animation (`ticker` keyframes, **55s** per loop); disabled when `prefers-reduced-motion: reduce`.
 
 ### 4. Hot indexes carousel (`#hot-indexes`)
 
@@ -141,9 +141,10 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - White rounded card (`border-radius: 28px` / `24px` mobile) with soft drop shadow inside `.container`. Chart uses `compact` mode (`CHART_HEIGHT_COMPACT` = 280) so the box stays shorter than the full dashboard.
 - **Story progress:** 5 grey segments centered on top (Instagram-style). The active segment fills over **4s**, then the carousel advances and loops forever. `prefers-reduced-motion: reduce` disables auto-advance (progress stays partial).
 - **Slides:** curated picks in `HOT_INDEX_PICKS` (`src/lib/hotOfficeIndexes.ts`) — exact `indexes.name` or numeric `indexes.id` (id **11** for Education **תקציב**, since that name is shared). Current picks: רצח בחברה הערבית · הרוגים בתאונות דרכים · החוב הממשלתי · תקציב (id 11). Missing picks fall back to alert → KPI indexes so the strip still fills to 5.
-- Each slide shows the **office name** above the index **description** (`indexes.info`, fallback to `name`) — same hierarchy as the share PNG — plus dashboard-style **share** and **מקור** actions, the live `IndexTrendChart`, and `OfficeErasBar` with **`showCompare={false}`** (eras strip only — no compare panel). Title/office copy is forced **RTL right-aligned** (higher-specificity rules beat leftover `.office-dashboard__chart-header` flex styles if that page’s CSS was loaded earlier in the session).
+- Each slide shows the **office name** above the index **description** (`indexes.info`, fallback to `name`) — same hierarchy as the share PNG — plus dashboard-style **share** and **מקור** actions, the live `IndexTrendChart` (bar fills use that office’s `ministerHistory` party colors, including split yearly bars), and `OfficeErasBar` with **`showCompare={false}`** (eras strip only — no compare panel). Title/office copy is forced **RTL right-aligned** (higher-specificity rules beat leftover `.office-dashboard__chart-header` flex styles if that page’s CSS was loaded earlier in the session).
 - Clicking anywhere on the card opens `/government/dashboard?office=&index=` for the active slide (title underlines on card hover). Share, מקור, and the side arrows keep their own actions; horizontal swipes change slides without navigating.
 - Side arrows (‹ / ›) step slides; on touch, horizontal swipe left = next / right = previous.
+- Below the carousel card: text link **לצפייה בכל מדדי משרדי הממשלה כנסו >>** → `/government/dashboard` (`.hot-indexes__cta`, same bold blue underline-on-hover style as elections page text links).
 - Data: same `useOfficeDashboard` / Supabase path as `/government/dashboard`. Section hides on fetch error / empty; shows a skeleton while loading.
 - Share reuses `exportOfficeChartImage` + `sharePngImage` (capture node uses dashboard chart-header classnames so the PNG decorator still finds the title).
 
