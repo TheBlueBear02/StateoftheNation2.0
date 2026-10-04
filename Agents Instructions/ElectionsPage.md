@@ -36,7 +36,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/components/elections/lists/ListRatingStep.tsx` | Tinder-style one-card rating deck with progress and action buttons |
 | `src/components/elections/lists/CandidateRateCard.tsx` | Full-bleed candidate swipe card (overlay details + pointer swipe) |
 | `src/components/elections/lists/ListFitReport.tsx` | Fit score report + download/share actions |
-| `src/components/elections/lists/ShareableListReport.tsx` | Fixed-size offscreen card for `html-to-image` PNG export |
+| `src/components/elections/lists/ShareableListReport.tsx` | Fixed-size offscreen card for PNG export via `exportNodeToPng` |
 | `src/components/elections/dream/DreamOfficeSquare.tsx` | Empty (+) or filled office/PM square; circular bottom-left % badge colored by popularity band |
 | `src/components/elections/dream/DreamOfficePickerModal.tsx` | 2-step modal: pick party → pick person from `useElectionCandidates` |
 | `src/components/elections/dream/ShareableGovernment.tsx` | Fixed-size offscreen cabinet card for clipboard PNG export (includes circular % badges on filled seats) |
@@ -60,11 +60,12 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/components/elections/EditablePartyPanel.tsx` | Collapsible party metadata editor on `/elections/edit` |
 | `src/lib/updateElectionCandidate.ts` | Calls `/api/elections/update-candidate` (service key server-side) with list-position conflict checks |
 | `src/lib/deleteElectionCandidate.ts` | Calls `/api/elections/delete-candidate` to remove an `election_candidates` row (scoped by candidate + party) |
+| `src/lib/unlinkElectionCandidatePerson.ts` | Calls `/api/elections/unlink-candidate-person` to detach a wrong Knesset person match and create a fresh `people` row |
 | `src/lib/updateElectionParty.ts` | Updates to `election_parties` (name, short name, color, logo, ballot letter, description) |
 | `src/lib/enrichElectionCandidate.ts` | Dev-only client for per-card pipeline preview (`/api/elections/enrich-candidate`) |
 | `src/lib/runElectionPartyPipeline.ts` | Dev-only client for party-level pipeline (`/api/elections/pipeline/*`) |
 | `src/lib/geocodeElectionMap.ts` | Dev-only client for party-scoped map geocode (`/api/elections/geocode-map`) |
-| `src/app/api/elections/[...path]/route.ts` | Next.js App Router handlers: `update-candidate`, `delete-candidate`, `update-party`, party pipeline, and geocode-map (pipeline gated by `assertPipelineEnabled`) |
+| `src/app/api/elections/[...path]/route.ts` | Next.js App Router handlers: `update-candidate`, `delete-candidate`, `unlink-candidate-person`, `update-party`, party pipeline, and geocode-map (pipeline gated by `assertPipelineEnabled`) |
 | `src/app/elections/**/page.tsx` | App Router wrappers + metadata; public index/polls/`[partyId]` also SSR-fetch data + JSON-LD |
 | `src/lib/supabaseServer.ts` | Shared anon server Supabase client |
 | `src/lib/fetchElectionParties.ts` | Shared parties fetch |
@@ -90,7 +91,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 
 `fetchElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר, הרשימה המשותפת (replacing separate חד״ש־תע״ל / בל״ד cards), עמך ישראל, המילואימניקים, and כחול לבן; יש עתיד, חד״ש־תע״ל, בל״ד, and נועם stay `polled_only` (still in polls, not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero has no subtitle; under the election date it links to `/elections/polls` (weighted poll averages), `/elections/lists` (list rating game), and `/elections/dream-government` (dream cabinet). A `DreamGovernmentPromo` section also appears on `/elections` (above the overview map) and as the first project teaser on the homepage (before `ListsGamePromo`).
 
-`fetchElectionCandidates(client, partyId)` / `useElectionCandidates(partyId)` load ordered `election_candidates` joined to `people`. They then query `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merge overlapping terms with `computeMemberTenureStats`, and attach `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
+`fetchElectionCandidates(client, partyId)` / `useElectionCandidates(partyId)` load ordered `election_candidates` joined to `people` (including `knesset_person_id`). They then query `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merge overlapping terms with `computeMemberTenureStats`, and attach `knessetPersonId`, `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
 
 `useAllElectionMapPins(parties)` loads all geocoded candidates for the supplied party ids in one query (`city`, `latitude`, and `longitude` all non-null), joins MK tenure the same way, and attaches `partyId`, `partyName`, and `partyColor` for multi-party map rendering on `/elections`.
 
@@ -119,7 +120,7 @@ Client-only game (no DB writes). Flow: **pick party → rate every candidate →
 5. **Progress** — after the last rating the game advances automatically to the fit report (no on-card counter).
 6. **Realistic seats band** — `E = round(seatsAvg)` from the last 5 regular polls. Positions `E−1`, `E`, and `E+1` (clamped to `1…N`) mark the realistic zone on cards with a badge. No separate band summary text is shown above the deck.
 7. **Fit score** — position-weighted: green=1, orange=0.5, red=0; weight for position `p` is `N − p + 1`. Score = `round(100 × Σ(rating×weight) / Σ(weight))`.
-8. **Report / share** — single dark-blue card (`#0a1628`): white share icon (top-left) exports/shares a PNG; white site logo top-right; fit score and rating counts centered in white at the top; candidates in list order as small portrait cards (same 3∶4.2 ratio as the swipe cards) with green/orange/red borders, a list-position badge on each card, and no names. The portrait grid uses `direction: ltr` so place 1 starts on the left and continues left-to-right (rows wrap naturally). Below the card: centered **בחר מפלגה אחרת** and a Hebrew note explaining the weighted score (green=1, orange=0.5, red=0; higher list positions weigh more; 0–100).
+8. **Report / share** — single dark-blue card (`#0a1628`): white share icon (top-left) exports/shares a PNG via `sharePngImage` + `exportNodeToPng` (same CORS-safe path as dream government: clone off-DOM, proxy/inline remote portraits through `/api/image-proxy`, then `toPng` on the fixed-size `ShareableListReport` card); white site logo top-right; fit score and rating counts centered in white at the top; candidates in list order as small portrait cards (same 3∶4.2 ratio as the swipe cards) with green/orange/red borders, a list-position badge on each card, and no names. The portrait grid uses `direction: ltr` so place 1 starts on the left and continues left-to-right (rows wrap naturally). Below the card: centered **בחר מפלגה אחרת** and a Hebrew note explaining the weighted score (green=1, orange=0.5, red=0; higher list positions weigh more; 0–100).
 
 ## Dream Government (`/elections/dream-government`)
 
@@ -160,7 +161,9 @@ Dev-only ops view (`isDev` / `NODE_ENV === 'development'`). Production builds re
 
 Lightweight private tool for editing **existing** candidates (save and delete; no add). Access is gated by comparing a submitted password to `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` in the browser (legacy `VITE_ELECTIONS_EDIT_SECRET` still read); a successful unlock is stored in `sessionStorage` under `elections-edit-unlocked`. If the env var is missing, the page shows a config error instead of opening.
 
-After unlock, pick a party (same square `<select>` pattern as Knesset/Government) and edit one candidate card at a time. Each card is **collapsed by default**, showing list position, photo, and full name; click the summary row to expand the full edit form. Collapsed rows with empty fields show **חסר:** followed by the missing field labels (e.g. `תיאור · עיר · תמונה`). Unsaved changes show **יש שינויים לא שמורים** on the collapsed row. Each card saves independently via `updateElectionCandidate`. Expanded cards also offer **מחק מהרשימה** (with a confirm step) via `deleteElectionCandidate`, which removes only the `election_candidates` row — the linked `people` row is kept (shared with Knesset and other modules). List positions of remaining candidates are not renumbered.
+After unlock, pick a party (same square `<select>` pattern as Knesset/Government) and edit one candidate card at a time. Each card is **collapsed by default**, showing list position, photo, full name, computed tenure (`X שנים בכנסת` or `ח״כ חדש`), and a **מקושר לכנסת** hint when `people.knesset_person_id` is set; click the summary row to expand the full edit form. Collapsed rows with empty fields show **חסר:** followed by the missing field labels (e.g. `תיאור · עיר · תמונה`). Unsaved changes show **יש שינויים לא שמורים** on the collapsed row. Each card saves independently via `updateElectionCandidate`. Expanded cards also offer **מחק מהרשימה** (with a confirm step) via `deleteElectionCandidate`, which removes only the `election_candidates` row — the linked `people` row is kept (shared with Knesset and other modules). List positions of remaining candidates are not renumbered.
+
+Expanded cards show a read-only **person link** block: whether the candidate is linked to a person with `knesset_person_id`, computed years in the Knesset from `knesset_memberships` (display-only; not editable), plus `person_id` / `knesset_person_id`. When linked, **נתק קישור** (confirm) calls `unlinkElectionCandidatePerson` → `/api/elections/unlink-candidate-person`: creates a fresh `people` row copying name/photo/birth/gender/wikipedia (no knesset/wikidata ids), re-points `election_candidates.person_id` to it, and keeps the old `people` row. After unlink, tenure shows as new MK (0 years).
 
 Above the candidate list, a collapsible **פרטי מפלגה** panel (`EditablePartyPanel`) edits the selected party row in `election_parties`. It saves independently via `updateElectionParty`.
 
@@ -183,6 +186,8 @@ Above the candidate list, a collapsible **פרטי מפלגה** panel (`Editable
 | מגדר | `people` | `gender` (`זכר` / `נקבה`) |
 | ויקיפדיה (URL) | `people` | `wikipedia_url` |
 | מיקום ברשימה | `election_candidates` | `list_position` |
+| קישור לכנסת (read-only) | `people` | `knesset_person_id` (null = not linked) |
+| שנות כנסת (read-only) | computed | from `knesset_memberships` via `computeMemberTenureStats` |
 
 When `city` changes, the save also sets `latitude` / `longitude` to `null` so the public map does not keep a stale pin (re-geocode later via pipeline Stage 4). `list_position` uniqueness is checked client-side against siblings; Supabase unique-constraint errors are surfaced in Hebrew.
 
@@ -253,7 +258,7 @@ When a candidate's `city` is edited and saved, `latitude` / `longitude` are clea
 
 Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` in `.env`.
 
-**Saves (dev + production):** `/elections/edit` always writes through `/api/elections/update-candidate`, `/api/elections/delete-candidate`, and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which use `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret` / `x-pipeline-edit-secret`. These three routes are available in production without `ENABLE_PIPELINE_API`; Python pipeline/enrich/geocode routes stay dev-only (or opt-in). Anon has SELECT only on elections tables — no anon UPDATE/DELETE. Hosting must set `SUPABASE_SERVICE_KEY` and the edit secret env vars.
+**Saves (dev + production):** `/elections/edit` always writes through `/api/elections/update-candidate`, `/api/elections/delete-candidate`, `/api/elections/unlink-candidate-person`, and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which use `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret` / `x-pipeline-edit-secret`. These data-edit routes are available in production without `ENABLE_PIPELINE_API`; Python pipeline/enrich/geocode routes stay dev-only (or opt-in). Anon has SELECT only on elections tables — no anon UPDATE/DELETE. Hosting must set `SUPABASE_SERVICE_KEY` and the edit secret env vars.
 
 ## Seats Trend (party hero)
 
@@ -311,6 +316,7 @@ Manual checks:
 - Parties without candidate rows show empty candidate/map states.
 - `/elections/edit` requires `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` (or shared `PIPELINE_EDIT_SECRET`), unlocks with the password, and can save a candidate field change via `/api/elections/update-candidate` when `SUPABASE_SERVICE_KEY` is set.
 - `/elections/edit` can delete a candidate from the selected party list via **מחק מהרשימה** → **אישור מחיקה** (`/api/elections/delete-candidate`); the card disappears after refetch and the `people` row remains.
+- `/elections/edit` shows computed tenure and Knesset-person link status; when linked, **נתק קישור** → **אישור ניתוק** (`/api/elections/unlink-candidate-person`) creates a new `people` row and clears the Knesset match (tenure becomes new MK).
 - `/elections/edit` party panel can save party name, color, logo, ballot letter, and description for the selected party via `/api/elections/update-party`.
 - In dev, **השלם מידע** on a card with missing fields fills the form from pipeline preview; save persists to Supabase.
 - In dev, for a party with 0–3 candidates, the party pipeline panel can paste a list, preview it, run all six stages, resolve review-queue items, and load candidate cards.

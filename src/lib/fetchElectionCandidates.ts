@@ -10,6 +10,7 @@ export type ElectionCandidate = {
   id: number
   partyId: number
   personId: number
+  knessetPersonId: number | null
   listPosition: number
   fullName: string
   imageUrl: string | null
@@ -158,6 +159,7 @@ function normalizeCandidate(
     id: row.id,
     partyId: row.party_id,
     personId: row.person_id,
+    knessetPersonId: person?.knesset_person_id ?? null,
     listPosition: row.list_position,
     fullName: person?.full_name ?? 'מועמד/ת',
     imageUrl: person?.image_url ?? null,
@@ -244,7 +246,7 @@ export async function fetchElectionCandidates(
   const { data, error: queryError } = await client
     .from('election_candidates')
     .select(
-      'id, election_id, party_id, person_id, list_position, description, city, latitude, longitude, person:people(full_name, image_url, birth_date, gender, wikipedia_url)',
+      'id, election_id, party_id, person_id, list_position, description, city, latitude, longitude, person:people(full_name, image_url, birth_date, gender, wikipedia_url, knesset_person_id)',
     )
     .eq('party_id', partyId)
     .order('list_position', { ascending: true })

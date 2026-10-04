@@ -20,6 +20,8 @@ import { useElectionParties } from '../hooks/useElectionParties'
 import { getInitials, tintColor } from '../lib/hemicycle'
 import { updateElectionCandidate } from '../lib/updateElectionCandidate'
 import { deleteElectionCandidate } from '../lib/deleteElectionCandidate'
+import { unlinkElectionCandidatePerson } from '../lib/unlinkElectionCandidatePerson'
+import { formatTenureYears } from '../lib/knessetTenure'
 import {
   enrichElectionCandidate,
   type CandidateEnrichmentUpdates,
@@ -49,6 +51,11 @@ type SaveState = {
 
 type DeleteState = {
   status: 'idle' | 'confirm' | 'deleting' | 'error'
+  message: string | null
+}
+
+type UnlinkState = {
+  status: 'idle' | 'confirm' | 'unlinking' | 'error'
   message: string | null
 }
 
@@ -237,6 +244,10 @@ function EditableCandidateCard({
     status: 'idle',
     message: null,
   })
+  const [unlinkState, setUnlinkState] = useState<UnlinkState>({
+    status: 'idle',
+    message: null,
+  })
   const [pipelineState, setPipelineState] = useState<PipelineState>({
     status: 'idle',
     message: null,
@@ -247,6 +258,7 @@ function EditableCandidateCard({
     setDraft(baseline)
     setSaveState({ status: 'idle', message: null })
     setDeleteState({ status: 'idle', message: null })
+    setUnlinkState({ status: 'idle', message: null })
     setPipelineState({ status: 'idle', message: null })
     setPipelineElapsedSeconds(0)
   }, [baseline])
@@ -275,6 +287,7 @@ function EditableCandidateCard({
   async function handleDelete() {
     if (
       deleteState.status === 'deleting' ||
+      unlinkState.status === 'unlinking' ||
       saveState.status === 'saving' ||
       pipelineState.status === 'running'
     ) {
@@ -301,10 +314,47 @@ function EditableCandidateCard({
     await onSaved()
   }
 
+  async function handleUnlink() {
+    if (
+      unlinkState.status === 'unlinking' ||
+      deleteState.status === 'deleting' ||
+      saveState.status === 'saving' ||
+      pipelineState.status === 'running' ||
+      candidate.knessetPersonId == null
+    ) {
+      return
+    }
+
+    if (unlinkState.status === 'idle') {
+      setUnlinkState({ status: 'confirm', message: null })
+      return
+    }
+
+    setUnlinkState({ status: 'unlinking', message: null })
+
+    const result = await unlinkElectionCandidatePerson({
+      candidateId: candidate.id,
+      partyId: candidate.partyId,
+      personId: candidate.personId,
+    })
+
+    if (!result.ok) {
+      setUnlinkState({ status: 'error', message: result.error })
+      return
+    }
+
+    setUnlinkState({ status: 'idle', message: null })
+    await onSaved()
+  }
+
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (saveState.status === 'saving' || deleteState.status === 'deleting') {
+    if (
+      saveState.status === 'saving' ||
+      deleteState.status === 'deleting' ||
+      unlinkState.status === 'unlinking'
+    ) {
       return
     }
 
@@ -416,6 +466,18 @@ function EditableCandidateCard({
   const canClickEnrich = showEnrichButton && !pipelineRunning
   const pipelineRunningMessage = formatPipelineRunningMessage(pipelineElapsedSeconds)
   const pipelineRunningShort = formatPipelineRunningShort(pipelineElapsedSeconds)
+  const isLinkedToKnessetPerson = candidate.knessetPersonId != null
+  const tenureSummary =
+    candidate.totalYearsInKnesset > 0
+      ? `${formatTenureYears(candidate.totalYearsInKnesset)} בכנסת`
+      : 'ח״כ חדש'
+  const tenureValueLabel =
+    candidate.totalYearsInKnesset > 0
+      ? formatTenureYears(candidate.totalYearsInKnesset)
+      : '0 (ח״כ חדש)'
+  const linkStatusLabel = isLinkedToKnessetPerson
+    ? 'מקושר לאדם עם מזהה כנסת'
+    : 'אדם ללא מזהה כנסת'
 
   return (
     <li
@@ -447,6 +509,12 @@ function EditableCandidateCard({
 
           <span className="candidate-edit-card__summary-body">
             <span className="candidate-card__name">{displayName}</span>
+            {!expanded ? (
+              <span className="candidate-edit-card__meta">
+                {tenureSummary}
+                {isLinkedToKnessetPerson ? ' · מקושר לכנסת' : ''}
+              </span>
+            ) : null}
             {!expanded && missingFields.length > 0 ? (
               <span className="candidate-edit-card__missing">
                 חסר: {missingFields.join(' · ')}
@@ -505,6 +573,69 @@ function EditableCandidateCard({
           onSubmit={handleSave}
           noValidate
         >
+          <div className="candidate-edit-card__person-link">
+            <p className="candidate-edit-card__person-link-status">
+              <span>{linkStatusLabel}</span>
+              <span>שנות כנסת: {tenureValueLabel}</span>
+              <span dir="ltr">person_id: {candidate.personId}</span>
+              {isLinkedToKnessetPerson ? (
+                <span dir="ltr">knesset_person_id: {candidate.knessetPersonId}</span>
+              ) : null}
+            </p>
+            {isLinkedToKnessetPerson ? (
+              unlinkState.status === 'confirm' ||
+              unlinkState.status === 'unlinking' ||
+              unlinkState.status === 'error' ? (
+                <div className="candidate-edit-card__unlink-confirm">
+                  <p className="candidate-edit-card__unlink-prompt" role="alert">
+                    לנתק את הקישור לאדם עם מזהה כנסת וליצור אדם חדש למועמד זה?
+                  </p>
+                  <button
+                    type="button"
+                    className="candidate-edit-card__unlink candidate-edit-card__unlink--confirm"
+                    onClick={handleUnlink}
+                    disabled={unlinkState.status === 'unlinking'}
+                  >
+                    {unlinkState.status === 'unlinking'
+                      ? 'מנתק…'
+                      : 'אישור ניתוק'}
+                  </button>
+                  <button
+                    type="button"
+                    className="candidate-edit-card__collapse"
+                    onClick={() =>
+                      setUnlinkState({ status: 'idle', message: null })
+                    }
+                    disabled={unlinkState.status === 'unlinking'}
+                  >
+                    ביטול
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="candidate-edit-card__unlink"
+                  onClick={handleUnlink}
+                  disabled={
+                    saveState.status === 'saving' ||
+                    deleteState.status === 'deleting' ||
+                    pipelineState.status === 'running'
+                  }
+                >
+                  נתק קישור
+                </button>
+              )
+            ) : null}
+            {unlinkState.message ? (
+              <p
+                className="candidate-edit-card__status candidate-edit-card__status--error"
+                role="alert"
+              >
+                {unlinkState.message}
+              </p>
+            ) : null}
+          </div>
+
           <label className="candidate-edit-card__field">
             <span>שם מלא</span>
             <input
@@ -615,7 +746,8 @@ function EditableCandidateCard({
               className="candidate-edit-card__save"
               disabled={
                 saveState.status === 'saving' ||
-                deleteState.status === 'deleting'
+                deleteState.status === 'deleting' ||
+                unlinkState.status === 'unlinking'
               }
             >
               {saveState.status === 'saving' ? 'שומר…' : 'שמור'}
@@ -624,7 +756,10 @@ function EditableCandidateCard({
               type="button"
               className="candidate-edit-card__collapse"
               onClick={() => setExpanded(false)}
-              disabled={deleteState.status === 'deleting'}
+              disabled={
+                deleteState.status === 'deleting' ||
+                unlinkState.status === 'unlinking'
+              }
             >
               סגור
             </button>
@@ -663,6 +798,7 @@ function EditableCandidateCard({
                 onClick={handleDelete}
                 disabled={
                   saveState.status === 'saving' ||
+                  unlinkState.status === 'unlinking' ||
                   pipelineState.status === 'running'
                 }
               >

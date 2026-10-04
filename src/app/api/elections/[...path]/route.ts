@@ -63,6 +63,16 @@ type DeleteCandidateInput = {
   partyId: number
 }
 
+type UnlinkCandidatePersonInput = {
+  candidateId: number
+  partyId: number
+  personId: number
+}
+
+type UnlinkCandidatePersonResult =
+  | { ok: true; personId: number }
+  | { ok: false; error: string }
+
 async function deleteCandidateWithClient(
   client: SupabaseClient,
   input: DeleteCandidateInput,
@@ -91,6 +101,102 @@ async function deleteCandidateWithClient(
   }
 
   return { ok: true }
+}
+
+async function unlinkCandidatePersonWithClient(
+  client: SupabaseClient,
+  input: UnlinkCandidatePersonInput,
+): Promise<UnlinkCandidatePersonResult> {
+  if (!Number.isInteger(input.candidateId) || input.candidateId < 1) {
+    return { ok: false, error: 'מזהה מועמד לא תקין' }
+  }
+
+  if (!Number.isInteger(input.partyId) || input.partyId < 1) {
+    return { ok: false, error: 'מזהה מפלגה לא תקין' }
+  }
+
+  if (!Number.isInteger(input.personId) || input.personId < 1) {
+    return { ok: false, error: 'מזהה אדם לא תקין' }
+  }
+
+  const { data: candidateRows, error: candidateError } = await client
+    .from('election_candidates')
+    .select('id, party_id, person_id')
+    .eq('id', input.candidateId)
+    .eq('party_id', input.partyId)
+    .limit(1)
+
+  if (candidateError) {
+    return { ok: false, error: candidateError.message }
+  }
+
+  const candidate = candidateRows?.[0]
+  if (!candidate) {
+    return { ok: false, error: 'המועמד לא נמצא ברשימת המפלגה' }
+  }
+
+  if (candidate.person_id !== input.personId) {
+    return { ok: false, error: 'הקישור לאדם אינו תואם את המועמד' }
+  }
+
+  const { data: personRows, error: personError } = await client
+    .from('people')
+    .select(
+      'id, full_name, image_url, birth_date, gender, wikipedia_url, knesset_person_id',
+    )
+    .eq('id', input.personId)
+    .limit(1)
+
+  if (personError) {
+    return { ok: false, error: personError.message }
+  }
+
+  const person = personRows?.[0]
+  if (!person) {
+    return { ok: false, error: 'רשומת האדם לא נמצאה' }
+  }
+
+  if (person.knesset_person_id == null) {
+    return { ok: false, error: 'המועמד אינו מקושר לאדם עם מזהה כנסת' }
+  }
+
+  const { data: createdRows, error: createError } = await client
+    .from('people')
+    .insert({
+      full_name: person.full_name,
+      image_url: person.image_url,
+      birth_date: person.birth_date,
+      gender: person.gender,
+      wikipedia_url: person.wikipedia_url,
+    })
+    .select('id')
+
+  if (createError) {
+    return { ok: false, error: createError.message }
+  }
+
+  const newPersonId = createdRows?.[0]?.id
+  if (!Number.isInteger(newPersonId) || newPersonId < 1) {
+    return { ok: false, error: 'יצירת אדם חדש נכשלה' }
+  }
+
+  const { data: updatedRows, error: updateError } = await client
+    .from('election_candidates')
+    .update({ person_id: newPersonId })
+    .eq('id', input.candidateId)
+    .eq('party_id', input.partyId)
+    .eq('person_id', input.personId)
+    .select('id')
+
+  if (updateError) {
+    return { ok: false, error: updateError.message }
+  }
+
+  if (!updatedRows?.length) {
+    return { ok: false, error: 'לא ניתן לעדכן את קישור המועמד' }
+  }
+
+  return { ok: true, personId: newPersonId }
 }
 
 async function updateWithClient(
@@ -274,6 +380,7 @@ const DATA_EDIT_ROUTES = new Set([
   'update-candidate',
   'update-party',
   'delete-candidate',
+  'unlink-candidate-person',
 ])
 
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -463,6 +570,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return jsonOk(result, result.ok ? 200 : 400)
     }
 
+    if (route === 'unlink-candidate-person') {
+      const admin = getAdminClient()
+      if (!admin) {
+        return jsonError('חסר SUPABASE_SERVICE_KEY או SUPABASE_URL', 503)
+      }
+
+      const body = (await request.json()) as UnlinkCandidatePersonInput
+      const result = await unlinkCandidatePersonWithClient(admin, body)
+      return jsonOk(result, result.ok ? 200 : 400)
+    }
+
     if (route === 'enrich-candidate') {
       const body = (await request.json()) as { candidateId?: number }
       const candidateId = Number(body?.candidateId)
@@ -523,6 +641,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     if (route === 'delete-candidate') {
       return jsonError('שגיאת שרת בעת המחיקה', 500)
+    }
+    if (route === 'unlink-candidate-person') {
+      return jsonError('שגיאת שרת בעת ניתוק הקישור', 500)
     }
     if (route === 'enrich-candidate') {
       return jsonError('שגיאת שרת בעת הרצת pipeline', 500)

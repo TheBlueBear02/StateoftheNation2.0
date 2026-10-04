@@ -18,7 +18,7 @@ The schema is split into these logical groups:
 | **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` · `pollsters` | Live — `/elections/polls`, `/piplines` |
 | **Site** | `site_updates` | Live — homepage news strip |
 
-All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE. Dream-government pick upserts use a **public** service-role API (`/api/elections/dream-government/submit`) with an anonymous `client_id` (no edit secret).
+All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/delete-candidate`, `/api/elections/unlink-candidate-person`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE. Dream-government pick upserts use a **public** service-role API (`/api/elections/dream-government/submit`) with an anonymous `client_id` (no edit secret).
 
 ---
 

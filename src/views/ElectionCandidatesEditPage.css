@@ -282,6 +282,83 @@
   font-weight: 700;
 }
 
+.candidate-edit-card__meta {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.candidate-edit-card__person-link {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #f7f7f7;
+}
+
+.candidate-edit-card__person-link-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.candidate-edit-card__unlink {
+  width: fit-content;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-white);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.candidate-edit-card__unlink:hover,
+.candidate-edit-card__unlink:focus-visible {
+  border-color: var(--color-alert);
+  color: var(--color-alert);
+  outline: none;
+}
+
+.candidate-edit-card__unlink:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.candidate-edit-card__unlink--confirm {
+  border-color: var(--color-alert);
+  background: var(--color-alert);
+  color: var(--color-white);
+}
+
+.candidate-edit-card__unlink--confirm:hover,
+.candidate-edit-card__unlink--confirm:focus-visible {
+  background: #c0392b;
+  color: var(--color-white);
+}
+
+.candidate-edit-card__unlink-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.candidate-edit-card__unlink-prompt {
+  margin: 0;
+  width: 100%;
+  color: var(--color-alert);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
 .candidate-edit-card__missing {
   color: var(--color-alert);
   font-size: 0.8rem;
