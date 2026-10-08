@@ -174,7 +174,7 @@ Schema file: `Layer 1 - Gathering Data/knesset/schema_knesset_committees.sql` (a
 **Source split (important):**
 | Data | Source | Notes |
 |------|--------|-------|
-| Committees, sessions | Knesset OData `ParliamentInfo.svc` | `KNS_Committee`, `KNS_CommitteeSession` |
+| Committees, sessions | Knesset OData `ParliamentInfo.svc` (`curl_cffi`; Hasadna CSV if WAF-blocked) | `KNS_Committee`, `KNS_CommitteeSession` |
 | Protocol file URLs | **Session-scoped** Knesset OData `KNS_DocumentCommitteeSession` (`GroupTypeID=23`, `.doc`/`.docx`); optional Hasadna CSV via `--use-hasadna` | Never full-scan the entity |
 | Committee seat membership + roles | Frozen last sync / optional Hasadna `mk_individual_committees.csv` (`--use-hasadna`) | Live OData `CommitteeID` / committee PositionIDs are **empty** for K20–25 |
 | Full transcript text + speaker parts | **DOC self-parse** from `file_url` (`committee_protocol_parse.py` + `antiword`) → `source=parsed_file`; optional Hasadna parts only with `--use-hasadna` when no DOC | Default weekly path is Knesset-only |

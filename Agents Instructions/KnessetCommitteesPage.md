@@ -108,14 +108,14 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 **Schema:** `Layer 1 - Gathering Data/knesset/schema_knesset_committees.sql`  
 Weekly via `.github/workflows/knesset-pipeline.yml` (50 newest missing transcripts/run; installs `antiword`). **Default path is Knesset-only** (Hasadna dumps are stale for committees).
 
-**Default ingest (no Hasadna):**
-1. OData `KNS_Committee` / `KNS_CommitteeSession` for metadata.
-2. **Session-scoped** OData `KNS_DocumentCommitteeSession` (`CommitteeSessionID eq … and GroupTypeID eq 23`) for protocol FilePaths on sittings still missing a DOC/DOCX — capped by `--odata-doc-session-cap` (default **400**). Never full-scan the entity (that previously canceled the 2h job).
+**Default ingest (Knesset-first):**
+1. OData `KNS_Committee` / `KNS_CommitteeSession` via `odata_client.py` (`curl_cffi` Chrome impersonation). If GitHub Actions IPs are WAF-blocked, falls back to Hasadna CSV mirrors for those entities (cached per run).
+2. **Session-scoped** OData `KNS_DocumentCommitteeSession` (`CommitteeSessionID eq … and GroupTypeID eq 23`) for protocol FilePaths on sittings still missing a DOC/DOCX — capped by `--odata-doc-session-cap` (default **400**). Never full-scan the entity. Same WAF → Hasadna dataservice CSV fallback.
 3. Download DOC/DOCX from `fs.knesset.gov.il` and self-parse speakers (`source=parsed_file`, needs `antiword` for `.doc`).
 4. Sessions without a protocol DOC URL are skipped until Knesset publishes one (often days/weeks after the sitting).
-5. **Memberships are skipped** — OData `CommitteeID` is empty for K20–25. Existing `knesset_committee_memberships` rows stay as last synced; UI attendance still updates from protocol `נכחו` / `חברי הכנסת`.
+5. **Memberships are skipped** unless `--use-hasadna` — OData `CommitteeID` is empty for K20–25. Existing roster rows stay as last synced; UI attendance still updates from protocol `נכחו` / `חברי הכנסת`.
 
-**Legacy:** `--use-hasadna` re-enables Hasadna CSVs for memberships, document dumps, and pre-parsed parts (DOC still preferred for transcripts when a FilePath exists). Job timeout is **180** minutes.
+**Legacy:** `--use-hasadna` also pulls Hasadna pre-parsed protocol text/parts when no DOC exists. Job timeout is **180** minutes.
 
 ### Targeted fetch (committee + day)
 

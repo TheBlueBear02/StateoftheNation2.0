@@ -48,7 +48,6 @@ import os
 import re
 import sys
 import time
-import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -70,6 +69,7 @@ from committee_protocol_parse import (  # noqa: E402
     ProtocolParseError,
     parse_protocol_url,
 )
+from odata_client import fetch_odata  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from record_pipeline_run import record_pipeline_run  # noqa: E402
@@ -87,9 +87,7 @@ log = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-ODATA_BASE = "https://knesset.gov.il/Odata/ParliamentInfo.svc"
 HASADNA_BASE = "https://production.oknesset.org/pipelines/data"
-PAGE_SIZE = 50
 RETRY_MAX = 5
 RETRY_DELAY = 4
 
@@ -109,23 +107,12 @@ POSITION_TO_SEAT_ROLE = {
     663: "observer",
 }
 
-NS = {
-    "atom": "http://www.w3.org/2005/Atom",
-    "m": "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
-    "d": "http://schemas.microsoft.com/ado/2007/08/dataservices",
-}
-
-HEADERS = {
+HTTP_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
+        "Chrome/131.0.0.0 Safari/537.36"
     ),
-    "Accept": "application/atom+xml,application/xml",
-}
-
-HTTP_HEADERS = {
-    "User-Agent": HEADERS["User-Agent"],
     "Accept": "*/*",
 }
 
@@ -170,141 +157,14 @@ _ATTENDANCE_PART_HEADERS = frozenset(
 )
 
 
-# ── OData (keeps full DateTime for session timestamps) ────────────────────────
-
-def is_reblaze_block(text: str) -> bool:
-    """True when the body is a WAF/HTML interstitial instead of Atom XML."""
-    sample = (text or "")[:4000].lower()
-    if any(
-        s in sample
-        for s in (
-            "reblaze",
-            "access denied",
-            "request blocked",
-            "rbzid",
-            "cf-ray",
-            "captcha",
-        )
-    ):
-        return True
-    stripped = (text or "").lstrip().lower()
-    return stripped.startswith("<!doctype html") or stripped.startswith("<html")
+def fetch_odata_committees(
+    entity: str, filter_expr: str | None = None
+) -> list[dict]:
+    """OData fetch keeping full DateTime values for session timestamps."""
+    return fetch_odata(entity, filter_expr, keep_datetime=True)
 
 
-def parse_atom_feed(content: bytes) -> ET.Element:
-    """Parse an OData Atom feed; raise ValueError on HTML/malformed bodies."""
-    try:
-        root = ET.fromstring(content)
-    except ET.ParseError as exc:
-        raise ValueError(f"invalid OData XML: {exc}") from exc
-    tag = root.tag.split("}")[-1] if "}" in root.tag else root.tag
-    if tag != "feed":
-        raise ValueError(f"expected Atom <feed>, got <{tag}>")
-    return root
-
-
-def parse_odata_value(elem: ET.Element):
-    if elem.get(f"{{{NS['m']}}}null", "false").lower() == "true":
-        return None
-
-    type_attr = elem.get(f"{{{NS['m']}}}type", "")
-    text = (elem.text or "").strip()
-    if not text:
-        return None
-
-    if type_attr in ("Edm.Int32", "Edm.Int16", "Edm.Byte", "Edm.Int64"):
-        return int(text)
-    if type_attr == "Edm.Decimal":
-        return float(text)
-    if type_attr == "Edm.Boolean":
-        return text.lower() == "true"
-    if type_attr == "Edm.DateTime":
-        # Keep full timestamp for sessions; date-only fields still work as ISO prefix.
-        if "T" in text:
-            return text.replace("Z", "+00:00")
-        return text[:10]
-    return text
-
-
-def parse_entry(entry: ET.Element) -> dict:
-    props = entry.find("./atom:content/m:properties", NS)
-    if props is None:
-        return {}
-    return {
-        child.tag.split("}")[-1]: parse_odata_value(child)
-        for child in props
-    }
-
-
-def fetch_odata(entity: str, filter_expr: str | None = None) -> list[dict]:
-    base_params: dict = {"$top": PAGE_SIZE}
-    if filter_expr:
-        base_params["$filter"] = filter_expr
-
-    all_rows: list[dict] = []
-    skip = 0
-    page = 1
-
-    while True:
-        params = {**base_params, "$skip": skip}
-        log.info("  %s: page %d (skip=%d)…", entity, page, skip)
-
-        root = None
-        resp = None
-        for attempt in range(1, RETRY_MAX + 1):
-            try:
-                resp = requests.get(
-                    f"{ODATA_BASE}/{entity}",
-                    params=params,
-                    headers=HEADERS,
-                    timeout=60,
-                )
-                resp.raise_for_status()
-                if is_reblaze_block(resp.text):
-                    raise ValueError("WAF/HTML block page instead of Atom feed")
-                root = parse_atom_feed(resp.content)
-                break
-            except (requests.RequestException, ValueError) as exc:
-                wait = RETRY_DELAY * attempt
-                snippet = ""
-                if resp is not None:
-                    snippet = resp.text[:240].replace("\n", " ")
-                log.warning(
-                    "  OData error (attempt %d/%d): %s — retrying in %ds%s",
-                    attempt,
-                    RETRY_MAX,
-                    exc,
-                    wait,
-                    f" | body[:240]={snippet!r}" if snippet else "",
-                )
-                if attempt == RETRY_MAX:
-                    raise RuntimeError(
-                        f"OData {entity} page {page} failed after {RETRY_MAX} attempts: {exc}"
-                    ) from exc
-                time.sleep(wait)
-
-        assert root is not None
-        entries = root.findall("atom:entry", NS)
-        rows = [parse_entry(e) for e in entries]
-        all_rows.extend(rows)
-        log.info(
-            "  %s: page %d → %d rows (total: %d)",
-            entity,
-            page,
-            len(rows),
-            len(all_rows),
-        )
-
-        if len(rows) < PAGE_SIZE:
-            break
-        skip += PAGE_SIZE
-        page += 1
-        time.sleep(0.25)
-
-    return all_rows
-
-
-# ── HTTP helpers (Hasadna) ────────────────────────────────────────────────────
+# ── HTTP helpers (Hasadna / protocol files) ───────────────────────────────────
 
 def http_get_bytes(url: str, timeout: int = 120) -> bytes:
     for attempt in range(1, RETRY_MAX + 1):
@@ -674,7 +534,7 @@ def sync_committees(sb: Client, knesset_num: int) -> dict:
             "run load_all_knesset_data.py first"
         )
 
-    raw = fetch_odata("KNS_Committee", f"KnessetNum eq {knesset_num}")
+    raw = fetch_odata_committees("KNS_Committee", f"KnessetNum eq {knesset_num}")
     rows = []
     for r in raw:
         cid = r.get("CommitteeID")
@@ -885,7 +745,9 @@ def sync_sessions(sb: Client, knesset_num: int) -> dict:
     log.info("── syncing knesset_committee_sessions (Knesset %d) ──", knesset_num)
     committee_by_oid = load_id_map(sb, "knesset_committees", "knesset_committee_id")
 
-    raw = fetch_odata("KNS_CommitteeSession", f"KnessetNum eq {knesset_num}")
+    raw = fetch_odata_committees(
+        "KNS_CommitteeSession", f"KnessetNum eq {knesset_num}"
+    )
     by_oid: dict[int, dict] = {}
     skipped = 0
     for r in raw:
@@ -1003,7 +865,7 @@ def fetch_protocol_docs_via_odata_for_sessions(
     total = len(session_oids)
     for i, oid in enumerate(session_oids, 1):
         log.info("  OData docs for CommitteeSessionID=%d (%d/%d)…", oid, i, total)
-        odata_rows = fetch_odata(
+        odata_rows = fetch_odata_committees(
             "KNS_DocumentCommitteeSession",
             f"CommitteeSessionID eq {oid} and GroupTypeID eq {PROTOCOL_GROUP_TYPE_ID}",
         )

@@ -34,16 +34,13 @@ Field name corrections vs v1 (from live API discovery):
 
 import os
 import sys
-import time
 import logging
 import argparse
 from datetime import datetime
-import xml.etree.ElementTree as ET
+from pathlib import Path
 
-import requests
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from emit_site_updates import (  # noqa: E402
@@ -52,6 +49,13 @@ from emit_site_updates import (  # noqa: E402
     snapshot_knesset_positions,
 )
 from record_pipeline_run import record_pipeline_run  # noqa: E402
+
+from odata_client import (  # noqa: E402
+    ODATA_BASE,
+    fetch_odata,
+    is_reblaze_block,
+    parse_atom_feed,
+)
 
 load_dotenv()
 
@@ -63,28 +67,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger(__name__)
-
-# ── OData config ──────────────────────────────────────────────────────────────
-
-ODATA_BASE  = "https://knesset.gov.il/Odata/ParliamentInfo.svc"
-PAGE_SIZE   = 50
-RETRY_MAX   = 5
-RETRY_DELAY = 4   # seconds × attempt number
-
-NS = {
-    "atom": "http://www.w3.org/2005/Atom",
-    "m":    "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
-    "d":    "http://schemas.microsoft.com/ado/2007/08/dataservices",
-}
-
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept": "application/atom+xml,application/xml",
-}
 
 # PositionIDs that mean "Knesset Member" in KNS_PersonToPosition.
 # Confirmed via --discover KNS_Position against the live API:
@@ -109,153 +91,21 @@ def get_supabase() -> Client:
     return create_client(url, key)
 
 
-# ── OData XML fetching ────────────────────────────────────────────────────────
-
-def is_reblaze_block(text: str) -> bool:
-    """True when the body is a WAF/HTML interstitial instead of Atom XML."""
-    sample = (text or "")[:4000].lower()
-    if any(
-        s in sample
-        for s in (
-            "reblaze",
-            "access denied",
-            "request blocked",
-            "rbzid",
-            "cf-ray",
-            "captcha",
-        )
-    ):
-        return True
-    stripped = (text or "").lstrip().lower()
-    return stripped.startswith("<!doctype html") or stripped.startswith("<html")
-
-
-def parse_atom_feed(content: bytes) -> ET.Element:
-    """Parse an OData Atom feed; raise ValueError on HTML/malformed bodies."""
-    try:
-        root = ET.fromstring(content)
-    except ET.ParseError as exc:
-        raise ValueError(f"invalid OData XML: {exc}") from exc
-    tag = root.tag.split("}")[-1] if "}" in root.tag else root.tag
-    if tag != "feed":
-        raise ValueError(f"expected Atom <feed>, got <{tag}>")
-    return root
-
-
-def parse_odata_value(elem: ET.Element):
-    if elem.get(f"{{{NS['m']}}}null", "false").lower() == "true":
-        return None
-
-    type_attr = elem.get(f"{{{NS['m']}}}type", "")
-    text = (elem.text or "").strip()
-    if not text:
-        return None
-
-    if type_attr in ("Edm.Int32", "Edm.Int16", "Edm.Byte", "Edm.Int64"):
-        return int(text)
-    if type_attr == "Edm.Decimal":
-        return float(text)
-    if type_attr == "Edm.Boolean":
-        return text.lower() == "true"
-    if type_attr == "Edm.DateTime":
-        return text[:10]  # "YYYY-MM-DD"
-    return text
-
-
-def parse_entry(entry: ET.Element) -> dict:
-    props = entry.find("./atom:content/m:properties", NS)
-    if props is None:
-        return {}
-    return {
-        child.tag.split("}")[-1]: parse_odata_value(child)
-        for child in props
-    }
-
-
-def fetch_odata(entity: str, filter_expr: str = None) -> list[dict]:
-    """
-    Fetch ALL rows from a KNS_* entity using explicit $skip-based pagination.
-
-    The Knesset OData API does not reliably return <link rel="next"> in its
-    Atom XML responses, so we never rely on that element. Instead we keep
-    incrementing $skip by PAGE_SIZE until a page comes back with fewer rows
-    than PAGE_SIZE — that signals the last page.
-    """
-    base_params: dict = {"$top": PAGE_SIZE}
-    if filter_expr:
-        base_params["$filter"] = filter_expr
-
-    all_rows: list[dict] = []
-    skip = 0
-    page = 1
-
-    while True:
-        params = {**base_params, "$skip": skip}
-        log.info("  %s: page %d (skip=%d)…", entity, page, skip)
-
-        root = None
-        resp = None
-        for attempt in range(1, RETRY_MAX + 1):
-            try:
-                resp = requests.get(
-                    f"{ODATA_BASE}/{entity}",
-                    params=params,
-                    headers=HEADERS,
-                    timeout=60,
-                )
-                resp.raise_for_status()
-                if is_reblaze_block(resp.text):
-                    raise ValueError("WAF/HTML block page instead of Atom feed")
-                root = parse_atom_feed(resp.content)
-                break
-            except (requests.RequestException, ValueError) as exc:
-                wait = RETRY_DELAY * attempt
-                snippet = ""
-                if resp is not None:
-                    snippet = resp.text[:240].replace("\n", " ")
-                log.warning(
-                    "  OData error (attempt %d/%d): %s — retrying in %ds%s",
-                    attempt,
-                    RETRY_MAX,
-                    exc,
-                    wait,
-                    f" | body[:240]={snippet!r}" if snippet else "",
-                )
-                if attempt == RETRY_MAX:
-                    raise RuntimeError(
-                        f"OData {entity} page {page} failed after {RETRY_MAX} attempts: {exc}"
-                    ) from exc
-                time.sleep(wait)
-
-        assert root is not None
-        entries = root.findall("atom:entry", NS)
-        rows    = [parse_entry(e) for e in entries]
-        all_rows.extend(rows)
-        log.info("  %s: page %d → %d rows (total: %d)", entity, page, len(rows), len(all_rows))
-
-        if len(rows) < PAGE_SIZE:
-            break   # last page — fewer rows than requested means no more data
-
-        skip += PAGE_SIZE
-        page += 1
-        time.sleep(0.3)
-
-    return all_rows
-
+# ── OData helpers (shared client) ─────────────────────────────────────────────
 
 def probe_entity(name: str) -> bool:
     """Return True if an entity name responds with 200 and at least one row."""
     try:
-        resp = requests.get(
+        from odata_client import NS, _http_get  # noqa: WPS433
+
+        resp = _http_get(
             f"{ODATA_BASE}/{name}",
             params={"$top": 1},
-            headers=HEADERS,
-            timeout=10,
+            timeout=15,
         )
         if resp.status_code == 200 and not is_reblaze_block(resp.text):
-            root    = ET.fromstring(resp.content)
-            entries = root.findall("atom:entry", NS)
-            return len(entries) > 0
+            root = parse_atom_feed(resp.content)
+            return len(root.findall("atom:entry", NS)) > 0
     except Exception:
         pass
     return False

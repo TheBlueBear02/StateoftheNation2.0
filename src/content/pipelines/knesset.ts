@@ -42,7 +42,7 @@ export const knessetPipeline: PipelineDoc = {
       id: 'source',
       title: 'מקור הנתונים',
       paragraphs: [
-        'ה-API הרשמי של הכנסת מחזיר Atom/XML בפורמט OData v2 מעל HTTPS. הסקריפט מדפדף עם $skip, ומנסה שוב כשמגיעה חסימת WAF/HTML או XML פגום במקום feed תקין.',
+        'ה-API הרשמי של הכנסת מחזיר Atom/XML בפורמט OData v2 מעל HTTPS. ב-GitHub Actions נעשה שימוש ב-curl_cffi (חיקוי Chrome) כדי לעבור חסימות WAF על IP של רנרים. אם OData עדיין מחזיר HTML — יש נפילה ל-CSV של Hasadna לאותה ישות.',
       ],
       code: 'https://knesset.gov.il/Odata/ParliamentInfo.svc',
       table: {
