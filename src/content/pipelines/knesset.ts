@@ -42,9 +42,9 @@ export const knessetPipeline: PipelineDoc = {
       id: 'source',
       title: 'מקור הנתונים',
       paragraphs: [
-        'ה-API הרשמי של הכנסת מחזיר Atom/XML בפורמט OData v2. הסקריפט עוקב אחרי קישורי next לדפדוף, ומטפל בחסימות Reblaze עם ניסיונות חוזרים.',
+        'ה-API הרשמי של הכנסת מחזיר Atom/XML בפורמט OData v2 מעל HTTPS. הסקריפט מדפדף עם $skip, ומנסה שוב כשמגיעה חסימת WAF/HTML או XML פגום במקום feed תקין.',
       ],
-      code: 'http://knesset.gov.il/Odata/ParliamentInfo.svc',
+      code: 'https://knesset.gov.il/Odata/ParliamentInfo.svc',
       table: {
         headers: ['ישות OData', 'טבלת יעד', 'הערות'],
         rows: [

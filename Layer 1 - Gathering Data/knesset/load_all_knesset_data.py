@@ -66,7 +66,7 @@ log = logging.getLogger(__name__)
 
 # ── OData config ──────────────────────────────────────────────────────────────
 
-ODATA_BASE  = "http://knesset.gov.il/Odata/ParliamentInfo.svc"
+ODATA_BASE  = "https://knesset.gov.il/Odata/ParliamentInfo.svc"
 PAGE_SIZE   = 50
 RETRY_MAX   = 5
 RETRY_DELAY = 4   # seconds × attempt number
@@ -112,7 +112,34 @@ def get_supabase() -> Client:
 # ── OData XML fetching ────────────────────────────────────────────────────────
 
 def is_reblaze_block(text: str) -> bool:
-    return any(s in text.lower() for s in ["reblaze", "access denied", "request blocked", "rbzid"])
+    """True when the body is a WAF/HTML interstitial instead of Atom XML."""
+    sample = (text or "")[:4000].lower()
+    if any(
+        s in sample
+        for s in (
+            "reblaze",
+            "access denied",
+            "request blocked",
+            "rbzid",
+            "cf-ray",
+            "captcha",
+        )
+    ):
+        return True
+    stripped = (text or "").lstrip().lower()
+    return stripped.startswith("<!doctype html") or stripped.startswith("<html")
+
+
+def parse_atom_feed(content: bytes) -> ET.Element:
+    """Parse an OData Atom feed; raise ValueError on HTML/malformed bodies."""
+    try:
+        root = ET.fromstring(content)
+    except ET.ParseError as exc:
+        raise ValueError(f"invalid OData XML: {exc}") from exc
+    tag = root.tag.split("}")[-1] if "}" in root.tag else root.tag
+    if tag != "feed":
+        raise ValueError(f"expected Atom <feed>, got <{tag}>")
+    return root
 
 
 def parse_odata_value(elem: ET.Element):
@@ -166,29 +193,41 @@ def fetch_odata(entity: str, filter_expr: str = None) -> list[dict]:
         params = {**base_params, "$skip": skip}
         log.info("  %s: page %d (skip=%d)…", entity, page, skip)
 
+        root = None
+        resp = None
         for attempt in range(1, RETRY_MAX + 1):
             try:
                 resp = requests.get(
                     f"{ODATA_BASE}/{entity}",
                     params=params,
                     headers=HEADERS,
-                    timeout=30,
+                    timeout=60,
                 )
                 resp.raise_for_status()
                 if is_reblaze_block(resp.text):
-                    wait = RETRY_DELAY * attempt
-                    log.warning("  Reblaze block (attempt %d/%d) — waiting %ds", attempt, RETRY_MAX, wait)
-                    time.sleep(wait)
-                    continue
+                    raise ValueError("WAF/HTML block page instead of Atom feed")
+                root = parse_atom_feed(resp.content)
                 break
-            except requests.RequestException as exc:
-                if attempt == RETRY_MAX:
-                    raise
+            except (requests.RequestException, ValueError) as exc:
                 wait = RETRY_DELAY * attempt
-                log.warning("  Error (attempt %d/%d): %s — retrying in %ds", attempt, RETRY_MAX, exc, wait)
+                snippet = ""
+                if resp is not None:
+                    snippet = resp.text[:240].replace("\n", " ")
+                log.warning(
+                    "  OData error (attempt %d/%d): %s — retrying in %ds%s",
+                    attempt,
+                    RETRY_MAX,
+                    exc,
+                    wait,
+                    f" | body[:240]={snippet!r}" if snippet else "",
+                )
+                if attempt == RETRY_MAX:
+                    raise RuntimeError(
+                        f"OData {entity} page {page} failed after {RETRY_MAX} attempts: {exc}"
+                    ) from exc
                 time.sleep(wait)
 
-        root    = ET.fromstring(resp.content)
+        assert root is not None
         entries = root.findall("atom:entry", NS)
         rows    = [parse_entry(e) for e in entries]
         all_rows.extend(rows)
