@@ -666,3 +666,61 @@ def emit_elections_run_update(
     except Exception as exc:
         log.warning("emit_elections_run_update failed: %s", exc)
         return False
+
+
+# ── Committees collector ──────────────────────────────────────────────────────
+
+def emit_committees_run_update(
+    sb: Client,
+    *,
+    summary: dict[str, Any],
+    knesset_num: int = 25,
+    pipeline_run_id: int | None = None,
+    started_at: datetime | None = None,
+    headline_override: str | None = None,
+) -> dict[str, Any] | None:
+    """Emit one ticker row when a committees sync added transcripts/sessions/committees.
+
+    Uses the orchestrator summary counters (inserted/ok). Never raises.
+    """
+    try:
+        steps = summary.get("steps") or {}
+        t_stats = steps.get("transcripts") or {}
+        s_stats = steps.get("sessions") or {}
+        c_stats = steps.get("committees") or {}
+
+        # sync_transcripts sets inserted = successful parses this run.
+        new_transcripts = int(t_stats.get("inserted") or 0)
+        new_sessions = int(s_stats.get("inserted") or 0)
+        new_committees = int(c_stats.get("inserted") or 0)
+
+        if new_transcripts <= 0 and new_sessions <= 0 and new_committees <= 0:
+            return None
+
+        started = started_at or datetime.now(timezone.utc)
+        started_iso = started.astimezone(timezone.utc).isoformat()
+        dedupe = (
+            f"knesset-committees:{knesset_num}:{started_iso}"
+            f":t{new_transcripts}:s{new_sessions}:c{new_committees}"
+        )
+        return emit_pipeline_site_update(
+            sb,
+            event_type="knesset_committees_run",
+            href="/knesset/committees",
+            page_label_he="עמוד ועדות הכנסת",
+            facts={
+                "pipeline": "knesset-committees",
+                "knesset_num": knesset_num,
+                "new_transcript_count": new_transcripts,
+                "new_session_count": new_sessions,
+                "new_committee_count": new_committees,
+                "from_self_parse": int(t_stats.get("from_self_parse") or 0),
+                "from_hasadna": int(t_stats.get("from_hasadna") or 0),
+            },
+            dedupe_key=dedupe[:500],
+            pipeline_run_id=pipeline_run_id,
+            headline_override=headline_override,
+        )
+    except Exception as exc:
+        log.warning("emit_committees_run_update failed: %s", exc)
+        return None

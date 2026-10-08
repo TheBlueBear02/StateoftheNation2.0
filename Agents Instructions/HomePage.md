@@ -126,7 +126,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 
 - Black background, white text, blue dot separators.
 - Full-bleed edge-to-edge (no `.container`) — intentional marquee effect.
-- Headlines from `site_updates` via `useSiteUpdates` only (written by pipeline finish hooks in `emit_site_updates.py`). No static default / filler headlines. Each item is a `Link` to its `href` (e.g. `/elections/polls`, `/knesset`).
+- Headlines from `site_updates` via `useSiteUpdates` only (written by pipeline finish hooks in `emit_site_updates.py`). No static default / filler headlines. Each item is a `Link` to its `href` (e.g. `/elections/polls`, `/knesset`, `/knesset/committees`).
 - Each item shows a Jerusalem local stamp before the headline: `HH:mm | …` for updates from today, otherwise `D.M | …` with no time (e.g. `15:00 | כותרת` / `30.7 | כותרת`).
 - Feed: up to **10** latest DB rows (`occurred_at` desc). On query failure, missing Supabase config, or an empty table, the strip is **hidden** (not padded with placeholders).
 - The track renders `newsItems` twice for a seamless CSS marquee loop — that is intentional duplication for animation, not a second fetch.

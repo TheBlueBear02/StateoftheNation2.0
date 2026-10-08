@@ -106,7 +106,7 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 **Script:** `Layer 1 - Gathering Data/knesset/load_knesset_committees.py`  
 **Self-parse helper:** `Layer 1 - Gathering Data/knesset/committee_protocol_parse.py`  
 **Schema:** `Layer 1 - Gathering Data/knesset/schema_knesset_committees.sql`  
-Weekly via `.github/workflows/knesset-pipeline.yml` (50 newest missing transcripts/run; installs `antiword`). **Default path is Knesset-only** (Hasadna dumps are stale for committees).
+Weekly via `.github/workflows/knesset-pipeline.yml` (50 newest missing transcripts/run; installs `antiword`; passes `OPENAI_API_KEY`). **Default path is Knesset-only** (Hasadna dumps are stale for committees). After a successful run that inserted new committees, sessions, or transcripts, `emit_committees_run_update` writes a homepage ticker row linking to `/knesset/committees`.
 
 **Default ingest (Knesset-first):**
 1. OData `KNS_Committee` / `KNS_CommitteeSession` via `odata_client.py` (`curl_cffi` Chrome impersonation). If GitHub Actions IPs are WAF-blocked, falls back to Hasadna CSV mirrors for those entities (cached per run).

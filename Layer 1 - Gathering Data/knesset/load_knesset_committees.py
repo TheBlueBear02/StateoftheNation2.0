@@ -72,6 +72,7 @@ from committee_protocol_parse import (  # noqa: E402
 from odata_client import fetch_odata  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from emit_site_updates import emit_committees_run_update  # noqa: E402
 from record_pipeline_run import record_pipeline_run  # noqa: E402
 
 # Prefer cwd .env, then repo root (two levels up from knesset/).
@@ -1729,7 +1730,7 @@ def run(
             )
 
         finished = datetime.now(timezone.utc)
-        record_pipeline_run(
+        run_id = record_pipeline_run(
             sb,
             pipeline="knesset-committees",
             action="sync",
@@ -1744,6 +1745,28 @@ def run(
             started_at=started,
             finished_at=finished,
         )
+        site_update = emit_committees_run_update(
+            sb,
+            summary=summary,
+            knesset_num=knesset_num,
+            pipeline_run_id=run_id,
+            started_at=started,
+        )
+        if site_update:
+            log.info(
+                "site_updates: committees headline — %s",
+                site_update.get("headline"),
+            )
+            summary["site_update"] = {
+                "id": site_update.get("id"),
+                "headline": site_update.get("headline"),
+                "href": site_update.get("href"),
+            }
+        else:
+            log.info(
+                "site_updates: skipped — no new committees/sessions/transcripts "
+                "(or OPENAI_API_KEY missing)"
+            )
         log.info("── done ──")
         return summary
     except Exception as exc:

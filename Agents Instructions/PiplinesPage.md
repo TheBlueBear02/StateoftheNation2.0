@@ -106,6 +106,7 @@ Thin collectors already wired:
 
 - `emit_polls_run_update` — new non-scenario polls since run start → `/elections/polls`
 - `emit_knesset_run_update` — field-level membership/appointment diffs → `/knesset`
+- `emit_committees_run_update` — new committees / sessions / transcripts from `load_knesset_committees.py` → `/knesset/committees`
 - `emit_elections_run_update` — new `election_candidates` since run start → `/elections`
 
 Finish sequence for orchestrators: domain work → `record_pipeline_run` → **emit site update when the run produced new/changed data** (e.g. new polls inserted, knesset position field diffs, new election candidates, office KPI pending or published candidates). Do not call emit on no-op successful runs. Dedupe keys must be unique per meaningful change set (poll ids, knesset diff hash, office-kpis `run_id`+index keys) — not a once-per-day key that overwrites earlier ticker rows. Approving an office-KPI candidate on `/government/dashboard/edit` also upserts a `site_updates` row.
