@@ -3,11 +3,12 @@
 -- Prerequisite: public.knessets, public.people.
 --
 -- Scope: designed for the 25th Knesset first; knesset_id FK allows later terms.
--- Sources (ingest later):
+-- Default ingest (load_knesset_committees.py): Knesset OData + DOC self-parse.
 --   OData ParliamentInfo.svc — KNS_Committee / KNS_CommitteeSession /
---     KNS_DocumentCommitteeSession (GroupTypeID=23 protocols)
---   Hasadna — mk_individual_committees.csv (membership; OData CommitteeID empty),
---     meeting_protocols_text / meeting_protocols_parts (full text + speaker turns)
+--     KNS_DocumentCommitteeSession (GroupTypeID=23; session-scoped queries only)
+--   Protocol DOC/DOCX FilePath → committee_protocol_parse.py
+-- Optional --use-hasadna: memberships + document CSVs + pre-parsed parts
+--   (OData CommitteeID is empty for K20–25)
 
 -- Shared updated_at helper (no-op replace if already present with same body)
 create or replace function public.set_updated_at()

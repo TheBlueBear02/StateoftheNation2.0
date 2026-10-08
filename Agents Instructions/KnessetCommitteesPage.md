@@ -106,16 +106,20 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 **Script:** `Layer 1 - Gathering Data/knesset/load_knesset_committees.py`  
 **Self-parse helper:** `Layer 1 - Gathering Data/knesset/committee_protocol_parse.py`  
 **Schema:** `Layer 1 - Gathering Data/knesset/schema_knesset_committees.sql`  
-Weekly via `.github/workflows/knesset-pipeline.yml` (200 newest missing transcripts/run; installs `antiword`).
+Weekly via `.github/workflows/knesset-pipeline.yml` (50 newest missing transcripts/run; installs `antiword`). **Default path is Knesset-only** (Hasadna dumps are stale for committees).
 
-Transcript sync is **hybrid**:
-1. Prefer Hasadna parsed text/parts when the joined dump lists filenames for the session.
-2. Otherwise download the protocol DOC/DOCX `FilePath` (from dataservice document dump / OData) and split speakers locally (`source=parsed_file`).
-3. Sessions with neither Hasadna parts nor a DOC URL are skipped until a protocol file appears (Knesset often publishes DOCs days/weeks after the sitting).
+**Default ingest (no Hasadna):**
+1. OData `KNS_Committee` / `KNS_CommitteeSession` for metadata.
+2. **Session-scoped** OData `KNS_DocumentCommitteeSession` (`CommitteeSessionID eq … and GroupTypeID eq 23`) for protocol FilePaths on sittings still missing a DOC/DOCX — capped by `--odata-doc-session-cap` (default **400**). Never full-scan the entity (that previously canceled the 2h job).
+3. Download DOC/DOCX from `fs.knesset.gov.il` and self-parse speakers (`source=parsed_file`, needs `antiword` for `.doc`).
+4. Sessions without a protocol DOC URL are skipped until Knesset publishes one (often days/weeks after the sitting).
+5. **Memberships are skipped** — OData `CommitteeID` is empty for K20–25. Existing `knesset_committee_memberships` rows stay as last synced; UI attendance still updates from protocol `נכחו` / `חברי הכנסת`.
+
+**Legacy:** `--use-hasadna` re-enables Hasadna CSVs for memberships, document dumps, and pre-parsed parts (DOC still preferred for transcripts when a FilePath exists). Job timeout is **180** minutes.
 
 ### Targeted fetch (committee + day)
 
-To pull all sittings for a committee on a calendar day without waiting for the weekly newest-200 batch:
+To pull all sittings for a committee on a calendar day without waiting for the weekly newest-50 batch:
 
 ```bash
 cd "Layer 1 - Gathering Data/knesset"
@@ -128,6 +132,7 @@ python load_knesset_committees.py --committee "ועדת הכספים" --date 202
 - With `--table all` (default) + both flags: runs **sessions → documents → transcripts** only (skips committees/memberships refresh). `--transcripts-limit` is ignored.
 - Transcript-only if metadata already synced: `--table transcripts --committee … --date …`
 - Default `--transcripts-mode missing` skips sittings that already have a ready transcript; use `--transcripts-mode all` to re-parse.
+- `--table memberships` requires `--use-hasadna` (no Knesset OData seat source).
 - Needs `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` in `.env`, and `antiword` (or WSL) for `.doc` self-parse.
 
 Attendance is extracted from transcript parts with headers `נכחו` (committee members) and `חברי הכנסת` (guest MKs who are not committee members) whenever transcripts are synced, and can be backfilled with:

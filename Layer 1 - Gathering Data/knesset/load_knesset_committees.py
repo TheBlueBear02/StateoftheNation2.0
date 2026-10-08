@@ -4,19 +4,20 @@ load_knesset_committees.py
 ==========================
 Sync Knesset 25 committee data into Supabase.
 
-Sources:
-  - Knesset OData ParliamentInfo.svc
+Default sources (Knesset only — Hasadna dumps are stale for committees):
+  - OData ParliamentInfo.svc
       KNS_Committee / KNS_CommitteeSession / KNS_DocumentCommitteeSession
-  - Hasadna dumps (memberships + parsed protocol text/parts)
-      members/mk_individual/*.csv
-      committees/kns_committeesession/*.csv
-      committees/meeting_protocols_{text,parts}/...
-  - Self-parse fallback: download protocol DOC/DOCX from FilePath when
-    Hasadna has no text/parts (requires `antiword` for .doc; WSL/Linux)
+      (documents: session-scoped queries only — never full-scan)
+  - Protocol DOC/DOCX FilePath on fs.knesset.gov.il → local self-parse
+      (requires `antiword` for .doc; WSL/Linux)
+
+Optional legacy (`--use-hasadna`):
+  - Hasadna memberships (OData CommitteeID is empty for K20–25)
+  - Hasadna document CSVs + pre-parsed protocol text/parts
 
 Tables written:
   knesset_committees
-  knesset_committee_memberships
+  knesset_committee_memberships  (only with --use-hasadna)
   knesset_committee_sessions
   knesset_committee_session_documents
   knesset_committee_session_transcripts
@@ -27,7 +28,7 @@ Usage:
   python load_knesset_committees.py --skip-transcripts
   python load_knesset_committees.py --transcripts-mode missing --transcripts-limit 200
   python load_knesset_committees.py --table committees
-  python load_knesset_committees.py --table memberships
+  python load_knesset_committees.py --use-hasadna --table memberships
   python load_knesset_committees.py --knesset 25
   python load_knesset_committees.py --committee "ועדת הכספים" --date 2024-03-12
   python load_knesset_committees.py --table transcripts --committee 977 --date 2024-03-12 --session-oid 2156789
@@ -94,6 +95,10 @@ RETRY_DELAY = 4
 
 DEFAULT_KNESSET_NUM = 25
 PROTOCOL_GROUP_TYPE_ID = 23
+# Cap OData DocumentCommitteeSession queries when Hasadna CSV fails.
+# Full-entity paging is ~120k+ rows and can exceed the GitHub Actions job timeout.
+DEFAULT_ODATA_DOC_SESSION_CAP = 400
+HASADNA_CSV_TIMEOUT_SEC = 600
 ISRAEL_TZ = ZoneInfo("Asia/Jerusalem")
 
 POSITION_TO_SEAT_ROLE = {
@@ -304,9 +309,12 @@ def http_get_text(url: str, timeout: int = 120) -> str:
     return http_get_bytes(url, timeout=timeout).decode("utf-8-sig", errors="replace")
 
 
-def download_csv_rows(url: str) -> list[dict]:
+def download_csv_rows(
+    url: str, *, timeout: int = HASADNA_CSV_TIMEOUT_SEC
+) -> list[dict]:
+    """Download a Hasadna CSV. Document dumps are ~40–55MB; allow a long timeout."""
     log.info("  downloading CSV %s", url)
-    text = http_get_text(url, timeout=300)
+    text = http_get_text(url, timeout=timeout)
     reader = csv.DictReader(io.StringIO(text))
     rows = list(reader)
     log.info("  → %d CSV rows", len(rows))
@@ -895,59 +903,10 @@ def sync_sessions(sb: Client, knesset_num: int) -> dict:
 
 # ── Sync: protocol documents ──────────────────────────────────────────────────
 
-def sync_documents(sb: Client, knesset_num: int) -> dict:
-    """
-    Load protocol documents from Hasadna's document dump (faster than paging
-    all GroupTypeID=23 rows from OData), keep those whose session is already
-    loaded for this knesset.
-    """
-    log.info("── syncing protocol documents (Hasadna, GroupTypeID=%d) ──", PROTOCOL_GROUP_TYPE_ID)
-    session_by_oid = load_id_map(sb, "knesset_committee_sessions", "knesset_session_id")
-    if not session_by_oid:
-        log.warning("  no sessions in DB — skip documents")
-        return {
-            "table": "knesset_committee_session_documents",
-            "upserted": 0,
-            "inserted": 0,
-            "updated": 0,
-            "skipped": 0,
-        }
-
-    # Prefer the live dataservice dump (updated daily) for FilePath coverage;
-    # fall back to the older mirror, then OData.
-    urls = [
-        f"{HASADNA_BASE}/committees/kns_documentcommitteesession_dataservice/"
-        "kns_documentcommitteesession_dataservice.csv",
-        f"{HASADNA_BASE}/committees/kns_documentcommitteesession/"
-        "kns_documentcommitteesession.csv",
-    ]
-    raw: list[dict] = []
-    for url in urls:
-        try:
-            raw = download_csv_rows(url)
-            if raw:
-                break
-        except Exception as exc:
-            log.warning("  document CSV failed (%s): %s", url, exc)
-
-    if not raw:
-        log.warning("  falling back to OData KNS_DocumentCommitteeSession")
-        odata_rows = fetch_odata(
-            "KNS_DocumentCommitteeSession",
-            f"GroupTypeID eq {PROTOCOL_GROUP_TYPE_ID}",
-        )
-        raw = [
-            {
-                "DocumentCommitteeSessionID": r.get("DocumentCommitteeSessionID"),
-                "CommitteeSessionID": r.get("CommitteeSessionID"),
-                "GroupTypeID": r.get("GroupTypeID"),
-                "GroupTypeDesc": r.get("GroupTypeDesc"),
-                "ApplicationDesc": r.get("ApplicationDesc"),
-                "FilePath": r.get("FilePath"),
-            }
-            for r in odata_rows
-        ]
-
+def _protocol_docs_from_raw(
+    raw: list[dict], session_by_oid: dict[int, int]
+) -> dict[int, dict]:
+    """Map DocumentCommitteeSessionID → upsert row for DOC/DOCX protocols."""
     by_doc: dict[int, dict] = {}
     for r in raw:
         group_type = to_int(r.get("GroupTypeID"))
@@ -980,9 +939,144 @@ def sync_documents(sb: Client, knesset_num: int) -> dict:
             "application_desc": app_desc,
             "file_url": file_url,
         }
+    return by_doc
+
+
+def select_session_oids_missing_protocol_docs(
+    sb: Client,
+    session_by_oid: dict[int, int],
+    *,
+    limit: int,
+) -> list[int]:
+    """Newest-first Knesset session OIDs that still lack a protocol DOC/DOCX."""
+    if limit <= 0 or not session_by_oid:
+        return []
+    have_docs = load_protocol_docs_by_session(sb)
+    known_ids = set(session_by_oid.values())
+    missing: list[int] = []
+    for row in load_session_rows(sb):
+        sid = row["id"]
+        if sid not in known_ids or sid in have_docs:
+            continue
+        oid = to_int(row.get("knesset_session_id"))
+        if oid is None:
+            continue
+        missing.append(oid)
+        if len(missing) >= limit:
+            break
+    return missing
+
+
+def fetch_protocol_docs_via_odata_for_sessions(
+    session_oids: list[int],
+) -> list[dict]:
+    """
+    Fetch GroupTypeID=23 docs for specific CommitteeSessionIDs.
+
+    Never page the full KNS_DocumentCommitteeSession entity (~120k+ rows);
+    that fallback previously blew the weekly GitHub Actions 2h timeout.
+    """
+    raw: list[dict] = []
+    total = len(session_oids)
+    for i, oid in enumerate(session_oids, 1):
+        log.info("  OData docs for CommitteeSessionID=%d (%d/%d)…", oid, i, total)
+        odata_rows = fetch_odata(
+            "KNS_DocumentCommitteeSession",
+            f"CommitteeSessionID eq {oid} and GroupTypeID eq {PROTOCOL_GROUP_TYPE_ID}",
+        )
+        for r in odata_rows:
+            raw.append(
+                {
+                    "DocumentCommitteeSessionID": r.get("DocumentCommitteeSessionID"),
+                    "CommitteeSessionID": r.get("CommitteeSessionID"),
+                    "GroupTypeID": r.get("GroupTypeID"),
+                    "GroupTypeDesc": r.get("GroupTypeDesc"),
+                    "ApplicationDesc": r.get("ApplicationDesc"),
+                    "FilePath": r.get("FilePath"),
+                }
+            )
+        time.sleep(0.15)
+    return raw
+
+
+def sync_documents(
+    sb: Client,
+    knesset_num: int,
+    *,
+    odata_session_cap: int = DEFAULT_ODATA_DOC_SESSION_CAP,
+    use_hasadna: bool = False,
+) -> dict:
+    """
+    Load protocol DOC/DOCX FilePaths for sittings already in the DB.
+
+    Default: **session-scoped** Knesset OData for newest sessions still missing
+    a protocol file (never full-scan GroupTypeID=23).
+
+    With ``use_hasadna``: try Hasadna document CSVs first, then OData gap-fill.
+    """
+    source_label = "Hasadna+OData" if use_hasadna else "Knesset OData"
+    log.info(
+        "── syncing protocol documents (%s, GroupTypeID=%d) ──",
+        source_label,
+        PROTOCOL_GROUP_TYPE_ID,
+    )
+    session_by_oid = load_id_map(sb, "knesset_committee_sessions", "knesset_session_id")
+    if not session_by_oid:
+        log.warning("  no sessions in DB — skip documents")
+        return {
+            "table": "knesset_committee_session_documents",
+            "upserted": 0,
+            "inserted": 0,
+            "updated": 0,
+            "skipped": 0,
+        }
+
+    by_doc: dict[int, dict] = {}
+
+    if use_hasadna:
+        urls = [
+            f"{HASADNA_BASE}/committees/kns_documentcommitteesession_dataservice/"
+            "kns_documentcommitteesession_dataservice.csv",
+            f"{HASADNA_BASE}/committees/kns_documentcommitteesession/"
+            "kns_documentcommitteesession.csv",
+        ]
+        raw: list[dict] = []
+        for url in urls:
+            try:
+                raw = download_csv_rows(url)
+                if raw:
+                    break
+            except Exception as exc:
+                log.warning("  document CSV failed (%s): %s", url, exc)
+        by_doc = _protocol_docs_from_raw(raw, session_by_oid) if raw else {}
+        log.info("  Hasadna matched %d protocol docs for loaded sessions", len(by_doc))
+
+    missing = select_session_oids_missing_protocol_docs(
+        sb, session_by_oid, limit=odata_session_cap
+    )
+    # Hasadna rows are not upserted yet — don't OData-refetch those sessions.
+    covered_session_ids = {d["session_id"] for d in by_doc.values()}
+    if covered_session_ids:
+        missing = [
+            oid
+            for oid in missing
+            if session_by_oid.get(oid) not in covered_session_ids
+        ]
+    # Default path: OData is the sole document source for missing sittings.
+    # With --use-hasadna: OData only gap-fills what the CSV missed.
+    if missing:
+        log.info(
+            "  OData session-scoped fetch: %d newest sessions missing docs (cap=%d)",
+            len(missing),
+            odata_session_cap,
+        )
+        odata_raw = fetch_protocol_docs_via_odata_for_sessions(missing)
+        by_doc.update(_protocol_docs_from_raw(odata_raw, session_by_oid))
+    else:
+        log.info("  no sessions missing protocol docs — skip OData")
 
     rows = list(by_doc.values())
-    log.info("  %d protocol docs match loaded K%d sessions", len(rows), knesset_num)
+    log.info("  %d protocol docs to upsert for K%d", len(rows), knesset_num)
     return upsert(
         sb, "knesset_committee_session_documents", rows, "knesset_document_id"
     )
@@ -1410,13 +1504,15 @@ def sync_transcripts(
     mode: str,
     limit: int | None,
     session_ids: list[int] | None = None,
+    use_hasadna: bool = False,
 ) -> dict:
     targeted = session_ids is not None
     log.info(
-        "── syncing transcripts/parts (mode=%s, limit=%s, targeted=%s) ──",
+        "── syncing transcripts/parts (mode=%s, limit=%s, targeted=%s, source=%s) ──",
         mode,
         "n/a" if targeted else (limit if limit is not None else "none"),
         targeted,
+        "Hasadna+DOC" if use_hasadna else "Knesset DOC self-parse",
     )
     if mode == "none":
         return {
@@ -1428,7 +1524,9 @@ def sync_transcripts(
             "parts_written": 0,
         }
 
-    file_index = load_hasadna_session_file_index(knesset_num)
+    file_index = (
+        load_hasadna_session_file_index(knesset_num) if use_hasadna else {}
+    )
     docs_by_session = load_protocol_docs_by_session(sb)
     sessions = load_session_rows(sb, session_ids=session_ids)
     if targeted:
@@ -1449,7 +1547,7 @@ def sync_transcripts(
             already_ready += 1
             continue
         oid = sess["knesset_session_id"]
-        has_hasadna = oid in file_index
+        has_hasadna = use_hasadna and oid in file_index
         has_doc = sess["id"] in docs_by_session
         if not has_hasadna and not has_doc:
             no_source += 1
@@ -1483,9 +1581,9 @@ def sync_transcripts(
                 "already_ready": already_ready,
             }
         raise RuntimeError(
-            "targeted session(s) found but have neither Hasadna parts nor a "
-            "protocol DOC URL — wait for Knesset/Hasadna to publish the protocol, "
-            "or re-run after `--table documents`"
+            "targeted session(s) found but have no protocol DOC URL — "
+            "wait for Knesset to publish the protocol, or re-run after "
+            "`--table documents`"
         )
 
     ok = 0
@@ -1499,25 +1597,45 @@ def sync_transcripts(
     for i, sess in enumerate(candidates, start=1):
         session_id = sess["id"]
         oid = sess["knesset_session_id"]
-        meta = file_index.get(oid)
+        meta = file_index.get(oid) if use_hasadna else None
         doc = docs_by_session.get(session_id)
 
+        # Always prefer live Knesset DOC; Hasadna parts only as opt-in gap-fill.
+        use_doc = doc is not None
+        use_hasadna_parts = (not use_doc) and use_hasadna and meta is not None
+        source_label = "parsed_file" if use_doc else "hasadna"
         log.info(
             "  [%d/%d] session oid=%s db_id=%s source=%s",
             i,
             len(candidates),
             oid,
             session_id,
-            "hasadna" if meta else "parsed_file",
+            source_label,
         )
 
         full_text = None
         parts_rows: list[dict] = []
         errors: list[str] = []
-        source = "hasadna"
+        source = "parsed_file"
         document_id: int | None = None
 
-        if meta:
+        if use_doc:
+            source = "parsed_file"
+            document_id = doc["id"]
+            try:
+                full_text, parts_rows = parse_protocol_url(doc["file_url"])
+            except ProtocolParseError as exc:
+                errors.append(str(exc))
+                log.warning("    self-parse failed: %s", exc)
+            except Exception as exc:
+                errors.append(str(exc))
+                log.warning("    self-parse error: %s", exc)
+            if not full_text and not parts_rows and use_hasadna and meta:
+                log.info("    DOC self-parse empty — trying Hasadna parts")
+                use_hasadna_parts = True
+
+        if use_hasadna_parts and meta and not full_text and not parts_rows:
+            source = "hasadna"
             parts_path = meta.get("parts_parsed_filename")
             text_path = meta.get("text_parsed_filename")
             try:
@@ -1537,23 +1655,6 @@ def sync_transcripts(
             except Exception as exc:
                 errors.append(str(exc))
                 log.warning("    Hasadna fetch failed: %s", exc)
-
-            # If Hasadna files are listed but empty/broken, fall through to DOC.
-            if not full_text and not parts_rows and doc:
-                log.info("    Hasadna empty — falling back to DOC self-parse")
-                meta = None
-
-        if not meta and doc:
-            source = "parsed_file"
-            document_id = doc["id"]
-            try:
-                full_text, parts_rows = parse_protocol_url(doc["file_url"])
-            except ProtocolParseError as exc:
-                errors.append(str(exc))
-                log.warning("    self-parse failed: %s", exc)
-            except Exception as exc:
-                errors.append(str(exc))
-                log.warning("    self-parse error: %s", exc)
 
         if not full_text and not parts_rows:
             upsert_transcript_row(
@@ -1648,10 +1749,16 @@ def run(
     committee: str | None = None,
     session_date: str | None = None,
     session_oid: int | None = None,
+    odata_doc_session_cap: int = DEFAULT_ODATA_DOC_SESSION_CAP,
+    use_hasadna: bool = False,
 ) -> dict:
     sb = get_supabase()
     started = datetime.now(timezone.utc)
-    summary: dict = {"knesset_num": knesset_num, "steps": {}}
+    summary: dict = {
+        "knesset_num": knesset_num,
+        "use_hasadna": use_hasadna,
+        "steps": {},
+    }
     targeted = committee is not None and session_date is not None
 
     if targeted and table == "all":
@@ -1666,6 +1773,25 @@ def run(
         want.discard("transcripts")
         transcripts_mode = "none"
 
+    # OData has no CommitteeID for K20–25; seat rosters only via Hasadna.
+    if "memberships" in want and not use_hasadna:
+        if table == "memberships":
+            raise RuntimeError(
+                "Committee memberships require --use-hasadna "
+                "(Knesset OData CommitteeID is empty for current knessets). "
+                "Existing roster rows in Supabase are left unchanged."
+            )
+        log.info(
+            "── skipping memberships (default Knesset-only path; "
+            "pass --use-hasadna to refresh from Hasadna CSVs) ──"
+        )
+        summary["steps"]["memberships"] = {
+            "table": "knesset_committee_memberships",
+            "skipped": True,
+            "reason": "hasadna_disabled",
+        }
+        want.discard("memberships")
+
     target_session_ids: list[int] | None = None
 
     try:
@@ -1676,7 +1802,12 @@ def run(
         if "sessions" in want:
             summary["steps"]["sessions"] = sync_sessions(sb, knesset_num)
         if "documents" in want:
-            summary["steps"]["documents"] = sync_documents(sb, knesset_num)
+            summary["steps"]["documents"] = sync_documents(
+                sb,
+                knesset_num,
+                odata_session_cap=odata_doc_session_cap,
+                use_hasadna=use_hasadna,
+            )
 
         if targeted:
             committee_row, session_rows = resolve_target_session_ids(
@@ -1705,6 +1836,7 @@ def run(
                 mode=transcripts_mode,
                 limit=transcripts_limit,
                 session_ids=target_session_ids,
+                use_hasadna=use_hasadna,
             )
         if "attendance" in want:
             summary["steps"]["attendance"] = sync_attendance_from_existing_parts(
@@ -1765,7 +1897,15 @@ def main() -> None:
     parser.add_argument(
         "--skip-transcripts",
         action="store_true",
-        help="Skip Hasadna transcript/parts download",
+        help="Skip transcript/parts download and self-parse",
+    )
+    parser.add_argument(
+        "--use-hasadna",
+        action="store_true",
+        help=(
+            "Opt into stale Hasadna dumps for memberships / document CSVs / "
+            "pre-parsed parts. Default is Knesset OData + DOC self-parse only."
+        ),
     )
     parser.add_argument(
         "--transcripts-mode",
@@ -1805,6 +1945,16 @@ def main() -> None:
             "Without it, all sittings for --committee on --date are fetched."
         ),
     )
+    parser.add_argument(
+        "--odata-doc-session-cap",
+        type=int,
+        default=DEFAULT_ODATA_DOC_SESSION_CAP,
+        help=(
+            "Max newest sessions missing a protocol DOC to query via OData "
+            f"(default {DEFAULT_ODATA_DOC_SESSION_CAP}; 0 disables). "
+            "Never full-scans DocumentCommitteeSession."
+        ),
+    )
     args = parser.parse_args()
 
     has_committee = args.committee is not None
@@ -1833,6 +1983,8 @@ def main() -> None:
             committee=args.committee,
             session_date=args.session_date,
             session_oid=args.session_oid,
+            odata_doc_session_cap=max(0, args.odata_doc_session_cap),
+            use_hasadna=args.use_hasadna,
         )
     except RuntimeError as exc:
         log.error("%s", exc)
