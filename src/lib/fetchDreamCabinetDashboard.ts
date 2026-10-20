@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   DREAM_ALL_OFFICES,
   type DreamOfficeId,
@@ -62,6 +63,43 @@ export type DreamCabinetCandidateMetaRow = {
 export type DreamCabinetPickActivityRow = {
   client_id: string
   updated_at: string
+}
+
+/** PostgREST default page size; dream picks exceed one page. */
+export const DREAM_CABINET_PICKS_PAGE_SIZE = 1000
+
+/**
+ * Load every dream_cabinet_picks activity row for an election, paging past the
+ * ~1000-row PostgREST cap. Without this, uniqueVoters collapses to ~first-page
+ * clients only (e.g. ~147 from ~1000 seats when most browsers fill ~7 offices).
+ */
+export async function fetchAllDreamCabinetPickActivity(
+  client: SupabaseClient,
+  electionId: number,
+): Promise<{ rows: DreamCabinetPickActivityRow[]; error: string | null }> {
+  const rows: DreamCabinetPickActivityRow[] = []
+  let from = 0
+
+  for (;;) {
+    const to = from + DREAM_CABINET_PICKS_PAGE_SIZE - 1
+    const { data, error } = await client
+      .from('dream_cabinet_picks')
+      .select('client_id, updated_at')
+      .eq('election_id', electionId)
+      .order('id', { ascending: true })
+      .range(from, to)
+
+    if (error) {
+      return { rows: [], error: error.message }
+    }
+
+    const chunk = (data ?? []) as DreamCabinetPickActivityRow[]
+    rows.push(...chunk)
+    if (chunk.length < DREAM_CABINET_PICKS_PAGE_SIZE) break
+    from += DREAM_CABINET_PICKS_PAGE_SIZE
+  }
+
+  return { rows, error: null }
 }
 
 function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {

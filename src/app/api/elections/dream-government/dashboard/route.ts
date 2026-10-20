@@ -2,8 +2,8 @@ import type { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
   buildDreamCabinetDashboard,
+  fetchAllDreamCabinetPickActivity,
   type DreamCabinetCandidateMetaRow,
-  type DreamCabinetPickActivityRow,
 } from '@/lib/fetchDreamCabinetDashboard'
 import type { DreamCabinetStatsRpcRow } from '@/lib/fetchDreamCabinetStats'
 import { isDev } from '@/lib/runtimeEnv'
@@ -56,22 +56,18 @@ export async function GET(request: NextRequest) {
     admin.rpc('get_dream_cabinet_pick_stats', {
       p_election_id: electionId,
     }),
-    admin
-      .from('dream_cabinet_picks')
-      .select('client_id, updated_at')
-      .eq('election_id', electionId),
+    fetchAllDreamCabinetPickActivity(admin, electionId),
   ])
 
   if (statsResult.error) {
     return jsonError(statsResult.error.message, 500)
   }
   if (activityResult.error) {
-    return jsonError(activityResult.error.message, 500)
+    return jsonError(activityResult.error, 500)
   }
 
   const statsRows = (statsResult.data ?? []) as DreamCabinetStatsRpcRow[]
-  const activityRows = (activityResult.data ??
-    []) as DreamCabinetPickActivityRow[]
+  const activityRows = activityResult.rows
 
   const candidateIds = [
     ...new Set(

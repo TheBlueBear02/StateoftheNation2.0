@@ -563,7 +563,7 @@ Anonymous per-seat votes from `/elections/dream-government`. One current pick pe
 
 **RLS:** enabled with **no** anon/authenticated policies on the base table (hides `client_id`). Writes via service role from `POST /api/elections/dream-government/submit`. Aggregates via security-definer RPC `get_dream_cabinet_pick_stats(p_election_id)` (executable by anon; also used by `GET /api/elections/dream-government/stats` with the service key).
 
-**API:** public Next routes under `src/app/api/elections/dream-government/` for submit + stats (no edit secret). Dev-only dashboard at `GET /api/elections/dream-government/dashboard` (`NODE_ENV=development`) reads the base table via service role for unique voters and daily activity.
+**API:** public Next routes under `src/app/api/elections/dream-government/` for submit + stats (no edit secret). Dev-only dashboard at `GET /api/elections/dream-government/dashboard` (`NODE_ENV=development`) reads the base table via service role for unique voters and daily activity, paging past PostgREST’s ~1000-row default (`fetchAllDreamCabinetPickActivity`) so unique `client_id` counts are not truncated.
 
 ---
 
