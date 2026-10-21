@@ -4,6 +4,9 @@ import { JsonLd } from '@/components/seo/JsonLd'
 import { loadElectionPartyPage } from '@/lib/loadElectionPartyPage'
 import { getDefaultOgImageUrl, getSiteUrl } from '@/lib/runtimeEnv'
 
+/** Keep candidate photos / party copy in sync with Supabase after edits. */
+export const revalidate = 60
+
 type Props = {
   params: Promise<{ partyId: string }>
 }

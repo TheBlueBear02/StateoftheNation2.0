@@ -20,6 +20,16 @@
   gap: 0.75rem;
 }
 
+.dream-dash__gate {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 28rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-white, #fff);
+}
+
 .dream-dash__hero-row {
   display: flex;
   flex-wrap: wrap;

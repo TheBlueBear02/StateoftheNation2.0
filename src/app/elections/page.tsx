@@ -5,6 +5,9 @@ import { getSiteUrl } from '@/lib/runtimeEnv'
 import { createServerSupabaseClient } from '@/lib/supabaseServer'
 import { ElectionsPage } from '@/views/ElectionsPage'
 
+/** Party-card leader photos come from SSR; refresh so edits are not stuck forever. */
+export const revalidate = 60
+
 export const metadata: Metadata = {
   title: 'בחירות 2026',
   description:
