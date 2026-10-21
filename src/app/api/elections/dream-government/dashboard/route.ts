@@ -6,9 +6,13 @@ import {
   type DreamCabinetPickActivityRow,
 } from '@/lib/fetchDreamCabinetDashboard'
 import type { DreamCabinetStatsRpcRow } from '@/lib/fetchDreamCabinetStats'
-import { isDev } from '@/lib/runtimeEnv'
 import { ACTIVE_ELECTION_YEAR } from '@/lib/supabase'
-import { getServiceEnv, jsonError, jsonOk } from '@/server/apiCommon'
+import {
+  getServiceEnv,
+  jsonError,
+  jsonOk,
+  requirePipelineSecret,
+} from '@/server/apiCommon'
 
 function getAdminClient() {
   const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = getServiceEnv()
@@ -19,9 +23,8 @@ function getAdminClient() {
 }
 
 export async function GET(request: NextRequest) {
-  if (!isDev) {
-    return jsonError('זמין רק ב־development', 403)
-  }
+  const auth = requirePipelineSecret(request)
+  if (auth.error) return auth.error
 
   const admin = getAdminClient()
   if (!admin) {

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import path from 'node:path'
 import type { NextRequest } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import {
   assertPipelineEnabled,
   emptyToNull,
@@ -10,6 +11,15 @@ import {
   requireElectionsSecret,
   runPythonScript,
 } from '@/server/apiCommon'
+
+/** Bust cached `/elections` party cards and the party detail page after DB edits. */
+function revalidateElectionPages(partyId: number) {
+  revalidatePath('/elections')
+  revalidatePath('/elections/lists')
+  if (Number.isInteger(partyId) && partyId > 0) {
+    revalidatePath(`/elections/${partyId}`)
+  }
+}
 
 export const maxDuration = 300
 
@@ -438,6 +448,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       const body = (await request.json()) as ElectionCandidateEditInput
       const result = await updateWithClient(admin, body)
+      if (result.ok) {
+        revalidateElectionPages(Number(body.partyId))
+      }
       return jsonOk(result, result.ok ? 200 : 400)
     }
 
@@ -449,6 +462,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       const body = (await request.json()) as ElectionPartyEditInput
       const result = await updatePartyWithClient(admin, body)
+      if (result.ok) {
+        revalidateElectionPages(Number(body.partyId))
+      }
       return jsonOk(result, result.ok ? 200 : 400)
     }
 
@@ -460,6 +476,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       const body = (await request.json()) as DeleteCandidateInput
       const result = await deleteCandidateWithClient(admin, body)
+      if (result.ok) {
+        revalidateElectionPages(Number(body.partyId))
+      }
       return jsonOk(result, result.ok ? 200 : 400)
     }
 

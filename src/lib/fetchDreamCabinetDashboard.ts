@@ -6,6 +6,7 @@ import {
   buildDreamCabinetStats,
   type DreamCabinetStatsRpcRow,
 } from './fetchDreamCabinetStats'
+import { getPipelineEditSecret } from './runtimeEnv'
 
 export const DREAM_DASHBOARD_ACTIVITY_DAYS = 30
 export const DREAM_DASHBOARD_LEADER_LIMIT = 10
@@ -218,8 +219,18 @@ export function buildDreamCabinetDashboard(input: {
 }
 
 export async function fetchDreamCabinetDashboard(): Promise<DreamCabinetDashboard> {
+  const secret = getPipelineEditSecret()
+
   const response = await fetch('/api/elections/dream-government/dashboard', {
     method: 'GET',
+    headers: {
+      ...(secret
+        ? {
+            'X-Pipeline-Edit-Secret': secret,
+            'X-Elections-Edit-Secret': secret,
+          }
+        : {}),
+    },
   })
   const body = (await response.json()) as {
     ok?: boolean

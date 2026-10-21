@@ -12,7 +12,7 @@ Frontend module for the 2026 elections. It has a party index at `/elections`, a 
 | `/elections/polls` | `src/views/ElectionsPollsPage.tsx` | Weighted poll averages, trend chart, poll table |
 | `/elections/lists` | `src/views/ElectionListsGamePage.tsx` | Client-only list rating game (green / orange / red) with fit score and share image |
 | `/elections/dream-government` | `src/views/DreamGovernmentPage.tsx` | Dream cabinet builder (PM + 6 offices), clipboard PNG share, site-wide pick % badges |
-| `/elections/dream-government/dashboard` | `src/views/DreamGovernmentDashboardPage.tsx` | Dev-only ops dashboard: unique voters, daily activity, per-office leaderboards |
+| `/elections/dream-government/dashboard` | `src/views/DreamGovernmentDashboardPage.tsx` | Password-gated ops dashboard: unique voters, daily activity, per-office leaderboards |
 | `/elections/edit` | `src/views/ElectionCandidatesEditPage.tsx` | Password-gated editor for existing candidate + person fields |
 | `/elections/[partyId]` | `src/views/ElectionPartyPage.tsx` | Detail page for one party, keyed by `election_parties.id` |
 
@@ -28,7 +28,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/views/ElectionPartyPage.tsx` / `.css` | Party detail layout and section styles |
 | `src/views/ElectionListsGamePage.tsx` / `.css` | List rating game: pick party → rate candidates → fit report + share PNG |
 | `src/views/DreamGovernmentPage.tsx` / `.css` | Dream cabinet: pick PM + 6 ministers, share PNG, show site-wide pick % badges |
-| `src/views/DreamGovernmentDashboardPage.tsx` / `.css` | Dev-only dashboard: unique voters, 30-day activity chart, per-office leaderboards |
+| `src/views/DreamGovernmentDashboardPage.tsx` / `.css` | Password-gated dashboard: unique voters, 30-day activity chart, per-office leaderboards |
 | `src/views/ElectionCandidatesEditPage.tsx` / `.css` | Password gate, party picker, per-candidate edit forms, and party pipeline panel |
 | `src/components/elections/lists/ListPartyPicker.tsx` | Confirmed-party picker with full-bleed list-leader photo cards |
 | `src/components/elections/lists/ListRatingStep.tsx` | Tinder-style one-card rating deck with progress and action buttons |
@@ -49,7 +49,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/hooks/useDreamCabinetDashboard.ts` | Loads / refetches dream-gov dashboard aggregates (dev only) |
 | `src/app/api/elections/dream-government/submit/route.ts` | Public upsert of filled seats (service role; no edit secret) |
 | `src/app/api/elections/dream-government/stats/route.ts` | Public aggregate GET via `get_dream_cabinet_pick_stats` RPC |
-| `src/app/api/elections/dream-government/dashboard/route.ts` | Dev-only dashboard GET (service role; unique voters + activity + leaderboards) |
+| `src/app/api/elections/dream-government/dashboard/route.ts` | Password-gated dashboard GET (service role + pipeline secret; unique voters + activity + leaderboards) |
 | `src/lib/inlineImagesForExport.ts` | Clones the share card off-DOM, inlines `<img>` sources as data URLs, then `toPng` (avoids React resetting remote src mid-export) |
 | `src/lib/sharePngImage.ts` | Share helper: Android/Samsung prefer Web Share (skip unreliable image clipboard); iOS/desktop use Safari-safe `ClipboardItem(Promise)`; fallback open-image / download |
 | `src/app/api/image-proxy/route.ts` | Same-origin image proxy for share-export CORS. Allows **any** public http(s) image host (candidate photos live on many domains: Wikimedia, `raw.githubusercontent.com`, `fs.knesset.gov.il`, campaign sites, etc.) with an SSRF guard that blocks localhost and private/internal IPs (incl. DNS resolution) |
@@ -86,7 +86,9 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 
 `/elections` and `/elections/[partyId]` Server Components call `fetchElectionParties` / `loadElectionPartyPage` (anon key) and pass results into the client views so party cards, descriptions, and candidate lists appear in the first HTML. Hooks skip the browser refetch when initial data is provided. `useAllElectionMapPins` on the index remains client-fetched after parties hydrate.
 
-`fetchElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר, הרשימה המשותפת (replacing separate חד״ש־תע״ל / בל״ד cards), עמך ישראל, המילואימניקים, and כחול לבן; יש עתיד, חד״ש־תע״ל, בל״ד, and נועם stay `polled_only` (still in polls, not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero has no subtitle; under the election date it links to `/elections/polls` (weighted poll averages), `/elections/lists` (list rating game), and `/elections/dream-government` (dream cabinet). A `DreamGovernmentPromo` section also appears on `/elections` (above the overview map) and as the first project teaser on the homepage (before `ListsGamePromo`).
+Both public party routes set `export const revalidate = 60` (ISR) so leader photos and candidate lists do not stay frozen after a deploy. Successful `/api/elections/update-candidate`, `update-party`, and `delete-candidate` calls also run `revalidatePath` on `/elections`, `/elections/lists`, and `/elections/[partyId]` so edits from `/elections/edit` refresh the party-card grid immediately (the index card uses `people.image_url` of `list_position = 1`, same field as the candidate list).
+
+`fetchElectionParties` first tries to load `elections.year = 2026` for page title/date metadata. All party queries filter `party_status = 'confirmed'` so historical and polled_only rows (seeded for the polls pipeline) never appear on `/elections`. Confirmed parties include ישר, הרשימה המשותפת (replacing separate חד״ש־תע״ל / בל״ד cards), עמך ישראל, and המילואימניקים; יש עתיד, כחול לבן, חד״ש־תע״ל, בל״ד, and נועם stay `polled_only` (still in polls, not shown on the elections index). `ElectionsPage.tsx` uses `elections.date` for the hero countdown (`עוד X יום לבחירות`). The hero has no subtitle; under the election date it links to `/elections/polls` (weighted poll averages), `/elections/lists` (list rating game), and `/elections/dream-government` (dream cabinet). A `DreamGovernmentPromo` section also appears on `/elections` (above the overview map) and as the first project teaser on the homepage (before `ListsGamePromo`).
 
 `fetchElectionCandidates(client, partyId)` / `useElectionCandidates(partyId)` load ordered `election_candidates` joined to `people`. They then query `knesset_memberships` for those `person_id`s with `start_date` and `end_date`, merge overlapping terms with `computeMemberTenureStats`, and attach `totalDaysInKnesset` / `totalYearsInKnesset` to each candidate and map pin:
 
@@ -142,12 +144,12 @@ Interactive dream cabinet builder. Users pick PM + 6 ministers from confirmed pa
 | `src/hooks/useDreamCabinetStats.ts` | Load/refetch site aggregates; `applyLocalPicks` for instant post-share bars |
 | `src/app/api/elections/dream-government/submit/route.ts` | Public upsert (service role) |
 | `src/app/api/elections/dream-government/stats/route.ts` | Public aggregate GET (service role RPC) |
-| `src/app/api/elections/dream-government/dashboard/route.ts` | Dev-only dashboard GET (unique voters, daily activity, enriched leaderboards) |
-| `src/views/DreamGovernmentDashboardPage.tsx` | Dev-only UI at `/elections/dream-government/dashboard` (`notFound` when `NODE_ENV !== 'development'`) |
+| `src/app/api/elections/dream-government/dashboard/route.ts` | Password-gated dashboard GET (unique voters, daily activity, enriched leaderboards) |
+| `src/views/DreamGovernmentDashboardPage.tsx` | Password-gated UI at `/elections/dream-government/dashboard` (same site secret as `/elections/edit`) |
 
 ## Dream Government Dashboard (`/elections/dream-government/dashboard`)
 
-Dev-only ops view (`isDev` / `NODE_ENV === 'development'`). Production builds return 404; the API returns 403. Open directly at `/elections/dream-government/dashboard` while running `npm run dev`. `noindex`, excluded from sitemap, disallowed in `robots.ts`.
+Ops view available in production and local, gated by the shared pipeline/site password (`PipelineUnlockGate` → `PIPELINE_EDIT_SECRET` / `NEXT_PUBLIC_PIPELINE_EDIT_SECRET`, with fallbacks to elections/knesset edit secrets). Unlock is stored in `sessionStorage` under `pipeline-unlocked` (shared with `/elections/edit` and other edit pages). The dashboard API requires the same secret via `X-Pipeline-Edit-Secret` / `X-Elections-Edit-Secret`. `noindex`, excluded from sitemap, disallowed in `robots.ts`.
 
 1. **KPIs** — unique `client_id` count across `dream_cabinet_picks`, plus total active pick rows.
 2. **Activity chart** — last 30 Israel-calendar days; bars = unique clients who updated any pick that day (`updated_at`, stored as Israel local wall-clock); tooltip also shows pick-write count.
@@ -251,7 +253,7 @@ When a candidate's `city` is edited and saved, `latitude` / `longitude` are clea
 
 Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `ELECTIONS_EDIT_SECRET` / `NEXT_PUBLIC_ELECTIONS_EDIT_SECRET` in `.env`.
 
-**Saves (dev + production):** `/elections/edit` always writes through `/api/elections/update-candidate`, `/api/elections/delete-candidate`, and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which use `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret` / `x-pipeline-edit-secret`. These three routes are available in production without `ENABLE_PIPELINE_API`; Python pipeline/enrich/geocode routes stay dev-only (or opt-in). Anon has SELECT only on elections tables — no anon UPDATE/DELETE. Hosting must set `SUPABASE_SERVICE_KEY` and the edit secret env vars.
+**Saves (dev + production):** `/elections/edit` always writes through `/api/elections/update-candidate`, `/api/elections/delete-candidate`, and `/api/elections/update-party` (`src/app/api/elections/[...path]/route.ts`), which use `SUPABASE_SERVICE_KEY` server-side (never exposed to the browser). Auth header: `x-elections-edit-secret` / `x-pipeline-edit-secret`. These three routes are available in production without `ENABLE_PIPELINE_API`; Python pipeline/enrich/geocode routes stay dev-only (or opt-in). Anon has SELECT only on elections tables — no anon UPDATE/DELETE. Hosting must set `SUPABASE_SERVICE_KEY` and the edit secret env vars. After a successful save/delete, the API revalidates `/elections`, `/elections/lists`, and the party detail path so SSR party cards and candidate lists pick up the new `people.image_url` / party fields without waiting for the 60s ISR window.
 
 ## Seats Trend (party hero)
 
