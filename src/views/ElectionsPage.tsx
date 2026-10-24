@@ -145,6 +145,11 @@ export function ElectionsPage({
                     בנו את ממשלת החלומות שלכם
                   </Link>
                 </p>
+                <p className="elections-page__link">
+                  <Link href="/elections/government-borders">
+                    שרטטו את גבולות הגזרה לממשלה
+                  </Link>
+                </p>
               </nav>
             </header>
           </div>

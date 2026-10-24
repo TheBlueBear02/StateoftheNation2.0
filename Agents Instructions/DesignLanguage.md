@@ -75,6 +75,7 @@ Parent section / Section page / Current item
 | Page | Breadcrumb |
 |------|------------|
 | `/elections/polls` | `בחירות 2026` → `/elections` / סקרי מנדטים |
+| `/elections/government-borders` | `בחירות 2026` → `/elections` / ג"ג · גבולות גזרה |
 | `/elections/lists` | `בחירות 2026` → `/elections` / `משחק הרשימות` → `/elections/lists` |
 | `/elections/lists` (party selected) | … / משחק הרשימות / {party} |
 | `/elections/:partyId` | `בחירות 2026` → `/elections` / {party} |

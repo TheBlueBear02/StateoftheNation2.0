@@ -265,8 +265,11 @@ async function fetchUrlAsDataUrl(
 
 function replaceImageWithInitials(img: HTMLImageElement): void {
   const initials = img.getAttribute('data-initials')?.trim()
+  const fallbackClass =
+    img.getAttribute('data-fallback-class')?.trim() ||
+    'dream-share-slot__initials'
   const span = document.createElement('span')
-  span.className = 'dream-share-slot__initials'
+  span.className = fallbackClass
   span.setAttribute('aria-hidden', 'true')
   span.textContent = initials && initials.length > 0 ? initials : '?'
   img.replaceWith(span)

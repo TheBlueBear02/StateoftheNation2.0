@@ -1,11 +1,13 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { toPng } from 'html-to-image'
 import type { ElectionCandidate } from '../../../hooks/useElectionCandidates'
 import type { ElectionParty } from '../../../lib/supabase'
 import { getInitials } from '../../../lib/hemicycle'
+import { exportNodeToPng } from '../../../lib/inlineImagesForExport'
 import type { CandidateRating } from '../../../lib/listFitScore'
+import { getSiteUrl } from '../../../lib/runtimeEnv'
+import { sharePngImage } from '../../../lib/sharePngImage'
 import { ShareableListReport } from './ShareableListReport'
 
 type ListFitReportProps = {
@@ -15,43 +17,6 @@ type ListFitReportProps = {
   score: number
   counts: { green: number; orange: number; red: number }
   onRestart: () => void
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement('a')
-  link.download = filename
-  link.href = dataUrl
-  link.click()
-}
-
-async function shareOrDownload(
-  dataUrl: string,
-  filename: string,
-): Promise<'shared' | 'downloaded'> {
-  const response = await fetch(dataUrl)
-  const blob = await response.blob()
-  const file = new File([blob], filename, { type: 'image/png' })
-
-  if (
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files: [file] })
-  ) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: 'משחק הרשימות · מצב האומה',
-        text: 'בדקו עד כמה הרשימה מתאימה לכם',
-      })
-      return 'shared'
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return 'shared'
-      }
-    }
-  }
-
-  downloadDataUrl(dataUrl, filename)
-  return 'downloaded'
 }
 
 export function ListFitReport({
@@ -76,13 +41,32 @@ export function ListFitReport({
     setExportError(null)
 
     try {
-      const dataUrl = await toPng(node, {
-        cacheBust: true,
-        pixelRatio: 2,
-        backgroundColor: '#0a1628',
+      const shareResult = await sharePngImage({
+        filename,
+        shareTitle: 'משחק הרשימות · מצב האומה',
+        shareText: `בדקו עד כמה רשימת ${displayName} מתאימה לכם\n${getSiteUrl()}/elections/lists`,
+        makeBlob: async () => {
+          const dataUrl = await exportNodeToPng(node, {
+            pixelRatio: 2,
+            backgroundColor: '#0a1628',
+            skipAutoScale: true,
+          })
+          const response = await fetch(dataUrl)
+          return response.blob()
+        },
       })
-      await shareOrDownload(dataUrl, filename)
-    } catch {
+
+      if (!shareResult.ok) {
+        throw new Error(shareResult.error)
+      }
+
+      if (shareResult.method === 'download') {
+        setExportError(
+          'התמונה נפתחה או הורדה — במובייל לחצו לחיצה ארוכה כדי לשתף או לשמור',
+        )
+      }
+    } catch (error) {
+      console.error('[elections/lists] share export failed', error)
       setExportError('לא ניתן לייצא את התמונה. נסו שוב או בדקו חיבור לתמונות.')
     } finally {
       setExporting(false)

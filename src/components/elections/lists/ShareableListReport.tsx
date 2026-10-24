@@ -64,8 +64,9 @@ export const ShareableListReport = forwardRef<
                 <img
                   src={candidate.imageUrl}
                   alt=""
-                  crossOrigin="anonymous"
                   className="lists-share-card__face"
+                  data-initials={getInitials(candidate.fullName)}
+                  data-fallback-class="lists-share-card__face lists-share-card__face--initials"
                 />
               ) : (
                 <span className="lists-share-card__face lists-share-card__face--initials">

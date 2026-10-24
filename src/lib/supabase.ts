@@ -189,6 +189,7 @@ export type ElectionCandidatePerson = {
   birth_date: string | null
   gender: string | null
   wikipedia_url: string | null
+  knesset_person_id: number | null
 }
 
 export type ElectionCandidateRow = {
