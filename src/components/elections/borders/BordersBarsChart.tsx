@@ -2,14 +2,15 @@
 
 import { getInitials } from '../../../lib/hemicycle'
 import {
+  bordersAvatarObjectPosition,
   isPartyInRange,
   type BordersPartyColumn,
   type BordersRange,
 } from '../../../lib/governmentBorders'
 import { displayBlocBarGradientForParty } from '../../../lib/pollChartData'
 
-const PLOT_HEIGHT = 280
-const MIN_BAR_HEIGHT = 40
+/** Floor so tiny parties still show a visible stub (percent of plot). */
+const MIN_BAR_PCT = 14
 
 type BordersBarsChartProps = {
   columns: BordersPartyColumn[]
@@ -25,6 +26,7 @@ function PartyAvatar({ column }: { column: BordersPartyColumn }) {
   const name = column.leader?.fullName || column.partyShortName
 
   if (leaderImage) {
+    const objectPosition = bordersAvatarObjectPosition(column)
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
@@ -35,6 +37,7 @@ function PartyAvatar({ column }: { column: BordersPartyColumn }) {
         height={48}
         loading="lazy"
         decoding="async"
+        style={objectPosition ? { objectPosition } : undefined}
       />
     )
   }
@@ -83,15 +86,14 @@ export function BordersBarsChart({
 
       <div
         className="borders-bars__plot"
-        style={{ height: PLOT_HEIGHT }}
         role="img"
-        aria-label="מנדטים לפי מפלגה לפי הציר הנבחר"
+        aria-label="מנדטים לפי מפלגה על ציר גבולות הגזרה"
       >
         {columns.map((column, index) => {
           const inRange = isPartyInRange(index, range)
-          const height = Math.max(
-            MIN_BAR_HEIGHT,
-            (column.seats / maxSeats) * PLOT_HEIGHT,
+          const heightPct = Math.max(
+            MIN_BAR_PCT,
+            (column.seats / maxSeats) * 100,
           )
           return (
             <div
@@ -103,21 +105,26 @@ export function BordersBarsChart({
               }
               style={{ ['--col-index' as string]: index }}
             >
-              <div
-                className="borders-bars__bar"
-                style={{
-                  height,
-                  background: displayBlocBarGradientForParty({
-                    partyName: column.partyName,
-                    partyShortName: column.partyShortName,
-                    bloc: column.bloc,
-                  }),
-                }}
-                title={`${column.partyShortName}: ${column.seats}`}
-              >
-                <span className="borders-bars__seats">{column.seats}</span>
+              <div className="borders-bars__bar-slot">
+                <div
+                  className="borders-bars__bar"
+                  style={{
+                    height: `${heightPct}%`,
+                    background: displayBlocBarGradientForParty({
+                      partyName: column.partyName,
+                      partyShortName: column.partyShortName,
+                      bloc: column.bloc,
+                    }),
+                  }}
+                  title={`${column.partyShortName}: ${column.seats}`}
+                >
+                  <span className="borders-bars__seats">{column.seats}</span>
+                </div>
               </div>
-              <div className="borders-bars__avatar" title={column.partyShortName}>
+              <div
+                className="borders-bars__avatar"
+                title={column.partyShortName}
+              >
                 <PartyAvatar column={column} />
               </div>
               <span className="borders-bars__name">{column.partyShortName}</span>

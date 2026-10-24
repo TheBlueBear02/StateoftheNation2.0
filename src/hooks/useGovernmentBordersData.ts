@@ -5,13 +5,12 @@ import { fetchPartyLeaders } from '../lib/fetchElectionParties'
 import {
   getChannelPoll,
   listBordersChannels,
-  orderPartiesByTopic,
+  orderBordersParties,
   type BordersChannel,
   type BordersPartyColumn,
 } from '../lib/governmentBorders'
 import { supabase, supabaseConfigError } from '../lib/supabase'
 import type { ElectionPartyLeader } from '../lib/supabase'
-import { getBordersTopic } from '../content/governmentBordersTopics'
 import { usePolls } from './usePolls'
 
 export type UseGovernmentBordersDataResult = {
@@ -24,7 +23,6 @@ export type UseGovernmentBordersDataResult = {
 
 export function useGovernmentBordersData(
   channelKey: string | null,
-  topicId: string,
 ): UseGovernmentBordersDataResult {
   const { polls, loading, error } = usePolls(120)
   const [leadersByPartyId, setLeadersByPartyId] = useState<
@@ -80,9 +78,8 @@ export function useGovernmentBordersData(
 
   const columns = useMemo(() => {
     if (!poll) return []
-    const topic = getBordersTopic(topicId)
-    return orderPartiesByTopic(poll.results, topic, leadersByPartyId)
-  }, [poll, topicId, leadersByPartyId])
+    return orderBordersParties(poll.results, leadersByPartyId)
+  }, [poll, leadersByPartyId])
 
   return {
     loading,

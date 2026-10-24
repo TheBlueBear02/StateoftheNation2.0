@@ -7,7 +7,7 @@ import { GovernmentBordersPage } from '@/views/GovernmentBordersPage'
 export const metadata: Metadata = {
   title: 'ג"ג - גבולות גזרה לממשלה',
   description:
-    'שרטטו את גבולות הגזרה לממשלה לפי סקרי מנדטים וצירים פוליטיים לקראת בחירות 2026.',
+    'שרטטו את גבולות הגזרה לממשלה לפי סקרי מנדטים לקראת בחירות 2026.',
   alternates: { canonical: '/elections/government-borders' },
 }
 
@@ -22,7 +22,7 @@ export default function Page() {
           '@type': 'WebPage',
           name: 'ג"ג - גבולות גזרה לממשלה',
           description:
-            'שרטטו את גבולות הגזרה לממשלה לפי סקרי מנדטים וצירים פוליטיים לקראת בחירות 2026.',
+            'שרטטו את גבולות הגזרה לממשלה לפי סקרי מנדטים לקראת בחירות 2026.',
           url: `${siteUrl}/elections/government-borders`,
           inLanguage: 'he',
           breadcrumb: {

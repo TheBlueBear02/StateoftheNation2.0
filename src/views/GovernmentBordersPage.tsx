@@ -10,8 +10,8 @@ import { BordersSummaryBar } from '../components/elections/borders/BordersSummar
 import { BordersToolbar } from '../components/elections/borders/BordersToolbar'
 import { ShareableBordersPoster } from '../components/elections/borders/ShareableBordersPoster'
 import {
-  DEFAULT_BORDERS_TOPIC_ID,
-  getBordersTopic,
+  BORDERS_AXIS_END_LABEL,
+  BORDERS_AXIS_START_LABEL,
 } from '../content/governmentBordersTopics'
 import { useGovernmentBordersData } from '../hooks/useGovernmentBordersData'
 import { formatFieldwork } from '../lib/fetchPolls'
@@ -26,9 +26,6 @@ import { getSiteUrl } from '../lib/runtimeEnv'
 import { sharePngImage } from '../lib/sharePngImage'
 import './GovernmentBordersPage.css'
 
-const WIKI_SOURCE =
-  'https://en.wikipedia.org/wiki/Opinion_polling_for_the_2026_Israeli_legislative_election'
-
 function parseIntParam(value: string | null): number | null {
   if (value === null || value === '') return null
   const n = Number.parseInt(value, 10)
@@ -41,41 +38,30 @@ export function GovernmentBordersPage() {
   const searchParams = useSearchParams()
 
   const urlChannel = searchParams.get('channel')
-  const urlTopic = searchParams.get('topic') ?? DEFAULT_BORDERS_TOPIC_ID
   const urlFrom = parseIntParam(searchParams.get('from'))
   const urlTo = parseIntParam(searchParams.get('to'))
 
   const [channelKey, setChannelKey] = useState<string | null>(urlChannel)
-  const [topicId, setTopicId] = useState(urlTopic)
   const [range, setRange] = useState<BordersRange>({ start: 0, end: 0 })
   const [exporting, setExporting] = useState(false)
   const [copiedFlash, setCopiedFlash] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
 
   const posterRef = useRef<HTMLDivElement>(null)
-  /** Prefer URL from/to only on the first columns load for a channel+topic pair. */
+  /** Prefer URL from/to only on the first columns load for a channel. */
   const applyUrlRangeRef = useRef(true)
   const columnsKeyRef = useRef('')
 
-  const { loading, error, channels, columns } = useGovernmentBordersData(
-    channelKey,
-    topicId,
-  )
+  const { loading, error, channels, columns } =
+    useGovernmentBordersData(channelKey)
 
-  const topic = getBordersTopic(topicId)
   const activeChannel =
     channels.find((c) => c.key === (channelKey ?? channels[0]?.key)) ?? null
 
   const syncUrl = useCallback(
-    (next: {
-      channel: string
-      topic: string
-      from: number
-      to: number
-    }) => {
+    (next: { channel: string; from: number; to: number }) => {
       const params = new URLSearchParams()
       params.set('channel', next.channel)
-      params.set('topic', next.topic)
       params.set('from', String(next.from))
       params.set('to', String(next.to))
       const qs = params.toString()
@@ -97,9 +83,9 @@ export function GovernmentBordersPage() {
     setChannelKey(channels[0]!.key)
   }, [channelKey, channels, urlChannel])
 
-  // Reset / restore range when columns change (topic or channel).
+  // Reset / restore range when columns change (channel).
   useEffect(() => {
-    const key = `${channelKey ?? ''}|${topicId}|${columns.map((c) => c.partyId).join(',')}`
+    const key = `${channelKey ?? ''}|${columns.map((c) => c.partyId).join(',')}`
     if (columns.length === 0) {
       setRange({ start: 0, end: 0 })
       columnsKeyRef.current = key
@@ -121,7 +107,7 @@ export function GovernmentBordersPage() {
       setRange(defaultRange(columns))
     }
     applyUrlRangeRef.current = false
-  }, [columns, topicId, channelKey, urlFrom, urlTo])
+  }, [columns, channelKey, urlFrom, urlTo])
 
   const governmentSeats = useMemo(
     () => sumRange(columns, range),
@@ -133,11 +119,10 @@ export function GovernmentBordersPage() {
     if (!channelKey || columns.length === 0) return
     syncUrl({
       channel: channelKey,
-      topic: topicId,
       from: range.start,
       to: range.end,
     })
-  }, [channelKey, topicId, range, columns.length, syncUrl])
+  }, [channelKey, range, columns.length, syncUrl])
 
   useEffect(() => {
     if (!copiedFlash) return
@@ -148,11 +133,6 @@ export function GovernmentBordersPage() {
   const handleChannelChange = (key: string) => {
     applyUrlRangeRef.current = false
     setChannelKey(key)
-  }
-
-  const handleTopicChange = (id: string) => {
-    applyUrlRangeRef.current = false
-    setTopicId(id)
   }
 
   const handleRangeChange = useCallback(
@@ -268,8 +248,8 @@ export function GovernmentBordersPage() {
               </button>
             </div>
             <p className="borders-page__lead">
-              בחרו ציר פוליטי, סמנו רצף מפלגות על הקו — וקבלו את גבולות הגזרה
-              לממשלה לפי הסקר האחרון בערוץ.
+              סמנו רצף מפלגות על הקו — וקבלו את גבולות הגזרה לממשלה לפי הסקר
+              האחרון בערוץ.
             </p>
             {shareError ? (
               <p className="borders-page__share-error" role="status">
@@ -292,8 +272,6 @@ export function GovernmentBordersPage() {
                 channels={channels}
                 selectedChannelKey={activeChannel?.key ?? null}
                 onChannelChange={handleChannelChange}
-                topic={topic}
-                onTopicChange={handleTopicChange}
               />
 
               <BordersSummaryBar governmentSeats={governmentSeats} />
@@ -308,8 +286,8 @@ export function GovernmentBordersPage() {
                   <BordersBarsChart
                     columns={columns}
                     range={range}
-                    topicStartLabel={topic.startLabel}
-                    topicEndLabel={topic.endLabel}
+                    topicStartLabel={BORDERS_AXIS_START_LABEL}
+                    topicEndLabel={BORDERS_AXIS_END_LABEL}
                   />
                   <BordersRangePicker
                     columnCount={columns.length}
@@ -321,17 +299,6 @@ export function GovernmentBordersPage() {
               </div>
             </>
           )}
-
-          <footer className="borders-page__footer">
-            <p>
-              נתוני הסקרים מבוססים על{' '}
-              <a href={WIKI_SOURCE} target="_blank" rel="noopener noreferrer">
-                ויקיפדיה
-              </a>{' '}
-              (CC BY-SA 4.0). סדר המפלגות על הצירים הוא הערכה ידנית של מצב האומה
-              ואינו מייצג עמדה רשמית של המפלגות.
-            </p>
-          </footer>
         </div>
       </main>
 
@@ -341,7 +308,6 @@ export function GovernmentBordersPage() {
             ref={posterRef}
             columns={columns}
             range={range}
-            topic={topic}
             channelLabel={activeChannel.label}
             pollDateLabel={pollDateLabel}
             governmentSeats={governmentSeats}

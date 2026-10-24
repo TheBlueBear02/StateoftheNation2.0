@@ -1,10 +1,10 @@
 'use client'
 
 import { forwardRef } from 'react'
-import type { BordersTopic } from '../../../content/governmentBordersTopics'
 import { getInitials } from '../../../lib/hemicycle'
 import {
   BORDERS_MAJORITY,
+  bordersAvatarObjectPosition,
   isPartyInRange,
   majorityStatus,
   type BordersPartyColumn,
@@ -15,7 +15,6 @@ import { displayBlocBarGradientForParty } from '../../../lib/pollChartData'
 type ShareableBordersPosterProps = {
   columns: BordersPartyColumn[]
   range: BordersRange
-  topic: BordersTopic
   channelLabel: string
   pollDateLabel: string
   governmentSeats: number
@@ -31,7 +30,6 @@ export const ShareableBordersPoster = forwardRef<
   {
     columns,
     range,
-    topic,
     channelLabel,
     pollDateLabel,
     governmentSeats,
@@ -56,10 +54,6 @@ export const ShareableBordersPoster = forwardRef<
       <header className="borders-poster__header">
         <h3 className="borders-poster__title">ג&quot;ג · גבולות גזרה לממשלה</h3>
         <p className="borders-poster__subtitle">
-          {topic.label}
-          <span className="borders-poster__sep" aria-hidden="true">
-            ·
-          </span>
           {channelLabel}
           <span className="borders-poster__sep" aria-hidden="true">
             ·
@@ -93,6 +87,7 @@ export const ShareableBordersPoster = forwardRef<
           )
           const leaderImage = column.leader?.imageUrl?.trim() || null
           const logo = column.partyLogoUrl?.trim() || null
+          const avatarObjectPosition = bordersAvatarObjectPosition(column)
 
           return (
             <div
@@ -119,7 +114,17 @@ export const ShareableBordersPoster = forwardRef<
               <div className="borders-poster__avatar">
                 {leaderImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={leaderImage} alt="" width={40} height={40} />
+                  <img
+                    src={leaderImage}
+                    alt=""
+                    width={40}
+                    height={40}
+                    style={
+                      avatarObjectPosition
+                        ? { objectPosition: avatarObjectPosition }
+                        : undefined
+                    }
+                  />
                 ) : logo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

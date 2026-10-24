@@ -45,6 +45,7 @@ export function BordersRangePicker({
     originStart: number
     originEnd: number
     grabOffset: number
+    pointerId: number
   } | null>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -60,8 +61,13 @@ export function BordersRangePicker({
       const drag = dragRef.current
       const track = trackRef.current
       if (!drag || !track || columnCount <= 0) return
+      if (event.pointerId !== drag.pointerId) return
 
-      const col = columnFromClientX(event.clientX, track.getBoundingClientRect(), columnCount)
+      const col = columnFromClientX(
+        event.clientX,
+        track.getBoundingClientRect(),
+        columnCount,
+      )
 
       if (drag.mode === 'move') {
         const span = drag.originEnd - drag.originStart
@@ -81,7 +87,9 @@ export function BordersRangePicker({
       onChange({ start: drag.originStart, end: nextEnd })
     }
 
-    const onPointerUp = () => {
+    const onPointerUp = (event: PointerEvent) => {
+      const drag = dragRef.current
+      if (drag && event.pointerId !== drag.pointerId) return
       dragRef.current = null
       setDragging(false)
     }
@@ -96,10 +104,7 @@ export function BordersRangePicker({
     }
   }, [dragging, columnCount, onChange])
 
-  const beginDrag = (
-    event: ReactPointerEvent,
-    mode: DragMode,
-  ) => {
+  const beginDrag = (event: ReactPointerEvent, mode: DragMode) => {
     if (columnCount <= 0) return
     event.preventDefault()
     event.stopPropagation()
@@ -116,8 +121,39 @@ export function BordersRangePicker({
       originStart: safe.start,
       originEnd: safe.end,
       grabOffset: col - safe.start,
+      pointerId: event.pointerId,
+    }
+    try {
+      track.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore — capture optional */
     }
     setDragging(true)
+  }
+
+  /** Tap grey track outside the window → grow that edge to the tapped column. */
+  const onTrackPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (columnCount <= 0) return
+    if (event.target !== trackRef.current) return
+
+    const col = columnFromClientX(
+      event.clientX,
+      trackRef.current.getBoundingClientRect(),
+      columnCount,
+    )
+
+    if (col < safe.start) {
+      event.preventDefault()
+      onChange({ start: col, end: safe.end })
+      return
+    }
+    if (col > safe.end) {
+      event.preventDefault()
+      onChange({ start: safe.start, end: col })
+      return
+    }
+
+    beginDrag(event, 'move')
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -128,7 +164,6 @@ export function BordersRangePicker({
     if (event.key === 'ArrowRight') {
       event.preventDefault()
       if (shift) {
-        // Shrink from inline-start (right) — increase start.
         if (safe.start < safe.end) {
           onChange({ start: safe.start + 1, end: safe.end })
         }
@@ -141,11 +176,8 @@ export function BordersRangePicker({
     if (event.key === 'ArrowLeft') {
       event.preventDefault()
       if (shift) {
-        // Grow toward inline-end (left) — increase end.
         if (safe.end < columnCount - 1) {
           onChange({ start: safe.start, end: safe.end + 1 })
-        } else if (safe.start < safe.end) {
-          // At edge: shrink from start instead when expanding isn't possible.
         }
       } else if (safe.end < columnCount - 1) {
         onChange({ start: safe.start + 1, end: safe.end + 1 })
@@ -178,6 +210,7 @@ export function BordersRangePicker({
             ? 'borders-picker__track borders-picker__track--dragging'
             : 'borders-picker__track'
         }
+        onPointerDown={onTrackPointerDown}
       >
         <div
           className="borders-picker__window"
@@ -212,7 +245,7 @@ export function BordersRangePicker({
         </div>
       </div>
       <p className="borders-picker__hint">
-        גררו להזזה · משכו את הקצוות להרחבה או צמצום
+        גררו את הפס · משכו את הקצוות · לחצו מחוץ לפס כדי להרחיב
       </p>
     </div>
   )

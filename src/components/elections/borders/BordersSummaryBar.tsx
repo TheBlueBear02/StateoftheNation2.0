@@ -2,6 +2,8 @@
 
 import {
   BORDERS_MAJORITY,
+  BORDERS_SUMMARY_GOV_COLOR,
+  BORDERS_SUMMARY_OUT_COLOR,
   KNESSET_SEATS,
   majorityStatus,
 } from '../../../lib/governmentBorders'
@@ -52,7 +54,7 @@ export function BordersSummaryBar({ governmentSeats }: BordersSummaryBarProps) {
             className="borders-summary__segment borders-summary__segment--gov"
             style={{
               width: `${govPct}%`,
-              background: displayBlocBarGradient('#4890fd'),
+              background: displayBlocBarGradient(BORDERS_SUMMARY_GOV_COLOR),
             }}
           >
             {governmentSeats > 0 ? (
@@ -65,7 +67,7 @@ export function BordersSummaryBar({ governmentSeats }: BordersSummaryBarProps) {
             className="borders-summary__segment borders-summary__segment--opp"
             style={{
               width: `${oppPct}%`,
-              background: displayBlocBarGradient('#e74c3c'),
+              background: displayBlocBarGradient(BORDERS_SUMMARY_OUT_COLOR),
             }}
           >
             {oppositionSeats > 0 ? (
