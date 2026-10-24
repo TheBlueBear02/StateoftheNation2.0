@@ -96,6 +96,40 @@ function App() {
 
         {SHOW_GOVERNMENT_DASHBOARD ? <HotIndexesCarousel /> : null}
 
+        <section
+          id="knesset-committees"
+          className="project-section"
+          aria-labelledby="knesset-committees-title"
+        >
+          <Link href="/knesset/committees" className="project-section__link">
+            <div className="container">
+              <div className="project-section__inner">
+                <div className="project-section__content">
+                  <h2
+                    id="knesset-committees-title"
+                    className="project-section__title"
+                  >
+                    ועדות הכנסת: צפו בדיונים ובנוכחות סביב שולחן הוועדה
+                  </h2>
+                  <span className="project-section__tag">הכנסת</span>
+                </div>
+
+                <div className="project-section__media" aria-hidden="true">
+                  <img
+                    src="/committees-home-page.png"
+                    alt=""
+                    className="project-section__image"
+                    width={1099}
+                    height={771}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+            </div>
+          </Link>
+        </section>
+
         <DreamGovernmentPromo />
 
         <section

@@ -9,6 +9,8 @@ Shareable deep links: `/knesset/committees?committee=<id>` (sessions list), `/kn
 
 Status: **frontend MVP live** (schema + ingest + page). Full membership roster around the table; when protocol attendance exists, absentees render gray. Keyword search not built yet.
 
+Homepage teaser: `#knesset-committees` in `src/App.tsx` (directly under the hot-indexes / government dashboard carousel) links here with media from `public/committees-home-page.png`. See [HomePage.md](./HomePage.md).
+
 ## Page structure
 
 ```

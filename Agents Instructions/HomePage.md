@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure, tech stack, and shared conventions.
 
-Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with project teasers for elections, polls, government dashboard, government structure, and Knesset.
+Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with project teasers for elections, polls, government dashboard, Knesset committees, government structure, and Knesset.
 
 ## Page Structure
 
@@ -18,6 +18,9 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 ├─────────────────────────────────────────────────────────┤
 │  Hot indexes carousel (white, full-bleed)               │
 │    └─ .container — rounded white box + story progress   │
+├─────────────────────────────────────────────────────────┤
+│  Project: ועדות הכנסת (white, full-bleed)              │
+│    └─ .container — tag + title | media                  │
 ├─────────────────────────────────────────────────────────┤
 │  Project: ממשלת החלומות (white, full-bleed)            │
 │    └─ .container — tag + title | media                  │
@@ -53,6 +56,7 @@ Homepage for **מצב האומה** (State of the Nation). RTL Hebrew layout with
 | `src/components/government/HotIndexesCarousel.css` | Carousel box, progress bars, arrows, swipe shell |
 | `src/lib/hotOfficeIndexes.ts` | Curated hot-index name list + picker / fallback |
 | `public/dream-government-homepage.png` | Dream-government project section screenshot |
+| `public/committees-home-page.png` | Knesset committees project section screenshot |
 | `public/government-building-homepage.svg` | Government structure teaser — civic building illustration |
 | `public/knesset-building-homepage.svg` | Knesset teaser — Knesset building illustration |
 | `src/App.css` | `.container` primitive and section-specific styles |
@@ -147,22 +151,29 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Data: same `useOfficeDashboard` / Supabase path as `/government/dashboard`. Section hides on fetch error / empty; shows a skeleton while loading.
 - Share reuses `exportOfficeChartImage` + `sharePngImage` (capture node uses dashboard chart-header classnames so the PNG decorator still finds the title).
 
-### 5. Dream government project (`#dream-government`)
+### 5. Knesset committees project (`#knesset-committees`)
+
+- White section directly under the hot-indexes / government dashboard carousel.
+- News-block layout: title **ועדות הכנסת: צפו בדיונים ובנוכחות סביב שולחן הוועדה** + category tag **הכנסת**.
+- Whole section is a link (`.project-section__link`) to `/knesset/committees`.
+- Media (`.project-section__media`): screenshot from `public/committees-home-page.png` (1099×771).
+
+### 6. Dream government project (`#dream-government`)
 
 - Rendered by `src/components/elections/DreamGovernmentPromo.tsx` (also used on `/elections`).
-- Project teaser below the hot-indexes carousel (white).
+- Project teaser below the committees section (white).
 - News-block layout: title **ממשלת החלומות: בחרו שר לכל משרד מבין המועמדים לכנסת** + category tag **בחירות 2026**.
 - Whole section is a link to `/elections/dream-government`.
 - Media (`.project-section__media`): landscape collage from `public/dream-government-homepage.png` (same full-width media column as the other project teasers).
 
-### 6. Mandate polls project (`#mandate-polls`)
+### 7. Mandate polls project (`#mandate-polls`)
 
 - White section below Dream Government.
 - News-block layout: title **סקר הסקרים: סקרי המנדטים של כל הערוצים במקום אחד** + category tag **בחירות 2026** + meta line **עודכן לאחרונה {D.M.YYYY}** from the newest non-scenario poll’s `fieldwork_end` (`useLatestPollDate` / `fetchLatestPollFieldworkEnd`). Meta is omitted while loading or if the query fails/empty.
 - Whole section is a link (`.project-section__link`) to `/elections/polls`.
 - Media (`.project-section__media`): screenshot from `public/polls-page-homepage.png`.
 
-### 7. Lists game project (`#lists-game`)
+### 8. Lists game project (`#lists-game`)
 
 - Rendered by shared `src/components/elections/ListsGamePromo.tsx` (also used at the bottom of `/elections/[partyId]`).
 - White section (no `alt` prop) below polls.
@@ -170,7 +181,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Whole section is a link (`.project-section__link`) to `/elections/lists`.
 - Media (`.project-section__media`): screenshot from `public/election-game-homepage.png`.
 
-### 8. Government + Knesset pair (`#institutions`)
+### 9. Government + Knesset pair (`#institutions`)
 
 - One `#fafafa` section (`.project-section--alt`) with two **white** side-by-side cards (`.institutions-pair__card`).
 - Each card stacks **image above text** (title + category tag); images are flush to the card edges (no image padding); text keeps side/bottom padding and stays RTL **right-aligned**.
@@ -179,7 +190,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Stays **two columns on mobile** as well (tighter gap/padding and slightly smaller titles).
 - Hover/focus: title underline only (no grey background change on the white cards).
 
-### 9. Footer (`site-footer`)
+### 10. Footer (`site-footer`)
 
 - Blue background (`--color-blue: #4890FD`), white text.
 - Full-bleed; inner wrapper (`site-footer__inner container`) uses a 3-column grid: white logo brand (RTL start), centered social links, end column with legal links + copyright (RTL end).
@@ -215,12 +226,13 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - `/government` → Government structure page
 - `/government/dashboard` → Office KPI / policy dashboard
 - `/knesset` → Knesset hemicycle page
+- `/knesset/committees` → Knesset committees page (homepage teaser `#knesset-committees`)
 - `/about` → About (footer link only)
 - `/terms` → Terms of use (footer link only)
 
 ## Responsive Behavior
 
-- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Single-project teasers (dream, polls, lists) switch to **image above / text below** (`column-reverse` on `.project-section__inner`); desktop stays the side-by-side grid. The government + Knesset pair stays **two columns**. Container padding remains fluid via `clamp()`.
+- **≤900px:** Homepage header is hidden. Hero collapses to a single centered column — bear video is hidden (`display: none` on `.hero__visual`); title logo is enlarged (`clamp(300px, 82vw, 480px)`), and subtitle/button grid are centered. Content capped at `--hero-text-max`. Single-project teasers (committees, dream, polls, lists) switch to **image above / text below** (`column-reverse` on `.project-section__inner`); desktop stays the side-by-side grid. The government + Knesset pair stays **two columns**. Container padding remains fluid via `clamp()`.
 - **≤480px:** Hero buttons become single column; header height, logo, and date text scale down (non-home / desktop-style header).
 
 ## Future Work
