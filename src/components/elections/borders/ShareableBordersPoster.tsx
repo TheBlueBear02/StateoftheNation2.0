@@ -52,7 +52,7 @@ export const ShareableBordersPoster = forwardRef<
       />
 
       <header className="borders-poster__header">
-        <h3 className="borders-poster__title">ג&quot;ג · גבולות גזרה לממשלה</h3>
+        <h3 className="borders-poster__title">גבולות גזרה לממשלה</h3>
         <p className="borders-poster__subtitle">
           {channelLabel}
           <span className="borders-poster__sep" aria-hidden="true">
@@ -159,9 +159,12 @@ export const ShareableBordersPoster = forwardRef<
         {selected.map((c) => c.partyShortName).join(' · ')}
       </p>
 
-      <p className="borders-poster__footer">
-        מצב האומה · רוב = {BORDERS_MAJORITY} מנדטים
-      </p>
+      <div className="borders-poster__cta">
+        <p className="borders-poster__footer">
+          מצב האומה · רוב = {BORDERS_MAJORITY} מנדטים
+        </p>
+        <p className="borders-poster__cta-url">matzavhauma.co.il</p>
+      </div>
     </div>
   )
 })

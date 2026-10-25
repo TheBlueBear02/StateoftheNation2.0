@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md), [DesignLanguage.md](./DesignLanguage.md), and [Database.md](./Database.md) for shared conventions and schema details.
 
-Frontend module for the 2026 elections. It has a party index at `/elections`, a party detail page at `/elections/[partyId]`, a list rating game at `/elections/lists`, a dream-government builder at `/elections/dream-government`, a government-borders (ג"ג) tool at `/elections/government-borders`, and a password-gated candidate editor at `/elections/edit`.
+Frontend module for the 2026 elections. It has a party index at `/elections`, a party detail page at `/elections/[partyId]`, a list rating game at `/elections/lists`, a dream-government builder at `/elections/dream-government`, a government-borders tool at `/elections/government-borders`, and a password-gated candidate editor at `/elections/edit`.
 
 ## Routes
 
@@ -13,7 +13,7 @@ Frontend module for the 2026 elections. It has a party index at `/elections`, a 
 | `/elections/lists` | `src/views/ElectionListsGamePage.tsx` | Client-only list rating game (green / orange / red) with fit score and share image |
 | `/elections/dream-government` | `src/views/DreamGovernmentPage.tsx` | Dream cabinet builder (PM + 6 offices), clipboard PNG share, site-wide pick % badges |
 | `/elections/dream-government/dashboard` | `src/views/DreamGovernmentDashboardPage.tsx` | Password-gated ops dashboard: unique voters, daily activity, per-office leaderboards |
-| `/elections/government-borders` | `src/views/GovernmentBordersPage.tsx` | ג"ג — contiguous government band on a fixed party axis from a channel’s latest poll; share poster |
+| `/elections/government-borders` | `src/views/GovernmentBordersPage.tsx` | Contiguous government band on a fixed party axis from a channel’s latest poll; share poster |
 | `/elections/edit` | `src/views/ElectionCandidatesEditPage.tsx` | Password-gated editor for existing candidate + person fields |
 | `/elections/[partyId]` | `src/views/ElectionPartyPage.tsx` | Detail page for one party, keyed by `election_parties.id` |
 
@@ -30,7 +30,7 @@ The homepage hero button **בחירות 2026** links to `/elections`. The homepa
 | `src/views/ElectionListsGamePage.tsx` / `.css` | List rating game: pick party → rate candidates → fit report + share PNG |
 | `src/views/DreamGovernmentPage.tsx` / `.css` | Dream cabinet: pick PM + 6 ministers, share PNG, show site-wide pick % badges |
 | `src/views/DreamGovernmentDashboardPage.tsx` / `.css` | Password-gated dashboard: unique voters, 30-day activity chart, per-office leaderboards |
-| `src/views/GovernmentBordersPage.tsx` / `.css` | ג"ג government-borders tool (bloc+size party order + range picker + share) |
+| `src/views/GovernmentBordersPage.tsx` / `.css` | Government-borders tool (bloc+size party order + range picker + share) |
 | `src/views/ElectionCandidatesEditPage.tsx` / `.css` | Password gate, party picker, per-candidate edit forms, and party pipeline panel |
 | `src/components/elections/lists/ListPartyPicker.tsx` | Confirmed-party picker with full-bleed list-leader photo cards |
 | `src/components/elections/lists/ListRatingStep.tsx` | Tinder-style one-card rating deck with progress and action buttons |

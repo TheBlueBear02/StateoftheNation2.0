@@ -11,7 +11,7 @@ Frontend and pipeline module for Knesset-26 opinion poll seat projections source
 | `/elections/polls` | `src/views/ElectionsPollsPage.tsx` | Last-N bar chart, bloc bar, party trend lines, aggregate-history lines, bloc trend |
 | `/elections/polls/edit` | `src/views/ElectionsPollsEditPage.tsx` | Password-gated pipeline runner (dev) |
 
-Also consumed by `/elections/government-borders` (ג"ג) via `usePolls` / `fetchPolls` — latest poll per publisher for the range-picker tool. See [GovernmentBordersPage.md](./GovernmentBordersPage.md).
+Also consumed by `/elections/government-borders` via `usePolls` / `fetchPolls` — latest poll per publisher for the range-picker tool. See [GovernmentBordersPage.md](./GovernmentBordersPage.md).
 
 Register `/elections/polls/edit` as a static App Router segment under `src/app/elections/polls/edit/` (alongside `/elections/polls`); views live in `src/views/…`.
 

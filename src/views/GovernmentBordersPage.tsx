@@ -9,10 +9,6 @@ import { BordersRangePicker } from '../components/elections/borders/BordersRange
 import { BordersSummaryBar } from '../components/elections/borders/BordersSummaryBar'
 import { BordersToolbar } from '../components/elections/borders/BordersToolbar'
 import { ShareableBordersPoster } from '../components/elections/borders/ShareableBordersPoster'
-import {
-  BORDERS_AXIS_END_LABEL,
-  BORDERS_AXIS_START_LABEL,
-} from '../content/governmentBordersTopics'
 import { useGovernmentBordersData } from '../hooks/useGovernmentBordersData'
 import { formatFieldwork } from '../lib/fetchPolls'
 import {
@@ -142,6 +138,12 @@ export function GovernmentBordersPage() {
     [columns.length],
   )
 
+  const sharePageUrl = useMemo(() => {
+    const base = `${getSiteUrl()}/elections/government-borders`
+    const qs = searchParams.toString()
+    return qs ? `${base}?${qs}` : base
+  }, [searchParams])
+
   const handleShare = async () => {
     const node = posterRef.current
     if (!node || exporting || copiedFlash) return
@@ -153,8 +155,8 @@ export function GovernmentBordersPage() {
     try {
       const shareResult = await sharePngImage({
         filename: 'government-borders.png',
-        shareTitle: 'ג"ג · גבולות גזרה לממשלה · מצב האומה',
-        shareText: `גבולות הגזרה שלי לממשלה: ${governmentSeats} מנדטים\n${getSiteUrl()}/elections/government-borders`,
+        shareTitle: 'גבולות גזרה לממשלה · מצב האומה',
+        shareText: `גבולות הגזרה שלי לממשלה: ${governmentSeats} מנדטים\n${sharePageUrl}`,
         makeBlob: async () => {
           const dataUrl = await exportNodeToPng(node, {
             pixelRatio: 2,
@@ -185,6 +187,21 @@ export function GovernmentBordersPage() {
     }
   }
 
+  const shareDisabled =
+    exporting || copiedFlash || columns.length === 0 || loading
+
+  const shareButtonLabel = copiedFlash
+    ? 'הועתק ללוח'
+    : exporting
+      ? 'מייצא תמונה…'
+      : 'שתפו כתמונה'
+
+  const shareAriaLabel = copiedFlash
+    ? 'הועתק ללוח'
+    : exporting
+      ? 'מייצא תמונה…'
+      : 'שתפו את גבולות הגזרה כתמונה'
+
   const pollDateLabel = activeChannel
     ? formatFieldwork(
         activeChannel.poll.fieldworkStart,
@@ -199,15 +216,13 @@ export function GovernmentBordersPage() {
           <PageBreadcrumb
             items={[
               { label: 'בחירות 2026', to: '/elections' },
-              { label: 'ג"ג · גבולות גזרה' },
+              { label: 'גבולות גזרה' },
             ]}
           />
 
           <header className="borders-page__header">
             <div className="borders-page__title-row">
-              <h1 className="borders-page__title">
-                ג&quot;ג · גבולות גזרה לממשלה
-              </h1>
+              <h1 className="borders-page__title">גבולות גזרה לממשלה</h1>
               <button
                 type="button"
                 className={
@@ -218,16 +233,8 @@ export function GovernmentBordersPage() {
                 onClick={() => {
                   void handleShare()
                 }}
-                disabled={
-                  exporting || copiedFlash || columns.length === 0 || loading
-                }
-                aria-label={
-                  copiedFlash
-                    ? 'הועתק ללוח'
-                    : exporting
-                      ? 'מייצא תמונה…'
-                      : 'שתפו את גבולות הגזרה'
-                }
+                disabled={shareDisabled}
+                aria-label={shareAriaLabel}
                 title={copiedFlash ? 'הועתק ללוח' : 'שתפו פוסטר'}
               >
                 {copiedFlash ? (
@@ -251,11 +258,6 @@ export function GovernmentBordersPage() {
               סמנו רצף מפלגות על הקו — וקבלו את גבולות הגזרה לממשלה לפי הסקר
               האחרון בערוץ.
             </p>
-            {shareError ? (
-              <p className="borders-page__share-error" role="status">
-                {shareError}
-              </p>
-            ) : null}
           </header>
 
           {loading ? (
@@ -274,8 +276,6 @@ export function GovernmentBordersPage() {
                 onChannelChange={handleChannelChange}
               />
 
-              <BordersSummaryBar governmentSeats={governmentSeats} />
-
               <div className="borders-page__chart-scroll">
                 <div
                   className="borders-page__chart-stack"
@@ -283,12 +283,7 @@ export function GovernmentBordersPage() {
                     ['--borders-col-count' as string]: columns.length,
                   }}
                 >
-                  <BordersBarsChart
-                    columns={columns}
-                    range={range}
-                    topicStartLabel={BORDERS_AXIS_START_LABEL}
-                    topicEndLabel={BORDERS_AXIS_END_LABEL}
-                  />
+                  <BordersBarsChart columns={columns} range={range} />
                   <BordersRangePicker
                     columnCount={columns.length}
                     range={range}
@@ -296,6 +291,31 @@ export function GovernmentBordersPage() {
                     governmentSeats={governmentSeats}
                   />
                 </div>
+              </div>
+
+              <BordersSummaryBar governmentSeats={governmentSeats} />
+
+              <div className="borders-page__share-actions">
+                <button
+                  type="button"
+                  className={
+                    copiedFlash
+                      ? 'borders-page__share-btn borders-page__share-btn--copied'
+                      : 'borders-page__share-btn'
+                  }
+                  onClick={() => {
+                    void handleShare()
+                  }}
+                  disabled={shareDisabled}
+                  aria-label={shareAriaLabel}
+                >
+                  {shareButtonLabel}
+                </button>
+                {shareError ? (
+                  <p className="borders-page__share-error" role="status">
+                    {shareError}
+                  </p>
+                ) : null}
               </div>
             </>
           )}

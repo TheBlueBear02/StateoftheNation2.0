@@ -15,8 +15,6 @@ const MIN_BAR_PCT = 14
 type BordersBarsChartProps = {
   columns: BordersPartyColumn[]
   range: BordersRange
-  topicStartLabel: string
-  topicEndLabel: string
 }
 
 function PartyAvatar({ column }: { column: BordersPartyColumn }) {
@@ -33,8 +31,8 @@ function PartyAvatar({ column }: { column: BordersPartyColumn }) {
         className="borders-bars__avatar-img"
         src={leaderImage}
         alt=""
-        width={48}
-        height={48}
+        width={52}
+        height={52}
         loading="lazy"
         decoding="async"
         style={objectPosition ? { objectPosition } : undefined}
@@ -68,22 +66,11 @@ function PartyAvatar({ column }: { column: BordersPartyColumn }) {
   )
 }
 
-export function BordersBarsChart({
-  columns,
-  range,
-  topicStartLabel,
-  topicEndLabel,
-}: BordersBarsChartProps) {
+export function BordersBarsChart({ columns, range }: BordersBarsChartProps) {
   const maxSeats = Math.max(...columns.map((c) => c.seats), 1)
 
   return (
     <div className="borders-bars">
-      <div className="borders-bars__axis-labels" aria-hidden="true">
-        {/* RTL flex: first child sits on the right (spectrum start). */}
-        <span className="borders-bars__axis-start">{topicStartLabel}</span>
-        <span className="borders-bars__axis-end">{topicEndLabel}</span>
-      </div>
-
       <div
         className="borders-bars__plot"
         role="img"

@@ -189,6 +189,6 @@ npm run lint
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` dashboard + `/piplines/docs` |
 | [ElectionsPage.md](./ElectionsPage.md) | `/elections` module |
 | [PollsPage.md](./PollsPage.md) | `/elections/polls` |
-| [GovernmentBordersPage.md](./GovernmentBordersPage.md) | `/elections/government-borders` (ג"ג) |
+| [GovernmentBordersPage.md](./GovernmentBordersPage.md) | `/elections/government-borders` |
 
 When adding a new major page or module, create a matching `Agents Instructions/{Feature}.md` and link it from this index.

@@ -239,7 +239,7 @@ function toColumn(
 }
 
 /**
- * Order poll parties for the ג"ג axis (RTL: index 0 = rightmost):
+ * Order poll parties for the government-borders axis (RTL: index 0 = rightmost):
  * - Far right = pinned Haredi parties (ש"ס, יהדות התורה, הציבור החרדי),
  *   seats ascending so the smaller sits on the outer edge
  * - Right wing = remaining coalition, seats ascending (toward center)
