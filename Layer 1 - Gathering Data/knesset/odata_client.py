@@ -343,6 +343,8 @@ def fetch_odata(
     keep_datetime: bool = False,
     allow_hasadna_fallback: bool = True,
     fetch_meta: dict[str, Any] | None = None,
+    orderby: str | None = None,
+    on_page=None,
 ) -> list[dict[str, Any]]:
     """
     Fetch all rows for a KNS_* entity.
@@ -373,6 +375,8 @@ def fetch_odata(
     base_params: dict[str, Any] = {"$top": PAGE_SIZE}
     if filter_expr:
         base_params["$filter"] = filter_expr
+    if orderby:
+        base_params["$orderby"] = orderby
 
     all_rows: list[dict[str, Any]] = []
     skip = 0
@@ -418,6 +422,12 @@ def fetch_odata(
                 time.sleep(wait)
 
         if page_failed:
+            # Pages already handed to on_page are checkpointed by the caller.
+            # Replacing them with a CSV dump would rewind that resume point.
+            if on_page is not None and skip > 0:
+                raise RuntimeError(
+                    f"OData {entity} page {page} failed after {RETRY_MAX} attempts"
+                )
             if allow_hasadna_fallback and entity in HASADNA_ENTITY_PATHS and (
                 saw_waf or page == 1
             ):
@@ -442,6 +452,8 @@ def fetch_odata(
             parse_entry(e, keep_datetime=keep_datetime) for e in entries
         ]
         all_rows.extend(rows)
+        if on_page is not None and rows:
+            on_page(rows)
         log.info(
             "  %s: page %d → %d rows (total: %d)",
             entity,

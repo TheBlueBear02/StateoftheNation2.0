@@ -220,8 +220,12 @@ def government_feed(
     )
 
 
-def watermarks_from_state_rows(rows: list[dict]) -> dict[str, datetime]:
-    known = set(INCREMENTAL_RESOURCES.values())
+def watermarks_from_state_rows(
+    rows: list[dict],
+    *,
+    allowed: set[str] | None = None,
+) -> dict[str, datetime]:
+    known = set(INCREMENTAL_RESOURCES.values()) if allowed is None else set(allowed)
     found: dict[str, datetime] = {}
     for row in rows:
         resource = row.get("resource")
@@ -233,14 +237,18 @@ def watermarks_from_state_rows(rows: list[dict]) -> dict[str, datetime]:
     return found
 
 
-def watermarks_from_run_rows(rows: list[dict]) -> dict[str, datetime]:
+def watermarks_from_run_rows(
+    rows: list[dict],
+    *,
+    allowed: set[str] | None = None,
+) -> dict[str, datetime]:
     """Newest explicit odata_watermarks per resource.
 
     A successful sync that did not record the key contributes nothing. That
     includes the full loader from before watermarks existed: its finished_at
     is not a LastUpdatedDate.
     """
-    known = set(INCREMENTAL_RESOURCES.values())
+    known = set(INCREMENTAL_RESOURCES.values()) if allowed is None else set(allowed)
     found: dict[str, datetime] = {}
     for row in rows:
         status = row.get("status")
@@ -266,13 +274,15 @@ def watermarks_from_run_rows(rows: list[dict]) -> dict[str, datetime]:
 def resolve_watermarks(
     state_rows: list[dict] | None,
     run_rows: list[dict] | None,
+    *,
+    allowed: set[str] | None = None,
 ) -> dict[str, datetime]:
     """Prefer pipeline_sync_state and fill any gap from pipeline_runs summaries."""
     found: dict[str, datetime] = {}
     if state_rows is not None:
-        found.update(watermarks_from_state_rows(state_rows))
+        found.update(watermarks_from_state_rows(state_rows, allowed=allowed))
     if run_rows:
-        for resource, stamp in watermarks_from_run_rows(run_rows).items():
+        for resource, stamp in watermarks_from_run_rows(run_rows, allowed=allowed).items():
             found.setdefault(resource, stamp)
     return found
 

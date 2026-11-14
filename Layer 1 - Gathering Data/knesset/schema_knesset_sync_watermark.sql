@@ -5,6 +5,8 @@
 -- pipeline_sync_state is the polls revid cache. The Knesset loader stores one
 -- row per resource (person, faction, gov_ministry, person_to_position) with
 -- watermark = the max LastUpdatedDate from the last successful live fetch.
+-- Committee sessions use pipeline='knesset-committees', resource='committee_session'
+-- and advance that watermark after each OData page so a cancelled run resumes.
 -- Until this column exists, the loader still records the same value on
 -- pipeline_runs.summary.odata_watermarks and reads it back.
 

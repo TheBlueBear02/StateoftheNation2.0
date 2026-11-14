@@ -5,7 +5,11 @@ load_knesset_committees.py
 Sync committee data for the current Knesset into Supabase.
 
 The Knesset number defaults to OData IsCurrent (KNS_KnessetDates), then knessets.is_active.
-Pass --knesset only to backfill one term explicitly.
+The scheduled run stays on that current term. Session rows are incremental
+(LastUpdatedDate after the last checkpoint). Protocols, transcripts, and
+attendance that are already stored are not downloaded again, so a cancelled
+run resumes at the gap. Pass --backfill to ignore the checkpoint; pass
+--knesset with --backfill only when an older term must be filled in.
 
 Default sources (Knesset only — Hasadna dumps are stale for committees):
   - OData ParliamentInfo.svc
@@ -32,7 +36,8 @@ Usage:
   python load_knesset_committees.py --transcripts-mode missing --transcripts-limit 200
   python load_knesset_committees.py --table committees
   python load_knesset_committees.py --use-hasadna --table memberships
-  python load_knesset_committees.py --knesset 26
+  python load_knesset_committees.py --backfill
+  python load_knesset_committees.py --backfill --knesset 25
   python load_knesset_committees.py --committee "ועדת הכספים" --date 2024-03-12
   python load_knesset_committees.py --table transcripts --committee 977 --date 2024-03-12 --session-oid 2156789
 
@@ -72,6 +77,15 @@ from load_all_knesset_data import (  # noqa: E402
 from committee_protocol_parse import (  # noqa: E402
     ProtocolParseError,
     parse_protocol_url,
+)
+from committee_incremental import (  # noqa: E402
+    advance_session_watermark,
+    ids_missing,
+    read_committee_session_watermark,
+    session_odata_filter,
+    session_query_since,
+    sessions_missing_attendance,
+    write_committee_session_watermark,
 )
 from odata_client import fetch_odata  # noqa: E402
 
@@ -433,33 +447,125 @@ def sync_attendance_for_session_parts(
     }
 
 
-def sync_attendance_from_existing_parts(sb: Client) -> dict:
-    """Backfill attendance from נכחו + חברי הכנסת transcript parts."""
-    log.info("── backfilling attendance from existing attendance parts ──")
-    name_index = build_people_name_index(sb)
+def _session_ids_with_attendance(sb: Client, session_ids: set[int]) -> set[int]:
+    found: set[int] = set()
+    ids = list(session_ids)
+    for i in range(0, len(ids), 100):
+        chunk = ids[i : i + 100]
+        offset = 0
+        while True:
+            batch = (
+                sb.table("knesset_committee_session_attendance")
+                .select("session_id")
+                .in_("session_id", chunk)
+                .range(offset, offset + 999)
+                .execute()
+                .data
+                or []
+            )
+            for row in batch:
+                if row.get("session_id") is not None:
+                    found.add(int(row["session_id"]))
+            if len(batch) < 1000:
+                break
+            offset += 1000
+    return found
 
+
+def sync_attendance_from_existing_parts(
+    sb: Client,
+    *,
+    only_session_ids: set[int] | None = None,
+    skip_existing: bool = False,
+) -> dict:
+    """Backfill attendance from נכחו + חברי הכנסת transcript parts.
+
+    only_session_ids limits the pass to one Knesset. skip_existing leaves
+    sessions that already have attendance rows alone, so a rerun after a
+    cancel only fills the gap.
+    """
+    log.info("── backfilling attendance from existing attendance parts ──")
+    if only_session_ids is not None and not only_session_ids:
+        log.info("  no sessions in scope — skip attendance")
+        return {
+            "table": "knesset_committee_session_attendance",
+            "sessions": 0,
+            "matched": 0,
+            "unmatched": 0,
+            "upserted": 0,
+            "inserted": 0,
+            "updated": 0,
+            "skipped": 0,
+        }
+    todo = set(only_session_ids) if only_session_ids is not None else None
+    skipped_existing = 0
+    if skip_existing and todo is not None:
+        have = _session_ids_with_attendance(sb, todo)
+        skipped_existing = len(todo & have)
+        todo = sessions_missing_attendance(todo, have)
+        log.info(
+            "  attendance: %d sessions already stored, %d still missing",
+            skipped_existing,
+            len(todo),
+        )
+        if not todo:
+            return {
+                "table": "knesset_committee_session_attendance",
+                "sessions": 0,
+                "matched": 0,
+                "unmatched": 0,
+                "upserted": 0,
+                "updated": 0,
+                "inserted": 0,
+                "skipped": skipped_existing,
+            }
+
+    name_index = build_people_name_index(sb)
     attendance_headers = sorted(_ATTENDANCE_PART_HEADERS)
     attendance_rows: list[dict] = []
-    page_size = 1000
-    offset = 0
-    while True:
-        batch = (
-            sb.table("knesset_committee_transcript_parts")
-            .select("session_id, speaker_header, body")
-            .in_("speaker_header", attendance_headers)
-            .range(offset, offset + page_size - 1)
-            .execute()
-            .data
-        )
-        attendance_rows.extend(batch or [])
-        if len(batch or []) < page_size:
-            break
-        offset += page_size
+    if todo is None:
+        page_size = 1000
+        offset = 0
+        while True:
+            batch = (
+                sb.table("knesset_committee_transcript_parts")
+                .select("session_id, speaker_header, body")
+                .in_("speaker_header", attendance_headers)
+                .range(offset, offset + page_size - 1)
+                .execute()
+                .data
+            )
+            attendance_rows.extend(batch or [])
+            if len(batch or []) < page_size:
+                break
+            offset += page_size
+    else:
+        ids = list(todo)
+        for i in range(0, len(ids), 100):
+            chunk = ids[i : i + 100]
+            offset = 0
+            while True:
+                batch = (
+                    sb.table("knesset_committee_transcript_parts")
+                    .select("session_id, speaker_header, body")
+                    .in_("session_id", chunk)
+                    .in_("speaker_header", attendance_headers)
+                    .range(offset, offset + 999)
+                    .execute()
+                    .data
+                    or []
+                )
+                attendance_rows.extend(batch)
+                if len(batch) < 1000:
+                    break
+                offset += 1000
 
     by_session: dict[int, list[dict]] = {}
     for row in attendance_rows:
         sid = row["session_id"]
-        by_session.setdefault(sid, []).append(row)
+        if todo is not None and int(sid) not in todo:
+            continue
+        by_session.setdefault(int(sid), []).append(row)
 
     total_matched = 0
     total_unmatched = 0
@@ -489,7 +595,7 @@ def sync_attendance_from_existing_parts(sb: Client) -> dict:
         "upserted": total_matched,
         "inserted": total_matched,
         "updated": 0,
-        "skipped": 0,
+        "skipped": skipped_existing,
     }
 
 
@@ -764,13 +870,10 @@ def upsert_memberships(sb: Client, rows: list[dict]) -> dict:
 
 # ── Sync: sessions ────────────────────────────────────────────────────────────
 
-def sync_sessions(sb: Client, knesset_num: int) -> dict:
-    log.info("── syncing knesset_committee_sessions (Knesset %d) ──", knesset_num)
-    committee_by_oid = load_id_map(sb, "knesset_committees", "knesset_committee_id")
-
-    raw = fetch_odata_committees(
-        "KNS_CommitteeSession", f"KnessetNum eq {knesset_num}"
-    )
+def _session_rows_from_raw(
+    raw: list[dict],
+    committee_by_oid: dict,
+) -> tuple[list[dict], int]:
     by_oid: dict[int, dict] = {}
     skipped = 0
     for r in raw:
@@ -782,7 +885,6 @@ def sync_sessions(sb: Client, knesset_num: int) -> dict:
         if committee_id is None:
             skipped += 1
             continue
-        # Last write wins if OData/pagination emits the same session twice.
         by_oid[int(sid)] = {
             "knesset_session_id": int(sid),
             "committee_id": committee_id,
@@ -798,15 +900,95 @@ def sync_sessions(sb: Client, knesset_num: int) -> dict:
             "start_at": to_timestamptz(r.get("StartDate")),
             "finish_at": to_timestamptz(r.get("FinishDate")),
         }
+    return list(by_oid.values()), skipped
 
-    rows = list(by_oid.values())
+
+def sync_sessions(
+    sb: Client,
+    knesset_num: int,
+    *,
+    backfill: bool = False,
+    watermark: datetime | None = None,
+    on_checkpoint=None,
+) -> dict:
+    """Upsert committee sessions for one Knesset.
+
+    Without a watermark (or with backfill) every session for that Knesset is
+    read, oldest LastUpdatedDate first, and the checkpoint advances after each
+    page so a killed run does not start over. With a watermark, only rows
+    newer than the checkpoint minus the overlap are requested. Existing
+    protocol files are not touched here.
+    """
+    since = session_query_since(watermark, backfill=backfill)
+    filt = session_odata_filter(knesset_num, since)
     log.info(
-        "  prepared %d sessions (%d skipped — unknown committee; %d raw rows)",
-        len(rows),
-        skipped,
-        len(raw),
+        "── syncing knesset_committee_sessions (Knesset %d, %s) ──",
+        knesset_num,
+        "backfill" if backfill else (f"since {since}" if since else "full current term"),
     )
-    return upsert(sb, "knesset_committee_sessions", rows, "knesset_session_id")
+    committee_by_oid = load_id_map(sb, "knesset_committees", "knesset_committee_id")
+    meta: dict = {}
+    checkpoint = None if backfill else watermark
+    totals = {
+        "table": "knesset_committee_sessions",
+        "upserted": 0,
+        "inserted": 0,
+        "updated": 0,
+        "skipped": 0,
+    }
+    paged = False
+
+    def on_page(rows: list[dict]) -> None:
+        nonlocal paged, checkpoint
+        paged = True
+        prepared, skipped = _session_rows_from_raw(rows, committee_by_oid)
+        totals["skipped"] += skipped
+        if prepared:
+            stats = upsert(
+                sb, "knesset_committee_sessions", prepared, "knesset_session_id"
+            )
+            for key in ("upserted", "inserted", "updated", "skipped"):
+                totals[key] += int(stats.get(key) or 0)
+        nxt = advance_session_watermark(checkpoint, rows)
+        if skipped:
+            log.warning(
+                "  %d session(s) skipped (committee not in this Knesset); "
+                "watermark left in place so they are retried",
+                skipped,
+            )
+        elif nxt is not None and nxt != checkpoint and on_checkpoint is not None:
+            checkpoint = nxt
+            on_checkpoint(nxt)
+
+    raw = fetch_odata(
+        "KNS_CommitteeSession",
+        filt,
+        keep_datetime=True,
+        orderby="LastUpdatedDate asc",
+        on_page=on_page,
+        fetch_meta=meta,
+    )
+    if not paged:
+        prepared, skipped = _session_rows_from_raw(raw, committee_by_oid)
+        totals["skipped"] += skipped
+        if prepared:
+            stats = upsert(
+                sb, "knesset_committee_sessions", prepared, "knesset_session_id"
+            )
+            for key in ("upserted", "inserted", "updated", "skipped"):
+                totals[key] += int(stats.get(key) or 0)
+        log.info(
+            "  prepared %d sessions (%d skipped — unknown committee; %d raw rows, source=%s)",
+            len(prepared),
+            skipped,
+            len(raw),
+            meta.get("source") or "odata",
+        )
+    totals["mode"] = "backfill" if backfill else ("incremental" if since else "full")
+    totals["source"] = meta.get("source") or "odata"
+    if checkpoint is not None:
+        totals["watermark"] = checkpoint.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    return totals
 
 
 # ── Sync: protocol documents ──────────────────────────────────────────────────
@@ -855,24 +1037,30 @@ def select_session_oids_missing_protocol_docs(
     session_by_oid: dict[int, int],
     *,
     limit: int,
+    sessions: list[dict] | None = None,
 ) -> list[int]:
-    """Newest-first Knesset session OIDs that still lack a protocol DOC/DOCX."""
+    """Newest-first session OIDs in this map that still lack a protocol DOC/DOCX.
+
+    Sessions that already have a stored protocol are not fetched again.
+    """
     if limit <= 0 or not session_by_oid:
         return []
     have_docs = load_protocol_docs_by_session(sb)
+    already = {
+        oid for oid, sid in session_by_oid.items() if sid in have_docs
+    }
     known_ids = set(session_by_oid.values())
+    source = sessions if sessions is not None else load_session_rows(sb)
     missing: list[int] = []
-    for row in load_session_rows(sb):
+    for row in source:
         sid = row["id"]
-        if sid not in known_ids or sid in have_docs:
+        if sid not in known_ids:
             continue
         oid = to_int(row.get("knesset_session_id"))
         if oid is None:
             continue
         missing.append(oid)
-        if len(missing) >= limit:
-            break
-    return missing
+    return ids_missing(missing, already)[:limit]
 
 
 def fetch_protocol_docs_via_odata_for_sessions(
@@ -928,7 +1116,12 @@ def sync_documents(
         source_label,
         PROTOCOL_GROUP_TYPE_ID,
     )
-    session_by_oid = load_id_map(sb, "knesset_committee_sessions", "knesset_session_id")
+    session_rows = load_sessions_for_knesset(sb, knesset_num)
+    session_by_oid = {
+        int(row["knesset_session_id"]): int(row["id"])
+        for row in session_rows
+        if row.get("knesset_session_id") is not None and row.get("id") is not None
+    }
     if not session_by_oid:
         log.warning("  no sessions in DB — skip documents")
         return {
@@ -960,7 +1153,10 @@ def sync_documents(
         log.info("  Hasadna matched %d protocol docs for loaded sessions", len(by_doc))
 
     missing = select_session_oids_missing_protocol_docs(
-        sb, session_by_oid, limit=odata_session_cap
+        sb,
+        session_by_oid,
+        limit=odata_session_cap,
+        sessions=session_rows,
     )
     # Hasadna rows are not upserted yet — don't OData-refetch those sessions.
     covered_session_ids = {d["session_id"] for d in by_doc.values()}
@@ -1041,6 +1237,52 @@ def _knesset_db_id(sb: Client, knesset_num: int) -> int:
             "run load_all_knesset_data.py first"
         )
     return knesset_id
+
+
+def load_sessions_for_knesset(sb: Client, knesset_num: int) -> list[dict]:
+    """Sessions whose committee belongs to this Knesset, newest first.
+
+    Other terms stay out of the document, transcript, and attendance passes.
+    """
+    knesset_id = _knesset_db_id(sb, knesset_num)
+    committee_ids: list[int] = []
+    offset = 0
+    while True:
+        batch = (
+            sb.table("knesset_committees")
+            .select("id")
+            .eq("knesset_id", knesset_id)
+            .range(offset, offset + 999)
+            .execute()
+            .data
+            or []
+        )
+        committee_ids.extend(
+            int(row["id"]) for row in batch if row.get("id") is not None
+        )
+        if len(batch) < 1000:
+            break
+        offset += 1000
+    rows: list[dict] = []
+    for i in range(0, len(committee_ids), 100):
+        chunk = committee_ids[i : i + 100]
+        offset = 0
+        while True:
+            batch = (
+                sb.table("knesset_committee_sessions")
+                .select("id, knesset_session_id, start_at, committee_id")
+                .in_("committee_id", chunk)
+                .range(offset, offset + 999)
+                .execute()
+                .data
+                or []
+            )
+            rows.extend(batch)
+            if len(batch) < 1000:
+                break
+            offset += 1000
+    rows.sort(key=lambda row: row.get("start_at") or "", reverse=True)
+    return rows
 
 
 def load_committees_for_knesset(sb: Client, knesset_num: int) -> list[dict]:
@@ -1436,7 +1678,10 @@ def sync_transcripts(
         load_hasadna_session_file_index(knesset_num) if use_hasadna else {}
     )
     docs_by_session = load_protocol_docs_by_session(sb)
-    sessions = load_session_rows(sb, session_ids=session_ids)
+    if targeted:
+        sessions = load_session_rows(sb, session_ids=session_ids)
+    else:
+        sessions = load_sessions_for_knesset(sb, knesset_num)
     if targeted:
         found = {s["id"] for s in sessions}
         missing = [sid for sid in session_ids if sid not in found]
@@ -1660,12 +1905,14 @@ def run(
     odata_doc_session_cap: int = DEFAULT_ODATA_DOC_SESSION_CAP,
     use_hasadna: bool = False,
     align_current_committees: bool = False,
+    backfill: bool = False,
 ) -> dict:
     sb = get_supabase()
     started = datetime.now(timezone.utc)
     summary: dict = {
         "knesset_num": knesset_num,
         "use_hasadna": use_hasadna,
+        "backfill": backfill,
         "steps": {},
     }
     targeted = committee is not None and session_date is not None
@@ -1715,7 +1962,23 @@ def run(
         if "memberships" in want:
             summary["steps"]["memberships"] = sync_memberships(sb, knesset_num)
         if "sessions" in want:
-            summary["steps"]["sessions"] = sync_sessions(sb, knesset_num)
+            watermark = None if backfill else read_committee_session_watermark(sb)
+            if watermark is not None:
+                log.info(
+                    "  committee session watermark %s",
+                    watermark.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+                )
+
+            def checkpoint(stamp: datetime) -> None:
+                write_committee_session_watermark(sb, stamp)
+
+            summary["steps"]["sessions"] = sync_sessions(
+                sb,
+                knesset_num,
+                backfill=backfill,
+                watermark=watermark,
+                on_checkpoint=checkpoint,
+            )
         if "documents" in want:
             summary["steps"]["documents"] = sync_documents(
                 sb,
@@ -1754,11 +2017,23 @@ def run(
                 use_hasadna=use_hasadna,
             )
         if "attendance" in want:
+            current_session_ids = {
+                int(row["id"])
+                for row in load_sessions_for_knesset(sb, knesset_num)
+                if row.get("id") is not None
+            }
             summary["steps"]["attendance"] = sync_attendance_from_existing_parts(
-                sb
+                sb,
+                only_session_ids=current_session_ids,
+                skip_existing=True,
             )
 
         finished = datetime.now(timezone.utc)
+        session_step = (summary.get("steps") or {}).get("sessions") or {}
+        if session_step.get("watermark"):
+            summary["odata_watermarks"] = {
+                "committee_session": session_step["watermark"],
+            }
         run_id = record_pipeline_run(
             sb,
             pipeline="knesset-committees",
@@ -1820,12 +2095,22 @@ def main() -> None:
         description="Sync Knesset committee data into Supabase"
     )
     parser.add_argument(
+        "--backfill",
+        action="store_true",
+        help=(
+            "Ignore the session LastUpdatedDate checkpoint and read every "
+            "session for the selected Knesset. Protocols already stored are "
+            "still not downloaded again. Required to pass a non-current --knesset."
+        ),
+    )
+    parser.add_argument(
         "--knesset",
         type=int,
         default=None,
         help=(
             "Knesset number to sync. Omit to use OData IsCurrent, "
-            "then knessets.is_active. Pass explicitly only for a one-off backfill."
+            "then knessets.is_active. A number other than the current "
+            "Knesset requires --backfill."
         ),
     )
     parser.add_argument(
@@ -1925,9 +2210,18 @@ def main() -> None:
         knesset_num = current
     else:
         knesset_num = args.knesset
+        if current is not None and knesset_num != current and not args.backfill:
+            log.error(
+                "Refusing Knesset %s while the current Knesset is %s. "
+                "The scheduled run only syncs the current term. "
+                "Pass --backfill to fill an older term.",
+                knesset_num,
+                current,
+            )
+            sys.exit(2)
         if current is not None and knesset_num != current:
             log.warning(
-                "Syncing committees for Knesset %s while the current Knesset is %s",
+                "Backfill committees for Knesset %s (current is %s)",
                 knesset_num,
                 current,
             )
@@ -1945,6 +2239,7 @@ def main() -> None:
             odata_doc_session_cap=max(0, args.odata_doc_session_cap),
             use_hasadna=args.use_hasadna,
             align_current_committees=current is not None and knesset_num == current,
+            backfill=args.backfill,
         )
     except RuntimeError as exc:
         log.error("%s", exc)
