@@ -6,6 +6,9 @@ Checks (recorded in pipeline_runs, action=consistency-check):
   - current-Knesset memberships with null faction_id
   - OData current committees missing from knesset_committees
   - committees marked current, or last synced, for a non-current Knesset
+  - OData current government (GovernmentNum on IsCurrent ministerial positions)
+    != governments.is_active
+  - the active government has no open minister_appointments (end_date null)
 
 Exit 0 when every check passes. Exit 1 on any issue or on a lookup failure.
 Provisional election-list faction links are reported but are not a failure.
@@ -22,6 +25,10 @@ from pathlib import Path
 from current_knesset import (
     database_active_knesset_number,
     odata_current_knesset_number,
+)
+from government_sync import (
+    current_government_numbers,
+    select_current_government_number,
 )
 from knesset_term import ConsistencyFacts, evaluate_consistency
 from load_all_knesset_data import get_supabase
@@ -136,6 +143,49 @@ def _last_committees_sync_knesset(sb) -> int | None:
         return None
 
 
+def _odata_current_government_number() -> int | None:
+    """Highest GovernmentNum on an IsCurrent ministerial position.
+
+    KNS_Government does not exist. IsCurrent eq true is paginated; ministerial
+    rows are the ones that also carry GovMinistryID.
+    """
+    rows = fetch_odata("KNS_PersonToPosition", "IsCurrent eq true")
+    numbers = current_government_numbers(rows)
+    if len(numbers) > 1:
+        log.warning(
+            "OData IsCurrent is set on multiple governments %s — using %s",
+            numbers,
+            max(numbers),
+        )
+    return select_current_government_number(numbers)
+
+
+def _database_active_government(sb) -> tuple[int | None, int | None]:
+    """(government_number, id) for governments.is_active. Highest number if several."""
+    rows = (
+        sb.table("governments")
+        .select("id, government_number")
+        .eq("is_active", True)
+        .execute()
+        .data
+        or []
+    )
+    parsed = [
+        (int(row["government_number"]), int(row["id"]))
+        for row in rows
+        if row.get("government_number") is not None and row.get("id") is not None
+    ]
+    if not parsed:
+        return None, None
+    if len(parsed) > 1:
+        log.warning(
+            "Multiple governments.is_active rows %s — using the highest number",
+            [number for number, _gov_id in parsed],
+        )
+    number, gov_id = max(parsed, key=lambda item: item[0])
+    return number, gov_id
+
+
 def _odata_current_committee_ids(knesset_number: int) -> frozenset[int]:
     rows = fetch_odata("KNS_Committee", f"KnessetNum eq {knesset_number}")
     ids: set[int] = set()
@@ -190,6 +240,25 @@ def load_facts(sb) -> ConsistencyFacts:
             log.error("OData current-committee lookup failed: %s", exc)
             committee_ids = None
 
+    government_lookup_ok = True
+    odata_government = None
+    try:
+        odata_government = _odata_current_government_number()
+    except Exception as exc:
+        government_lookup_ok = False
+        log.error("OData current-government lookup failed: %s", exc)
+
+    db_government, db_government_id = _database_active_government(sb)
+    open_appointments = None
+    if db_government_id is not None:
+        open_appointments = _count(
+            sb,
+            "minister_appointments",
+            lambda query: query.eq("government_id", db_government_id).is_(
+                "end_date", "null"
+            ),
+        )
+
     return ConsistencyFacts(
         odata_knesset_lookup_ok=lookup_ok,
         odata_current_knesset=odata_number,
@@ -201,6 +270,10 @@ def load_facts(sb) -> ConsistencyFacts:
         committees_marked_current_on_knessets=_committees_marked_current(sb),
         last_committees_sync_knesset=_last_committees_sync_knesset(sb),
         provisional_column_ready=column_ready,
+        odata_government_lookup_ok=government_lookup_ok,
+        odata_current_government=odata_government,
+        db_active_government=db_government,
+        active_government_open_appointments=open_appointments,
     )
 
 
@@ -238,6 +311,7 @@ def main() -> None:
         message = (
             "Knesset consistency ok "
             f"(Knesset {report['current_knesset']}, "
+            f"government {report['odata_current_government']}, "
             f"provisional faction links: {report['provisional_faction_memberships']})"
         )
         error = None

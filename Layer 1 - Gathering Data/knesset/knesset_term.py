@@ -306,6 +306,10 @@ class ConsistencyFacts:
     committees_marked_current_on_knessets: frozenset[int]
     last_committees_sync_knesset: int | None
     provisional_column_ready: bool
+    odata_government_lookup_ok: bool
+    odata_current_government: int | None
+    db_active_government: int | None
+    active_government_open_appointments: int | None
 
 
 def evaluate_consistency(facts: ConsistencyFacts) -> dict:
@@ -399,6 +403,37 @@ def evaluate_consistency(facts: ConsistencyFacts) -> dict:
                 ),
             )
 
+    if not facts.odata_government_lookup_ok:
+        add(
+            "odata_current_government_unreadable",
+            "Could not read the current government from OData GovernmentNum",
+        )
+    elif facts.odata_current_government is None:
+        add(
+            "odata_current_government_missing",
+            "OData returned no IsCurrent ministerial position with GovernmentNum",
+        )
+    elif facts.db_active_government != facts.odata_current_government:
+        add(
+            "odata_db_government_mismatch",
+            (
+                f"OData current government {facts.odata_current_government} != "
+                f"DB active government {facts.db_active_government}"
+            ),
+        )
+
+    if (
+        facts.db_active_government is not None
+        and facts.active_government_open_appointments == 0
+    ):
+        add(
+            "active_government_without_ministers",
+            (
+                f"Active government {facts.db_active_government} has no open "
+                "minister appointments"
+            ),
+        )
+
     return {
         "ok": not issues,
         "issues": issues,
@@ -407,4 +442,7 @@ def evaluate_consistency(facts: ConsistencyFacts) -> dict:
         "db_active_knesset": facts.db_active_knesset,
         "null_faction_memberships": facts.null_faction_memberships,
         "provisional_faction_memberships": facts.provisional_faction_memberships,
+        "odata_current_government": facts.odata_current_government,
+        "db_active_government": facts.db_active_government,
+        "active_government_open_appointments": facts.active_government_open_appointments,
     }

@@ -322,13 +322,13 @@ One row per Israeli government (ממשלה).
 |--------|------|-------------|
 | `id` | bigint | Primary key |
 | `government_number` | integer | Official government number. UNIQUE. |
-| `knesset_id` | bigint | FK → `knessets.id` — may be manually incomplete for historical rows |
-| `start_date` | date | Government formation date — may be manually incomplete for historical rows |
-| `end_date` | date | Government end date — may be manually incomplete for historical rows |
+| `knesset_id` | bigint | FK → `knessets.id`. Filled from the earliest appointment's Knesset when null; an existing value is kept |
+| `start_date` | date | Filled from the earliest ministerial `StartDate` when null; an existing value is kept |
+| `end_date` | date | Filled when a government stops being current and the value is null; an existing value is kept |
 | `is_active` | boolean | True for the current government |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `load_all_knesset_data.py`. No `KNS_Government` endpoint exists in the Knesset OData API — government numbers are derived from unique `GovernmentNum` values in `KNS_PersonToPosition`. The loader does not overwrite government metadata, so `knesset_id`, `start_date`, and `end_date` must be curated manually when available. The Government page tolerates missing or misaligned historical dates by falling back from `governments.end_date` to the latest appointment date inside the selected government, and resolves minister faction data from each person's latest known-faction Knesset membership before the government snapshot date rather than relying only on `governments.knesset_id`.
+**Data source:** `load_all_knesset_data.py`. There is no `KNS_Government` entity (confirmed in ParliamentInfo `$metadata`). Each government is a distinct `GovernmentNum` on ministerial `KNS_PersonToPosition` rows (`GovernmentNum` and `GovMinistryID` both set). The sync inserts a missing number, sets `is_active` on the highest number that still has an `IsCurrent` position, and clears the previous active row first (partial unique index). A null `end_date` on that previous row is filled from the latest `FinishDate`, or from the new government's earliest `StartDate` when those positions are not closed yet. `knesset_id`, `start_date`, and `end_date` already stored on a row are left as curated; only nulls are filled. On insert, `start_date` is the earliest ministerial `StartDate` and `knesset_id` is the Knesset on that earliest appointment. The Government page still tolerates a missing `end_date` by falling back to the latest appointment date, and resolves minister faction data from each person's latest known-faction Knesset membership before the snapshot date rather than relying only on `governments.knesset_id`.
 
 ---
 
@@ -350,7 +350,7 @@ Government ministries (משרדי ממשלה).
 | `is_shown` | boolean | Whether to show on the dashboard |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override. Frontend prefers `knesset_category_name`, then `name`.
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override set on insert. A ministry missing from a non-empty feed is closed (`is_active` false) and its curated fields are left in place. An empty feed closes nothing. Frontend prefers `knesset_category_name`, then `name`.
 
 ---
 
@@ -368,7 +368,7 @@ Records each person's ministerial appointment in a specific government.
 | `start_date` | date | Appointment start |
 | `end_date` | date | Appointment end — null if current |
 | `is_current` | boolean | OData `IsCurrent` mirror — government page filters by appointment date ranges, not this flag |
-| `is_acting` | boolean | Always `false` — not available from OData |
+| `is_acting` | boolean | Not in OData. Set false on insert only; sync does not overwrite a curated value |
 | `duty_desc` | text | Role description from OData |
 | `created_at` | timestamptz | Row creation timestamp |
 
@@ -797,9 +797,9 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 
 | Script | Tables updated | Trigger |
 |--------|---------------|---------|
-| `load_all_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Daily midnight Israel (GitHub Actions: `.github/workflows/knesset-pipeline.yml`). `knessets.is_active` follows OData `IsCurrent`. Null `FactionID` on the active Knesset can be filled provisionally from election lists. |
+| `load_all_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Daily midnight Israel (GitHub Actions: `.github/workflows/knesset-pipeline.yml`). `knessets.is_active` follows OData `IsCurrent`. `governments.is_active` follows the current `GovernmentNum` on ministerial positions; a new number is inserted and the previous active row is closed. Null `FactionID` on the active Knesset can be filled provisionally from election lists. |
 | `load_knesset_committees.py` | `knesset_committees` · `knesset_committee_sessions` · `knesset_committee_session_documents` · `knesset_committee_session_transcripts` · `knesset_committee_transcript_parts` (+ memberships only with `--use-hasadna`) | Same daily workflow (after main knesset sync). **Default Knesset: OData IsCurrent, else `knessets.is_active`.** **Default source: Knesset OData + DOC self-parse** (no Hasadna). CI installs `antiword`. Newest **50** missing transcripts/run. Targeted CLI: `--committee` + `--date YYYY-MM-DD`. One-off term: `--knesset <number>`. |
-| `check_knesset_consistency.py` | `pipeline_runs` (`pipeline=knesset`, `action=consistency-check`) | Same daily workflow, after committees. Fails the job on: OData current Knesset ≠ DB active knesset; current-Knesset memberships with null `faction_id`; OData current committees missing from the DB; committees marked current or last synced for a non-current Knesset. Provisional faction links are counted in the summary and are not themselves a failure. |
+| `check_knesset_consistency.py` | `pipeline_runs` (`pipeline=knesset`, `action=consistency-check`) | Same daily workflow, after committees. Fails the job on: OData current Knesset ≠ DB active knesset; current-Knesset memberships with null `faction_id`; OData current committees missing from the DB; committees marked current or last synced for a non-current Knesset; OData current government ≠ DB active government; active government with no open minister appointments. Provisional faction links are counted in the summary and are not themselves a failure. |
 | `seed_office_dashboard.py` | `offices.is_shown` / `info` · `indexes` · `index_data` | Manual — migrate curated KPI data from old sn.db |
 | `insert_raw_list.py` | `raw_candidate_lists` | Manual — when a party publishes their list |
 | `run_pipeline.py` | `election_candidates` · `people` (enrichment) | Manual — after each `insert_raw_list.py` run |
@@ -857,7 +857,7 @@ Unique constraints also provide leading-column indexes for several keys (e.g. `e
 |-------|-----------------|-------|
 | Coalition | `knesset_factions.is_coalition` | Memberships do **not** store coalition |
 | Current MK / minister in UI | Date ranges (`end_date` null / overlapping snapshot) | `people.is_current` / `minister_appointments.is_current` / faction `is_current` are OData mirrors only |
-| Active knesset / government | `is_active` (+ partial unique index) | Knesset flag is set from OData `IsCurrent` on each sync (previous active row cleared first). Government flag stays curated — there is no government OData entity. |
+| Active knesset / government | `is_active` (+ partial unique index) | Knesset flag is set from OData `IsCurrent` on each sync (previous active row cleared first). Government flag is the highest `GovernmentNum` that still has an `IsCurrent` ministerial position. There is no `KNS_Government` entity. Curated `knesset_id` / `start_date` / `end_date` on an existing government are not overwritten; a null `end_date` is filled when that government stops being current. |
 | MK faction when OData `FactionID` is null | Election list for `elections.knesset_number` = active Knesset, matched onto current-Knesset factions by `election_parties.knesset_faction_id` or by name | Stored with `faction_id_provisional=true`. Official `FactionID` overwrites it and clears the flag. |
 | Office display name | `offices.name` (curated) vs `knesset_category_name` (OData) | Sync never overwrites existing `name` |
 | Poll publisher | `polls.publisher` text identity; `publisher_id` FK for logos | Normalize resolves/creates `poll_publishers` rows |

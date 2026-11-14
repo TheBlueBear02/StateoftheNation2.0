@@ -294,7 +294,6 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict, dict | None]:
     knesset_map = sync.load_id_map(sb, "knessets", "knesset_number")
     people_map = sync.load_id_map(sb, "people", "knesset_person_id")
     faction_map = sync.load_id_map(sb, "knesset_factions", "knesset_faction_id")
-    gov_map = sync.load_id_map(sb, "governments", "government_number")
     office_map = sync.load_id_map(sb, "offices", "knesset_category_id")
 
     if stage == 3:
@@ -312,25 +311,16 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict, dict | None]:
         return STAGE_LABELS[stage], "סנכרון משרדים הושלם", summary, None
 
     if stage == 5:
-        count = len(sync.sync_governments(sb))
+        positions = sync.fetch_odata("KNS_PersonToPosition")
+        _gov_map, stats = sync.sync_governments(sb, positions, knesset_map)
         summary = make_run_summary(
-            [
-                make_stage_summary(
-                    stage,
-                    STAGE_LABELS[stage],
-                    [],
-                    note=f"נטענו {count} ממשלות מהמסד (ללא OData)",
-                )
-            ]
+            [make_stage_summary(stage, STAGE_LABELS[stage], [stats])]
         )
-        return (
-            STAGE_LABELS[stage],
-            f"נטענו {count} ממשלות מהמסד (ללא OData)",
-            summary,
-            None,
-        )
+        return STAGE_LABELS[stage], "סנכרון ממשלות הושלם", summary, None
 
     if stage == 6:
+        positions = sync.fetch_odata("KNS_PersonToPosition")
+        gov_map, gov_stats = sync.sync_governments(sb, positions, knesset_map)
         before = snapshot_knesset_positions(sb)
         position_stats = sync.sync_positions(
             sb,
@@ -339,11 +329,13 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict, dict | None]:
             faction_map,
             gov_map,
             office_map,
+            positions,
         )
         after = snapshot_knesset_positions(sb)
         changes = diff_knesset_positions(before, after)
         write_pending_site_update(changes)
         entries = [
+            gov_stats,
             position_stats["knesset_memberships"],
             position_stats["knesset_memberships_faction_id"],
             position_stats["minister_appointments"],

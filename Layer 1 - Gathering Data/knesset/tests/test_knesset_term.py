@@ -187,6 +187,10 @@ class ConsistencyTests(unittest.TestCase):
             committees_marked_current_on_knessets=frozenset({26}),
             last_committees_sync_knesset=26,
             provisional_column_ready=True,
+            odata_government_lookup_ok=True,
+            odata_current_government=37,
+            db_active_government=37,
+            active_government_open_appointments=30,
         )
         base.update(overrides)
         return ConsistencyFacts(**base)  # type: ignore[arg-type]
@@ -219,6 +223,18 @@ class ConsistencyTests(unittest.TestCase):
         codes = {issue["code"] for issue in wrong_term["issues"]}
         self.assertIn("committees_current_on_other_knesset", codes)
         self.assertIn("committees_synced_for_non_current_knesset", codes)
+
+        government = evaluate_consistency(self._facts(db_active_government=36))
+        self.assertEqual(
+            government["issues"][0]["code"], "odata_db_government_mismatch"
+        )
+
+        empty = evaluate_consistency(
+            self._facts(active_government_open_appointments=0)
+        )
+        self.assertEqual(
+            empty["issues"][0]["code"], "active_government_without_ministers"
+        )
 
     def test_boolean_odata_filter(self) -> None:
         rows = [
