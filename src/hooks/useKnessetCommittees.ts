@@ -229,7 +229,10 @@ async function fetchChairsByCommitteeIds(
   return chairs
 }
 
-export function useKnessetCommittees(): UseKnessetCommitteesResult {
+export function useKnessetCommittees(
+  knessetId: number | null,
+  enabled = true,
+): UseKnessetCommitteesResult {
   const [committees, setCommittees] = useState<KnessetCommittee[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -241,6 +244,16 @@ export function useKnessetCommittees(): UseKnessetCommitteesResult {
       setLoading(true)
       setError(null)
 
+      if (!enabled) {
+        return
+      }
+
+      if (knessetId == null) {
+        setCommittees([])
+        setLoading(false)
+        return
+      }
+
       if (supabaseConfigError || !supabase) {
         setError(supabaseConfigError ?? 'Supabase client is not configured')
         setCommittees([])
@@ -249,30 +262,6 @@ export function useKnessetCommittees(): UseKnessetCommitteesResult {
       }
 
       try {
-        const { data: knessetRow, error: knessetError } = await supabase
-          .from('knessets')
-          .select('id, knesset_number')
-          .eq('is_active', true)
-          .maybeSingle()
-
-        if (cancelled) {
-          return
-        }
-
-        if (knessetError) {
-          setError(knessetError.message)
-          setCommittees([])
-          setLoading(false)
-          return
-        }
-
-        if (!knessetRow?.id) {
-          setError('לא נמצאה כנסת פעילה')
-          setCommittees([])
-          setLoading(false)
-          return
-        }
-
         const [{ data, error: queryError }, statsByCommittee] =
           await Promise.all([
             supabase
@@ -280,7 +269,7 @@ export function useKnessetCommittees(): UseKnessetCommitteesResult {
               .select(
                 'id, knesset_committee_id, knesset_id, name, committee_type_id, committee_type_desc, is_current',
               )
-              .eq('knesset_id', knessetRow.id),
+              .eq('knesset_id', knessetId),
             fetchReadyTranscriptStatsByCommittee(),
           ])
 
@@ -333,7 +322,7 @@ export function useKnessetCommittees(): UseKnessetCommitteesResult {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [enabled, knessetId])
 
   return { committees, loading, error }
 }
