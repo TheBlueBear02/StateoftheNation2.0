@@ -37,7 +37,10 @@ jobs:
           PIPELINE_RUN_SOURCE: github-actions
 
       # antiword: convert Knesset .doc protocols (default transcript path).
+      # Still install and sync committees when the knesset data step failed.
+      # Otherwise the consistency check reports a Knesset the committees step never tried.
       - name: Install antiword for committee protocol self-parse
+        if: ${{ !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y antiword
 
       # Committees for the current Knesset (OData IsCurrent, else knessets.is_active).
@@ -46,6 +49,7 @@ jobs:
       # Docs: session-scoped OData only (never full-scan DocumentCommitteeSession).
       # Transcripts: newest missing with a protocol DOC (limit 50/run).
       - name: Run knesset committees pipeline
+        if: ${{ !cancelled() }}
         run: python load_knesset_committees.py --transcripts-mode missing --transcripts-limit 50
         working-directory: 'Layer 1 - Gathering Data/knesset'
         env:

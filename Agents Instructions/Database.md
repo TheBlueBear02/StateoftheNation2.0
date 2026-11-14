@@ -350,7 +350,7 @@ Government ministries (משרדי ממשלה).
 | `is_shown` | boolean | Whether to show on the dashboard |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override set on insert. A ministry missing from a non-empty feed is closed (`is_active` false) and its curated fields are left in place. An empty feed closes nothing. Frontend prefers `knesset_category_name`, then `name`.
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override set on insert. Changes to an existing row are `UPDATE`s, not a partial upsert: `name` is `NOT NULL`, and Postgres checks that on the speculative `INSERT` before `ON CONFLICT`. A ministry missing from a non-empty feed is closed (`is_active` false) the same way. An empty feed closes nothing. A new ministry with no OData name is skipped. Frontend prefers `knesset_category_name`, then `name`.
 
 ---
 

@@ -73,6 +73,7 @@ from government_sync import (  # noqa: E402
     current_government_numbers,
     plan_government_sync,
     plan_office_writes,
+    prepare_office_writes,
     select_current_government_number,
 )
 
@@ -344,12 +345,15 @@ def upsert(
     for i in range(0, len(to_insert), 500):
         sb.table(table).insert(to_insert[i:i + 500]).execute()
 
-    # Targeted upsert only for rows whose synced fields actually changed.
-    for i in range(0, len(to_update), 500):
-        sb.table(table).upsert(
-            to_update[i:i + 500],
-            on_conflict=conflict_col,
-        ).execute()
+    # PATCH existing rows. INSERT ... ON CONFLICT still validates NOT NULL on
+    # columns omitted from the payload, so a partial upsert (offices.is_active,
+    # membership faction_id) fails before the conflict is applied.
+    for row in to_update:
+        key = row.get(conflict_col)
+        payload = {field: value for field, value in row.items() if field != conflict_col}
+        if key is None or not payload:
+            continue
+        sb.table(table).update(payload).eq(conflict_col, key).execute()
 
     inserted = len(to_insert)
     updated = len(to_update)
@@ -562,8 +566,15 @@ def sync_offices(sb: Client) -> tuple[dict[int, int], dict]:
         for category_id, row in existing_rows.items()
         if category_id is not None
     }
-    rows = plan_office_writes(raw, existing)
+    rows, skipped = prepare_office_writes(plan_office_writes(raw, existing), set(existing))
+    for category_id, reason in skipped:
+        log.warning("  office %s skipped (%s)", category_id, reason)
     stats = upsert(sb, "offices", rows, "knesset_category_id", set(existing))
+    if skipped:
+        stats["skipped_offices"] = [
+            {"knesset_category_id": category_id, "reason": reason}
+            for category_id, reason in skipped
+        ]
     return load_id_map(sb, "offices", "knesset_category_id"), stats
 
 
