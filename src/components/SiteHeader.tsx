@@ -2,8 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-
-const CURRENT_TERM_LABEL = 'ממשלת ישראל ה37 | הכנסת ה25'
+import { useCurrentTermLabel } from '../hooks/useCurrentTermLabel'
 
 const CIVIL_DATE_FORMATTER = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Jerusalem',
@@ -94,6 +93,7 @@ function getHeaderDateLabels(date = new Date()) {
 export function SiteHeader() {
   const pathname = usePathname()
   const isHome = pathname === '/'
+  const termLabel = useCurrentTermLabel()
   const { civilDate, hebrewDate, isoDate } = getHeaderDateLabels()
 
   return (
@@ -114,7 +114,7 @@ export function SiteHeader() {
             <span aria-hidden="true">|</span>
             <span dir="ltr">{civilDate}</span>
           </time>
-          <p className="site-header__term">{CURRENT_TERM_LABEL}</p>
+          {termLabel ? <p className="site-header__term">{termLabel}</p> : null}
         </div>
       </div>
     </header>

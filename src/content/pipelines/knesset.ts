@@ -9,8 +9,8 @@ export const knessetPipeline: PipelineDoc = {
   docsPath: '/piplines/docs/knesset',
   editPath: '/knesset/edit',
   schedule: {
-    label: 'כל יום שבת בחצות · 00:00 שעון ישראל',
-    cron: '0 21 * * 5',
+    label: 'כל יום בחצות · 00:00 שעון ישראל',
+    cron: '0 21 * * *',
     timezone: 'Asia/Jerusalem',
   },
   sections: [
@@ -20,7 +20,8 @@ export const knessetPipeline: PipelineDoc = {
       paragraphs: [
         'תהליך הסנכרון שולף נתונים מ-Knesset OData API, ממפה שדות לטבלאות היעד, ומעדכן רשומות לפי מפתח ייחודי לכל טבלה.',
         'הכתיבה היא insert לשורות חדשות ועדכון רק כששדות ה-OData השתנו — אין מחיקות ואין כתיבה מחדש לשורות זהות. שדות ידניים (צבע סיעה, קואליציה וכו׳) לא נדרסים.',
-        'הצינור רץ כל יום שבת בחצות שעון ישראל ב-GitHub Actions (21:00 UTC ביום שישי בקיץ).',
+        'הצינור רץ כל יום בחצות שעון ישראל (21:00 UTC; בחורף 23:00 שעון ישראל). מספר הכנסת הפעילה נגזר מ-OData IsCurrent ונשמר ב-knessets.is_active — אין מספר כנסת קבוע בצינור.',
+        'כש-OData לא מחזיר FactionID לחבר כנסת, הצינור מקשר אותו זמנית לסיעה של הכנסת הנוכחית לפי רשימת הבחירות ומסמן faction_id_provisional. ברגע ש-OData מספק FactionID, הערך הרשמי דורס את הקישור הזמני.',
       ],
     },
     {
@@ -79,7 +80,7 @@ export const knessetPipeline: PipelineDoc = {
       id: 'run',
       title: 'הרצה',
       paragraphs: [
-        'הסקריפט נמצא ב-Layer 1 - Gathering Data/knesset/. סנכרון מלא רץ אוטומטית פעם בשבוע, ואפשר גם להריץ ידנית סנכרון מלא, טבלה בודדת, או מצב בדיקה לשדות שמגיעים מה-API.',
+        'הסקריפט נמצא ב-Layer 1 - Gathering Data/knesset/. סנכרון מלא רץ אוטומטית כל יום, ואחריו סנכרון ועדות לכנסת הנוכחית ובדיקת עקביות. אפשר גם להריץ ידנית סנכרון מלא, טבלה בודדת, או מצב בדיקה לשדות שמגיעים מה-API.',
       ],
       code: `# סנכרון מלא (גם מה ש-GitHub Actions מריץ)
 python load_all_knesset_data.py
@@ -98,7 +99,9 @@ python load_all_knesset_data.py --discover`,
       ],
       list: [
         'km_images.py — מקשר קבצי JPEG מקומיים לשדה image_url ב-people',
-        'fix_faction_links.py / fix_faction_links_all.py — ממלא faction_id בחברויות חסרות',
+        'קישור זמני מרשימות הבחירות — כשאין FactionID ב-OData, לחברי הכנסת הנוכחית',
+        'fix_faction_links.py / fix_faction_links_all.py — ממלא faction_id בחברויות חסרות (קישור שהתקבל נשמר עד ש-OData שולח FactionID)',
+        'check_knesset_consistency.py — משווה כנסת פעילה, סיעות חסרות וועדות נוכחיות מול OData',
         'check.py — בדיקות תקינות אד-הוק',
       ],
     },

@@ -2,7 +2,10 @@
 """
 load_knesset_committees.py
 ==========================
-Sync Knesset 25 committee data into Supabase.
+Sync committee data for the current Knesset into Supabase.
+
+The Knesset number defaults to OData IsCurrent (KNS_KnessetDates), then knessets.is_active.
+Pass --knesset only to backfill one term explicitly.
 
 Default sources (Knesset only — Hasadna dumps are stale for committees):
   - OData ParliamentInfo.svc
@@ -29,7 +32,7 @@ Usage:
   python load_knesset_committees.py --transcripts-mode missing --transcripts-limit 200
   python load_knesset_committees.py --table committees
   python load_knesset_committees.py --use-hasadna --table memberships
-  python load_knesset_committees.py --knesset 25
+  python load_knesset_committees.py --knesset 26
   python load_knesset_committees.py --committee "ועדת הכספים" --date 2024-03-12
   python load_knesset_committees.py --table transcripts --committee 977 --date 2024-03-12 --session-oid 2156789
 
@@ -59,6 +62,7 @@ from supabase import Client
 
 # Reuse upsert / id-map helpers from the main knesset loader.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from current_knesset import resolve_current_knesset_number  # noqa: E402
 from load_all_knesset_data import (  # noqa: E402
     get_supabase,
     load_id_map,
@@ -92,7 +96,6 @@ HASADNA_BASE = "https://production.oknesset.org/pipelines/data"
 RETRY_MAX = 5
 RETRY_DELAY = 4
 
-DEFAULT_KNESSET_NUM = 25
 PROTOCOL_GROUP_TYPE_ID = 23
 # Cap OData DocumentCommitteeSession queries when Hasadna CSV fails.
 # Full-entity paging is ~120k+ rows and can exceed the GitHub Actions job timeout.
@@ -561,6 +564,25 @@ def sync_committees(sb: Client, knesset_num: int) -> dict:
 
     stats = upsert(sb, "knesset_committees", rows, "knesset_committee_id")
     return stats
+
+
+def demote_other_knesset_committees(sb: Client, current_knesset_id: int) -> int:
+    """Clear is_current on committees that belong to a different Knesset term."""
+    result = (
+        sb.table("knesset_committees")
+        .update({"is_current": False})
+        .neq("knesset_id", current_knesset_id)
+        .eq("is_current", True)
+        .execute()
+    )
+    cleared = len(result.data or [])
+    if cleared:
+        log.info(
+            "  cleared is_current on %d committees outside knesset id %s",
+            cleared,
+            current_knesset_id,
+        )
+    return cleared
 
 
 # ── Sync: memberships (Hasadna) ───────────────────────────────────────────────
@@ -1637,6 +1659,7 @@ def run(
     session_oid: int | None = None,
     odata_doc_session_cap: int = DEFAULT_ODATA_DOC_SESSION_CAP,
     use_hasadna: bool = False,
+    align_current_committees: bool = False,
 ) -> dict:
     sb = get_supabase()
     started = datetime.now(timezone.utc)
@@ -1683,6 +1706,12 @@ def run(
     try:
         if "committees" in want:
             summary["steps"]["committees"] = sync_committees(sb, knesset_num)
+            if align_current_committees:
+                knesset_id = load_id_map(sb, "knessets", "knesset_number").get(knesset_num)
+                if knesset_id is not None:
+                    summary["steps"]["demote_other_committees"] = {
+                        "cleared": demote_other_knesset_committees(sb, knesset_id),
+                    }
         if "memberships" in want:
             summary["steps"]["memberships"] = sync_memberships(sb, knesset_num)
         if "sessions" in want:
@@ -1793,8 +1822,11 @@ def main() -> None:
     parser.add_argument(
         "--knesset",
         type=int,
-        default=DEFAULT_KNESSET_NUM,
-        help=f"Knesset number (default {DEFAULT_KNESSET_NUM})",
+        default=None,
+        help=(
+            "Knesset number to sync. Omit to use OData IsCurrent, "
+            "then knessets.is_active. Pass explicitly only for a one-off backfill."
+        ),
     )
     parser.add_argument(
         "--table",
@@ -1881,9 +1913,28 @@ def main() -> None:
     if limit == 0:
         limit = None
 
+    lookup = get_supabase()
+    current = resolve_current_knesset_number(lookup)
+    if args.knesset is None:
+        if current is None:
+            log.error(
+                "Could not resolve the current Knesset from OData IsCurrent "
+                "or knessets.is_active"
+            )
+            sys.exit(1)
+        knesset_num = current
+    else:
+        knesset_num = args.knesset
+        if current is not None and knesset_num != current:
+            log.warning(
+                "Syncing committees for Knesset %s while the current Knesset is %s",
+                knesset_num,
+                current,
+            )
+
     try:
         run(
-            knesset_num=args.knesset,
+            knesset_num=knesset_num,
             table=args.table,
             transcripts_mode=args.transcripts_mode,
             transcripts_limit=limit,
@@ -1893,6 +1944,7 @@ def main() -> None:
             session_oid=args.session_oid,
             odata_doc_session_cap=max(0, args.odata_doc_session_cap),
             use_hasadna=args.use_hasadna,
+            align_current_committees=current is not None and knesset_num == current,
         )
     except RuntimeError as exc:
         log.error("%s", exc)

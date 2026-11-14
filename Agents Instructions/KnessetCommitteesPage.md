@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure and [Database.md](./Database.md) for the Committees group schema.
 
-Visualization of **Knesset 25** committee sittings: pick a committee and session from a WhatsApp-style group list, see MKs around a hollow committee table, and play the transcript as a chat beside the table.
+Visualization of committee sittings for the **active Knesset** (`knessets.is_active`): pick a committee and session from a WhatsApp-style group list, see MKs around a hollow committee table, and play the transcript as a chat beside the table.
 
 Route: `/knesset/committees`  
 Shareable deep links: `/knesset/committees?committee=<id>` (sessions list), `/knesset/committees?committee=<id>&session=<id>` (transcript + table), and `/knesset/committees?committee=<id>&session=<id>&message=<partId>` (same session, jumps to that speech bubble). Ids are the internal Supabase PKs (`knesset_committees.id`, `knesset_committee_sessions.id`, `knesset_committee_transcript_parts.id`). Browser back/forward follows the query. Open Graph / Twitter metadata is generated from those query params (committee name, session number/date, agenda when available), and `og:url` keeps the full deep link so WhatsApp/Facebook do not strip `session` / `message`. The transcript chat header has a **share** button for the session; each MK speech bubble has a small **message share** button (native share sheet, else copy URL).
@@ -43,7 +43,7 @@ Mobile: no breadcrumb; chat/list flush under the site header (no top padding/gap
 | `src/lib/committeeTypes.ts` | Shared TS types |
 | `src/lib/committeeTableLayout.ts` | Seat placement around the table |
 | `src/lib/committeeSpeakerMatch.ts` | Match parts → seated MKs by person_id / header |
-| `src/hooks/useKnessetCommittees.ts` | K25 committees that have at least one ready transcript |
+| `src/hooks/useKnessetCommittees.ts` | Active-Knesset committees that have at least one ready transcript |
 | `src/hooks/useCommitteeSessions.ts` | Sessions (+ transcript filter) |
 | `src/hooks/useCommitteeMemberships.ts` | Active members for session date |
 | `src/hooks/useCommitteeAttendance.ts` | Session attendees from `נכחו` parse |
@@ -97,9 +97,9 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 
 ## Data queries
 
-1. Resolve `knessets.id` where `knesset_number = 25` → `knesset_committees`, then keep only committees that appear on a ready `knesset_committee_session_transcripts` row (via session). Aggregate per committee: ready-session **count** + **latest `start_at`**, and load current **chair** (name + photo) from memberships (`seat_role = chair`). Sort **ועדה ראשית** first, then by latest session descending.
+1. Resolve `knessets.id` where `is_active = true` → `knesset_committees`, then keep only committees that appear on a ready `knesset_committee_session_transcripts` row (via session). Aggregate per committee: ready-session **count** + **latest `start_at`**, and load current **chair** (name + photo) from memberships (`seat_role = chair`). Sort **ועדה ראשית** first, then by latest session descending. If no active knesset row exists, the page shows `לא נמצאה כנסת פעילה`.
 2. Sessions for `committee_id`; mark `hasTranscript` via ready transcripts for those session ids (chunked `.in`). Fetch first `סדר היום` part body per session for the sessions list subtitle, and exact `knesset_committee_transcript_parts` counts per session for the message badge.
-3. Memberships for committee, filtered to session date; join `people`. Enrich with factions (`usePersonFactions`) and tenure (`usePersonTenures` from `knesset_memberships`).
+3. Memberships for committee, filtered to session date; join `people`. Enrich with factions (`usePersonFactions` — when several memberships cover the session date, the highest Knesset number wins) and tenure (`usePersonTenures` from `knesset_memberships`).
 4. Attendance for `session_id` (when present, absentees are grayed; guests may be added).
 5. Transcript by `session_id` + parts ordered by `ordinal`, join `people`. Parts are **paged** in chunks of 1000 (PostgREST default cap) so long sittings keep the full protocol through `הישיבה ננעלה`, not only the first ~1000 turns. Session-list message badges use an exact DB count, which previously looked higher than the chat until paging was added.
 
@@ -108,7 +108,7 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 **Script:** `Layer 1 - Gathering Data/knesset/load_knesset_committees.py`  
 **Self-parse helper:** `Layer 1 - Gathering Data/knesset/committee_protocol_parse.py`  
 **Schema:** `Layer 1 - Gathering Data/knesset/schema_knesset_committees.sql`  
-Weekly via `.github/workflows/knesset-pipeline.yml` (50 newest missing transcripts/run; installs `antiword`; passes `OPENAI_API_KEY`). **Default path is Knesset-only** (Hasadna dumps are stale for committees). After a successful run that inserted new committees, sessions, or transcripts, `emit_committees_run_update` writes a homepage ticker row linking to `/knesset/committees`.
+Daily via `.github/workflows/knesset-pipeline.yml` (50 newest missing transcripts/run; installs `antiword`; passes `OPENAI_API_KEY`). **Default path is Knesset-only** (Hasadna dumps are stale for committees) and targets the current Knesset: OData `IsCurrent`, else `knessets.is_active`. Pass `--knesset <number>` only for a one-off backfill. After a committees sync of the current term, `is_current` is cleared on committees that belong to any other Knesset. After a successful run that inserted new committees, sessions, or transcripts, `emit_committees_run_update` writes a homepage ticker row linking to `/knesset/committees`. The workflow then runs `check_knesset_consistency.py`, which records a `pipeline_runs` row (`action=consistency-check`) and fails the job if OData's current Knesset, null faction links, or current committees disagree with the DB.
 
 **Default ingest (Knesset-first):**
 1. OData `KNS_Committee` / `KNS_CommitteeSession` via `odata_client.py` (`curl_cffi` Chrome impersonation). If GitHub Actions IPs are WAF-blocked, falls back to Hasadna CSV mirrors for those entities (cached per run).
@@ -121,7 +121,7 @@ Weekly via `.github/workflows/knesset-pipeline.yml` (50 newest missing transcrip
 
 ### Targeted fetch (committee + day)
 
-To pull all sittings for a committee on a calendar day without waiting for the weekly newest-50 batch:
+To pull all sittings for a committee on a calendar day without waiting for the daily newest-50 batch:
 
 ```bash
 cd "Layer 1 - Gathering Data/knesset"

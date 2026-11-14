@@ -51,7 +51,8 @@ function isActiveOnDate(
 
 /**
  * Resolve each person's faction display name (short_name preferred) as of a
- * session date, preferring Knesset 25 memberships.
+ * session date. When several memberships cover that date, the highest
+ * Knesset number wins, then the later start date.
  */
 export function usePersonFactions(
   personIds: number[],
@@ -138,13 +139,9 @@ export function usePersonFactions(
               })
               continue
             }
-            // Prefer Knesset 25, else newer membership start.
             const preferNext =
-              (knessetNumber === 25 && existing.knesset !== 25) ||
-              (knessetNumber === existing.knesset && start > existing.start) ||
-              (existing.knesset !== 25 &&
-                knessetNumber !== 25 &&
-                start > existing.start)
+              knessetNumber > existing.knesset ||
+              (knessetNumber === existing.knesset && start > existing.start)
             if (preferNext) {
               next.set(row.person_id, {
                 name: label,

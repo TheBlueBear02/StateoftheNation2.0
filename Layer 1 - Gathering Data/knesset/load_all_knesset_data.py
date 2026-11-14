@@ -50,6 +50,23 @@ from emit_site_updates import (  # noqa: E402
 )
 from record_pipeline_run import record_pipeline_run  # noqa: E402
 
+from current_knesset import database_active_knesset_number  # noqa: E402
+from knesset_term import (  # noqa: E402
+    MembershipFactionState,
+    active_flags_for_knesset_rows,
+    current_knesset_numbers,
+    knesset_numbers_to_deactivate,
+    official_conflicts,
+    plan_official_faction_writes,
+    select_current_knesset_number,
+)
+from provisional_factions import (  # noqa: E402
+    PROVISIONAL_COLUMN,
+    build_provisional_plan,
+    faction_write_payload,
+    provisional_column_ready,
+)
+
 from odata_client import (  # noqa: E402
     ODATA_BASE,
     fetch_odata,
@@ -384,7 +401,41 @@ def sync_knessets(sb: Client) -> dict[int, int]:
     for r in raw:
         k = r.get("KnessetNum")
         if k is not None:
-            groups[k].append(r)
+            groups[int(k)].append(r)
+
+    current_numbers = current_knesset_numbers(raw)
+    odata_current = select_current_knesset_number(current_numbers)
+    if len(current_numbers) > 1:
+        log.warning(
+            "  OData IsCurrent on multiple Knessets %s — using %s",
+            current_numbers,
+            odata_current,
+        )
+    elif odata_current is None:
+        log.warning(
+            "  OData returned no IsCurrent Knesset — leaving knessets.is_active unchanged"
+        )
+    else:
+        log.info("  OData current Knesset: %s", odata_current)
+
+    existing_rows = load_existing_rows(sb, "knessets", "knesset_number", ["is_active"])
+    existing_active = {
+        int(number): bool(row.get("is_active"))
+        for number, row in existing_rows.items()
+        if number is not None
+    }
+    flags = active_flags_for_knesset_rows(
+        sorted(groups),
+        odata_current=odata_current,
+        existing_active=existing_active,
+    )
+    # Partial unique index: clear the previous active term before writing the new one.
+    for number in knesset_numbers_to_deactivate(
+        [number for number, active in existing_active.items() if active],
+        odata_current,
+    ):
+        log.info("  deactivating knesset %s (OData current is %s)", number, odata_current)
+        sb.table("knessets").update({"is_active": False}).eq("knesset_number", number).execute()
 
     rows = []
     for knum in sorted(groups):
@@ -396,7 +447,7 @@ def sync_knessets(sb: Client) -> dict[int, int]:
             "knesset_name":   f"כנסת ה-{knum}",
             "start_date":     min(start_dates) if start_dates else None,
             "end_date":       max(end_dates)   if end_dates   else None,
-            "is_active":      any(bool(p.get("IsCurrent")) for p in plenums),
+            "is_active":      flags[knum],
         })
 
     log.info("  aggregated into %d knesset rows", len(rows))
@@ -524,6 +575,88 @@ def sync_governments(sb: Client) -> dict[int, int]:
     return gov_map
 
 
+def _apply_provisional_factions(
+    sb: Client,
+    *,
+    knesset_map: dict,
+    has_provisional_col: bool,
+    official_position_ids: set[int],
+    states_by_position: dict[int, MembershipFactionState],
+    official_writes: list,
+) -> dict:
+    """Fill null current-Knesset faction links from election lists. Never writes official rows."""
+    stats = {
+        "table": "knesset_memberships.faction_id_provisional",
+        "upserted": 0,
+        "inserted": 0,
+        "updated": 0,
+        "skipped": 0,
+        "unmatched_memberships": 0,
+        "ambiguous_people": 0,
+        "parties_unmatched": [],
+        "election_id": None,
+    }
+    if not has_provisional_col:
+        stats["skipped_reason"] = "column_missing"
+        return stats
+
+    active_number = database_active_knesset_number(sb)
+    active_id = knesset_map.get(active_number) if active_number is not None else None
+    if active_number is None or active_id is None:
+        log.warning("  provisional faction fallback skipped — no active knesset in the DB")
+        stats["skipped_reason"] = "no_active_knesset"
+        return stats
+
+    merged = dict(states_by_position)
+    for write in official_writes:
+        previous = merged.get(write.knesset_position_id)
+        merged[write.knesset_position_id] = MembershipFactionState(
+            knesset_position_id=write.knesset_position_id,
+            person_id=previous.person_id if previous else 0,
+            knesset_id=previous.knesset_id if previous else active_id,
+            faction_id=write.faction_id,
+            faction_id_provisional=False,
+        )
+
+    memberships = [
+        {
+            "knesset_position_id": state.knesset_position_id,
+            "person_id": state.person_id,
+            "knesset_id": state.knesset_id,
+            "faction_id": state.faction_id,
+            PROVISIONAL_COLUMN: state.faction_id_provisional,
+        }
+        for state in merged.values()
+        if state.knesset_id == active_id and state.person_id
+    ]
+    plan = build_provisional_plan(
+        sb,
+        current_knesset_number=active_number,
+        current_knesset_id=active_id,
+        memberships=memberships,
+        official_position_ids=official_position_ids,
+    )
+    payloads = [faction_write_payload(write) for write in plan["writes"]]
+    if payloads:
+        written = upsert(
+            sb,
+            "knesset_memberships",
+            payloads,
+            "knesset_position_id",
+        )
+        stats.update(written)
+        stats["table"] = "knesset_memberships.faction_id_provisional"
+    stats["unmatched_memberships"] = plan["unmatched_memberships"]
+    stats["ambiguous_people"] = plan["ambiguous_people"]
+    stats["parties_unmatched"] = plan["parties_unmatched"]
+    stats["election_id"] = plan["election_id"]
+    log.info(
+        "  → provisional faction_id written for %d current-Knesset memberships",
+        stats["upserted"],
+    )
+    return stats
+
+
 def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map: dict, gov_map: dict, office_map: dict) -> dict:
     """
     Fetches KNS_PersonToPosition ONCE and writes to both:
@@ -551,31 +684,42 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
             MK_POSITION_IDS,
         )
 
-    membership_rows, faction_updates, skipped = [], [], 0
+    membership_rows, skipped = [], 0
+    # position id → official faction pk, only when OData FactionID resolved.
+    official_by_position: dict[int, int] = {}
+    # Every position whose OData row carried a FactionID, mapped or not.
+    # Unmapped official ids must block the election-list fallback.
+    official_position_ids: set[int] = set()
     for r in mk_positions:
         person_id  = people_map.get(r.get("PersonID"))
         knesset_id = knesset_map.get(r.get("KnessetNum"))
-        faction_id = faction_map.get(r.get("FactionID")) if r.get("FactionID") else None
+        raw_faction = r.get("FactionID")
+        faction_id = faction_map.get(raw_faction) if raw_faction else None
         if not person_id or not knesset_id:
             skipped += 1
             continue
+        position_id = r["PersonToPositionID"]
         # Base row — never includes faction_id so we never overwrite an existing
         # correct link with a null from OData. faction_id is managed separately below.
         membership_rows.append({
-            "knesset_position_id": r["PersonToPositionID"],
+            "knesset_position_id": position_id,
             "person_id":           person_id,
             "knesset_id":          knesset_id,
             "start_date":          r.get("StartDate"),
             "end_date":            r.get("FinishDate"),  # ← FinishDate, NOT EndDate
             "duty_desc":           r.get("DutyDesc"),
         })
-        # Only update faction_id when OData actually has a value.
-        # This preserves any faction links set by previous scripts or manual curation.
-        if faction_id is not None:
-            faction_updates.append({
-                "knesset_position_id": r["PersonToPositionID"],
-                "faction_id":          faction_id,
-            })
+        if raw_faction:
+            official_position_ids.add(position_id)
+            if faction_id is None:
+                log.warning(
+                    "  OData FactionID %s on position %s did not match knesset_factions"
+                    " — leaving the existing link and skipping the election fallback",
+                    raw_faction,
+                    position_id,
+                )
+            else:
+                official_by_position[position_id] = faction_id
 
     if skipped:
         log.warning("  knesset_memberships: skipped %d unmapped rows", skipped)
@@ -598,13 +742,62 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
         if key is not None:
             membership_existing.add(key)
 
-    # Pass 2: upsert faction links only where OData has a value
+    # Pass 2: official FactionID only. Clears faction_id_provisional.
+    # A null OData FactionID never overwrites an existing link.
+    has_provisional_col = provisional_column_ready(sb)
+    state_columns = ["faction_id", "person_id", "knesset_id"]
+    if has_provisional_col:
+        state_columns.append(PROVISIONAL_COLUMN)
+    existing_state = load_existing_rows(
+        sb, "knesset_memberships", "knesset_position_id", state_columns
+    )
+    states_by_position = {
+        int(position_id): MembershipFactionState(
+            knesset_position_id=int(position_id),
+            person_id=int(row["person_id"]) if row.get("person_id") is not None else 0,
+            knesset_id=int(row["knesset_id"]) if row.get("knesset_id") is not None else 0,
+            faction_id=int(row["faction_id"]) if row.get("faction_id") is not None else None,
+            faction_id_provisional=bool(row.get(PROVISIONAL_COLUMN))
+            if has_provisional_col
+            else False,
+        )
+        for position_id, row in existing_state.items()
+        if position_id is not None
+    }
+    official_writes = plan_official_faction_writes(states_by_position, official_by_position)
+    conflicts = official_conflicts(official_writes)
+    for conflict in conflicts:
+        log.warning(
+            "  official FactionID differs from provisional for position %s: "
+            "provisional faction %s → official faction %s",
+            conflict.knesset_position_id,
+            conflict.previous_faction_id,
+            conflict.faction_id,
+        )
+    faction_updates = []
+    for write in official_writes:
+        payload = {
+            "knesset_position_id": write.knesset_position_id,
+            "faction_id": write.faction_id,
+        }
+        if has_provisional_col:
+            payload[PROVISIONAL_COLUMN] = False
+        faction_updates.append(payload)
+
     faction_stats = {
         "table": "knesset_memberships.faction_id",
         "upserted": 0,
         "inserted": 0,
         "updated": 0,
         "skipped": 0,
+        "official_conflicts": [
+            {
+                "knesset_position_id": conflict.knesset_position_id,
+                "provisional_faction_id": conflict.previous_faction_id,
+                "official_faction_id": conflict.faction_id,
+            }
+            for conflict in conflicts
+        ],
     }
     if faction_updates:
         faction_stats = upsert(
@@ -615,9 +808,28 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
             membership_existing,
         )
         faction_stats["table"] = "knesset_memberships.faction_id"
+        faction_stats["official_conflicts"] = [
+            {
+                "knesset_position_id": conflict.knesset_position_id,
+                "provisional_faction_id": conflict.previous_faction_id,
+                "official_faction_id": conflict.faction_id,
+            }
+            for conflict in conflicts
+        ]
         log.info("  → faction_id updated for %d rows", len(faction_updates))
+    elif official_position_ids:
+        log.info("  official FactionID links already matched — no faction_id writes")
     else:
-        log.warning("  OData returned no FactionID values — faction links unchanged")
+        log.warning("  OData returned no FactionID values — official faction links unchanged")
+
+    provisional_stats = _apply_provisional_factions(
+        sb,
+        knesset_map=knesset_map,
+        has_provisional_col=has_provisional_col,
+        official_position_ids=official_position_ids,
+        states_by_position=states_by_position,
+        official_writes=official_writes,
+    )
 
     # ── minister_appointments ────────────────────────────────────────────────
     log.info("── syncing minister_appointments ──")
@@ -662,6 +874,7 @@ def sync_positions(sb: Client, people_map: dict, knesset_map: dict, faction_map:
     return {
         "knesset_memberships": membership_stats,
         "knesset_memberships_faction_id": faction_stats,
+        "knesset_memberships_faction_id_provisional": provisional_stats,
         "minister_appointments": appointment_stats,
     }
 
@@ -709,6 +922,7 @@ def sync_all(sb: Client) -> dict:
         office_stats,
         position_stats["knesset_memberships"],
         position_stats["knesset_memberships_faction_id"],
+        position_stats["knesset_memberships_faction_id_provisional"],
         position_stats["minister_appointments"],
     ]
     return {
@@ -795,6 +1009,7 @@ def main():
                     "stages": [
                         position_stats["knesset_memberships"],
                         position_stats["knesset_memberships_faction_id"],
+                        position_stats["knesset_memberships_faction_id_provisional"],
                         position_stats["minister_appointments"],
                     ],
                     "change_count": len(changes),

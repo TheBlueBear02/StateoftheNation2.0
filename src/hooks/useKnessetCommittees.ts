@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import {
-  COMMITTEES_KNESSET_NUMBER,
   type KnessetCommittee,
   type KnessetCommitteeRow,
 } from '../lib/committeeTypes'
@@ -252,8 +251,8 @@ export function useKnessetCommittees(): UseKnessetCommitteesResult {
       try {
         const { data: knessetRow, error: knessetError } = await supabase
           .from('knessets')
-          .select('id')
-          .eq('knesset_number', COMMITTEES_KNESSET_NUMBER)
+          .select('id, knesset_number')
+          .eq('is_active', true)
           .maybeSingle()
 
         if (cancelled) {
@@ -268,7 +267,7 @@ export function useKnessetCommittees(): UseKnessetCommitteesResult {
         }
 
         if (!knessetRow?.id) {
-          setError(`לא נמצאה כנסת מספר ${COMMITTEES_KNESSET_NUMBER}`)
+          setError('לא נמצאה כנסת פעילה')
           setCommittees([])
           setLoading(false)
           return

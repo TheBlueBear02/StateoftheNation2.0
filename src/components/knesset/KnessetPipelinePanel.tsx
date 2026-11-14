@@ -405,7 +405,7 @@ export function KnessetPipelinePanel({
         <h3 className="knesset-pipeline-panel__subheading">אחרי הסנכרון</h3>
         <p className="party-pipeline-panel__intro">
           קישורי סיעות: ממלא <code>faction_id</code> חסרים מ-Open Knesset.
-          תמונות: מקשר JPEG מקומיים (הכנסת ה-25) לשדה <code>image_url</code>.
+          תמונות: מקשר JPEG מקומיים מתיקיית הכנסת הפעילה לשדה <code>image_url</code>.
         </p>
         <div className="party-pipeline-panel__actions">
           <button

@@ -9,6 +9,8 @@ const TABLE_LABELS: Record<string, string> = {
   knesset_memberships: 'חברויות',
   'knesset_memberships.faction_id': 'קישורי סיעות (faction_id)',
   knesset_memberships_faction_id: 'קישורי סיעות (faction_id)',
+  'knesset_memberships.faction_id_provisional': 'קישורי סיעות זמניים (רשימת בחירות)',
+  knesset_memberships_faction_id_provisional: 'קישורי סיעות זמניים (רשימת בחירות)',
   minister_appointments: 'מינויים',
   'people.image_url': 'תמונות (image_url)',
   pipeline_sync_state: 'מצב סנכרון',

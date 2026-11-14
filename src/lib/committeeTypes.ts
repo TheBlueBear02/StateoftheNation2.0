@@ -140,5 +140,3 @@ export type CommitteeTranscript = {
   fullText: string | null
   parts: CommitteeTranscriptPart[]
 }
-
-export const COMMITTEES_KNESSET_NUMBER = 25
