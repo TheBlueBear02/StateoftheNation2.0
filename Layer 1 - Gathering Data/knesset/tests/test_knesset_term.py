@@ -13,7 +13,9 @@ from knesset_term import (  # noqa: E402
     FactionRef,
     MembershipFactionState,
     PartyRef,
+    PersonName,
     active_flags_for_knesset_rows,
+    bridge_member_people,
     current_knesset_numbers,
     evaluate_consistency,
     knesset_image_folder_candidates,
@@ -21,6 +23,7 @@ from knesset_term import (  # noqa: E402
     match_party_to_faction,
     names_refer_to_same_party,
     official_conflicts,
+    person_names_match,
     person_party_map,
     plan_official_faction_writes,
     plan_provisional_faction_writes,
@@ -79,6 +82,56 @@ class NameMatchTests(unittest.TestCase):
             )
         )
         self.assertFalse(names_refer_to_same_party("ישר", "ישראל ביתנו"))
+        self.assertTrue(
+            names_refer_to_same_party(
+                "ישר",
+                "ישר! עם איזנקוט לראשות הממשלה מאחדים את ישראל",
+            )
+        )
+        self.assertTrue(names_refer_to_same_party('רע"ם', 'רע"מ'))
+        self.assertTrue(
+            names_refer_to_same_party(
+                "רע״ם בראשות מנסור עבאס",
+                "רע״מ",
+            )
+        )
+        self.assertTrue(
+            names_refer_to_same_party(
+                "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף",
+                "התאחדות הספרדים העולמית שומרי תורה",
+            )
+        )
+        self.assertTrue(
+            names_refer_to_same_party(
+                "זהות",
+                "הציונות הדתית בראשות בצלאל סמוטריץ וזהות בראשות משה פייגלין",
+            )
+        )
+
+    def test_person_name_bridge_ignores_a_different_knesset_id(self) -> None:
+        self.assertTrue(person_names_match("יפה טבג'ה", "יפה טבג’ה"))
+        self.assertTrue(person_names_match("\u2060נעם תיבון", "נעם תיבון"))
+        self.assertTrue(person_names_match("יאיא (יאיר) פינק", "יאיא פינק"))
+        self.assertTrue(person_names_match("חוה אתי עטייה", "אתי עטיה"))
+        self.assertTrue(person_names_match("דבורה בכר", "דבורה שריפיאן בכר"))
+        self.assertFalse(person_names_match("רפאל בן שטרית", "רפי בן שטרית"))
+
+        bridge = bridge_member_people(
+            [
+                PersonName(1, "תאיר איפרגן", 30960),
+                PersonName(2, "אלי כהן", 30083),
+                PersonName(3, "דוד פטר", 30939),
+                PersonName(4, "דוד פטר", 30940),
+            ],
+            [
+                PersonName(10, "תאיר איפרגן", None),
+                PersonName(11, "אלי כהן", 755),
+                PersonName(12, "דוד פטר", None),
+            ],
+        )
+        self.assertEqual(bridge.member_to_candidate, {1: 10})
+        self.assertEqual(bridge.kpid_conflicts, 1)
+        self.assertGreaterEqual(bridge.ambiguous, 1)
 
     def test_linked_current_faction_wins_over_name(self) -> None:
         factions = [
