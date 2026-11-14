@@ -43,7 +43,9 @@ Route: `/knesset`
 | `src/lib/memberRoles.ts` | Formats minister appointments and membership `duty_desc` into display roles |
 | `src/lib/memberSort.ts` | `MemberSortMode` type and Hebrew sort option labels |
 | `src/lib/supabase.ts` | Supabase client + types (`KnessetOption`, etc.) |
-| `src/components/SiteHeader.tsx` | Shared header (logo links home, Israel-time Hebrew-numeral/civil date labels, government/Knesset context line) |
+| `src/components/SiteHeader.tsx` | Shared header (logo links home, Israel-time Hebrew-numeral/civil date labels, live government/Knesset context line) |
+| `src/hooks/useCurrentTermLabel.ts` | Client fetch of `governments.is_active` + `knessets.is_active` for the header line |
+| `src/lib/termLabel.ts` | `ממשלת ישראל ה{n} \| הכנסת ה{n}` formatter |
 | `Layer 1 - Gathering Data/knesset/fix_faction_links_all.py` | Backfill for `faction_id` links across Knessets |
 
 ## Knesset Picker
@@ -241,17 +243,18 @@ When `isDev` is true, the **צינור נתונים** panel runs OData sync:
 | 2 | אנשים | `sync_people` |
 | 3 | סיעות | `sync_factions` |
 | 4 | משרדים | `sync_offices` |
-| 5 | ממשלות | `sync_governments` (DB only) |
+| 5 | ממשלות | `sync_governments` — creates a missing `GovernmentNum`, sets `is_active`, closes the previous row |
 | 6 | חברויות ומינויים | `sync_positions` — snapshots diffs into `pending_site_update.json` |
 | 7 | יצירת עדכון | `emit_knesset_run_update` from pending diffs → homepage `site_updates` (editable in UI) |
 
 - **התחל סנכרון מלא** runs stages 1–7 sequentially via `POST /api/knesset/pipeline/stage`
 - Stage 6 no longer emits the ticker itself in the edit UI — it only records membership/appointment field diffs. Stage 7 generates the Hebrew headline and shows an editable textarea (**שמור כותרת** → `POST /api/knesset/site-update`). CLI / GitHub Actions `load_all_knesset_data.py` (`sync_all`) still emits immediately after positions sync when membership/appointment fields changed (see [PiplinesPage.md](./PiplinesPage.md))
-- Production schedule: weekly Saturday midnight Israel via `.github/workflows/knesset-pipeline.yml` (writes are insert/update-only; unchanged rows skipped; curated faction fields never overwritten). OData uses `https://knesset.gov.il/Odata/ParliamentInfo.svc` via `odata_client.py` (`curl_cffi` Chrome TLS impersonation to reduce WAF blocks from GitHub Actions IPs). If OData still returns HTML, falls back to matching Hasadna CSV dumps (cached per run)
+- Production schedule: daily midnight Israel via `.github/workflows/knesset-pipeline.yml` (writes are insert/update-only; unchanged rows skipped; curated faction fields never overwritten). `knessets.is_active` follows OData `IsCurrent` (the previous active row is cleared first because only one active knesset is allowed). `governments.is_active` follows the highest `GovernmentNum` on an `IsCurrent` ministerial position. There is no `KNS_Government` entity. A missing number is inserted (`start_date` = earliest ministerial `StartDate`, `knesset_id` = that appointment's Knesset). An existing `knesset_id`, `start_date`, or `end_date` is not overwritten; a null `end_date` is filled when that government is no longer current. Offices mirror `KNS_GovMinistry` (`name` on insert only; a ministry missing from a non-empty feed is closed). Minister appointments copy official dates and `IsCurrent`; `is_acting` is set only on insert. OData uses `https://knesset.gov.il/Odata/ParliamentInfo.svc` via `odata_client.py` (`curl_cffi` Chrome TLS impersonation to reduce WAF blocks from GitHub Actions IPs). If OData still returns HTML, falls back to matching Hasadna CSV dumps (cached per run)
+- When `KNS_PersonToPosition.FactionID` is null, the sync fills `knesset_memberships.faction_id` for the active Knesset from the election that seats that Knesset (`election_candidates` → `election_parties` → current-Knesset `knesset_factions`) and sets `faction_id_provisional`. A later OData `FactionID` overwrites that value, clears the flag, and logs when the official faction differs. An official (non-provisional) `faction_id` is never replaced by the fallback. Apply `schema_knesset_membership_faction_provisional.sql` before the first run that should store the flag.
 - While running, the active stage row is highlighted with a spinner; each stage shows its own elapsed time, and the status line also shows total run time (`usePipelineRunProgress`)
 - Per-stage **הרץ** buttons run a single stage. Standalone stage 7 needs a prior stage 6 that left pending changes
 - Post-sync: **בדוק קישורי סיעות** / **החל קישורי סיעות** (`fix_faction_links_all` logic)
-- **עדכן תמונות** runs `km_images` logic (hardcoded to `public/images/KM Images/הכנסת ה25`)
+- **עדכן תמונות** runs `km_images` logic for the active Knesset folder `public/images/KM Images/הכנסת ה{n}` (also accepts `הכנסת ה-{n}`)
 
 Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `KNESSET_EDIT_SECRET` / `NEXT_PUBLIC_KNESSET_EDIT_SECRET` in `.env`.
 

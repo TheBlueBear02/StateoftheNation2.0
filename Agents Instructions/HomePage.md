@@ -102,7 +102,7 @@ Applied on: `site-header__inner`, `hero__inner`, `project-section` content shell
 - Inner wrapper (`site-header__inner container`): logo at RTL start (top-right), metadata block at the opposite side.
 - Logo path: `/header-logo%203.svg` (URL-encoded space in filename).
 - Date block: client-side `Intl.DateTimeFormat` using `Asia/Jerusalem`; Gregorian label is `DD.MM.YYYY`, Hebrew label uses `he-IL-u-ca-hebrew` civil-day behavior and formats day/year as Hebrew numerals (for example `י״ח בתמוז תשפ״ו`).
-- Context line below the date is static copy: `ממשלת ישראל ה37 | הכנסת ה25`.
+- Context line below the date is loaded in the browser from the active rows: `ממשלת ישראל ה{government_number}` where `governments.is_active`, and `הכנסת ה{knesset_number}` where `knessets.is_active` (`useCurrentTermLabel` / `formatCurrentTermLabel`). The line is omitted until that fetch returns, so a static prerender cannot freeze a term number into the HTML. The knesset sync sets `governments.is_active` from the current OData `GovernmentNum` and inserts a row when a new number appears, so the government half of the label follows that row. A caretaker government keeps its existing number until OData publishes a new one.
 - **Homepage mobile (≤900px):** `site-header--home` is hidden so the blue hero is the first surface; brand is carried by the larger hero title logo.
 
 ### 2. Hero (`hero`)

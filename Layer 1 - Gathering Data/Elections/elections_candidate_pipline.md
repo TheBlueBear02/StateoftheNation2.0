@@ -132,7 +132,7 @@ Elections/
 └── fetch_candidate_wiki_urls.py  # Stage 6: retry missing people.wikipedia_url
 ```
 
-Knesset data sync (separate, runs weekly via GitHub Actions):
+Knesset data sync (separate, runs daily via GitHub Actions):
 
 ```
 Layer 1 - Gathering Data/knesset/

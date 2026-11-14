@@ -1,21 +1,46 @@
 import os
+import sys
 import urllib.parse
-from supabase import create_client
+from pathlib import Path
 
 from dotenv import load_dotenv
+from supabase import create_client
+
+from current_knesset import database_active_knesset_number
+from knesset_term import knesset_image_folder_candidates
 
 load_dotenv()
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
-# Path to the folder on your machine
-IMAGES_ROOT = "public\images\KM Images\הכנסת ה25"
-
-# Base GitHub raw URL
-GITHUB_BASE = "https://raw.githubusercontent.com/TheBlueBear02/StateoftheNation2.0/main/public/images/KM%20Images/%D7%94%D7%9B%D7%A0%D7%A1%D7%AA%20%D7%9425"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+IMAGES_PARENT = PROJECT_ROOT / "public" / "images" / "KM Images"
+GITHUB_RAW_ROOT = (
+    "https://raw.githubusercontent.com/TheBlueBear02/StateoftheNation2.0/main"
+)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+knesset_number = database_active_knesset_number(supabase)
+if knesset_number is None:
+    sys.exit("No active knesset — cannot choose an image folder")
+
+IMAGES_ROOT = None
+for folder_name in knesset_image_folder_candidates(knesset_number):
+    candidate = IMAGES_PARENT / folder_name
+    if candidate.is_dir():
+        IMAGES_ROOT = candidate
+        break
+if IMAGES_ROOT is None:
+    expected = ", ".join(knesset_image_folder_candidates(knesset_number))
+    sys.exit(f"Image folder not found for Knesset {knesset_number}: {expected}")
+
+GITHUB_BASE = (
+    f"{GITHUB_RAW_ROOT}/"
+    + urllib.parse.quote("public/images/KM Images")
+    + "/"
+    + urllib.parse.quote(IMAGES_ROOT.name)
+)
 
 matched = []
 unmatched = []

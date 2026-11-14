@@ -334,11 +334,19 @@ def apply_updates(
     limit: int | None,
 ) -> int:
     updates = planned_updates[:limit] if limit is not None else planned_updates
+    # A manual Open Knesset apply is an accepted link until OData sends FactionID.
+    # It is not the election-list fallback, so the provisional flag is cleared.
+    from provisional_factions import provisional_column_ready
+
+    clear_provisional = provisional_column_ready(supabase)
 
     for index, update in enumerate(updates, start=1):
-        supabase.table("knesset_memberships").update(
-            {"faction_id": update.target_faction_id}
-        ).eq("id", update.membership_id).execute()
+        payload: dict[str, object] = {"faction_id": update.target_faction_id}
+        if clear_provisional:
+            payload["faction_id_provisional"] = False
+        supabase.table("knesset_memberships").update(payload).eq(
+            "id", update.membership_id
+        ).execute()
 
         if index % 50 == 0:
             print(f"  applied {index}/{len(updates)} updates...")

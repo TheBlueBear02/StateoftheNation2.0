@@ -60,7 +60,7 @@ StateoftheNation2.0/
 │   ├── Elections/           # Candidate enrichment pipeline
 │   ├── knesset/             # Knesset OData sync
 │   └── Polls/               # Wikipedia polls → aggregates
-├── .github/workflows/       # Scheduled polls (daily) + knesset (weekly) pipelines
+├── .github/workflows/       # Scheduled polls (daily) + knesset (daily) pipelines
 ├── next.config.ts
 ├── package.json
 └── .env                     # Secrets (not committed)
@@ -104,7 +104,7 @@ Page UI lives in `src/views/*` (and `src/App.tsx` for home). App Router `page.ts
 
 | Folder | Purpose |
 |--------|---------|
-| `knesset/` | OData sync (`load_all_knesset_data.py`); weekly GitHub Actions cron; office KPI seed (`seed_office_dashboard.py`), faction fixes, images |
+| `knesset/` | OData sync (`load_all_knesset_data.py`); daily GitHub Actions cron; current-Knesset committees; consistency check; office KPI seed (`seed_office_dashboard.py`), faction fixes, images |
 | `Elections/` | Candidate list pipeline + `run_party_pipeline_api.py` |
 | `Polls/` | Wikipedia scrape → normalize → aggregates; daily GitHub Actions cron |
 | (shared) | `record_pipeline_run.py` (ops log) · `emit_site_updates.py` (homepage ticker) |
@@ -185,7 +185,7 @@ npm run lint
 | [HomePage.md](./HomePage.md) | `/` |
 | [LegalPages.md](./LegalPages.md) | `/about`, `/terms` (footer only) |
 | [KnessetPage.md](./KnessetPage.md) | `/knesset` + `/knesset/edit` |
-| [KnessetCommitteesPage.md](./KnessetCommitteesPage.md) | `/knesset/committees` — K25 committees table + transcript Play |
+| [KnessetCommitteesPage.md](./KnessetCommitteesPage.md) | `/knesset/committees` — active-Knesset committees table + transcript Play |
 | [PiplinesPage.md](./PiplinesPage.md) | `/piplines` dashboard + `/piplines/docs` |
 | [ElectionsPage.md](./ElectionsPage.md) | `/elections` module |
 | [PollsPage.md](./PollsPage.md) | `/elections/polls` |

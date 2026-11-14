@@ -14,7 +14,6 @@ export const supabase: SupabaseClient | null = supabaseConfigError
   ? null
   : createClient(supabaseUrl!, supabaseAnonKey!)
 
-export const ACTIVE_KNESSET_ID = 26
 export const ACTIVE_ELECTION_YEAR = 2026
 
 export type KnessetOption = {

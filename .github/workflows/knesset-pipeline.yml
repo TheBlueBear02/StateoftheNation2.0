@@ -2,8 +2,8 @@ name: knesset-pipeline
 
 on:
   schedule:
-    # Saturday midnight Israel (IDT = UTC+3 → Friday 21:00 UTC; in winter IST runs at 23:00 Israel)
-    - cron: '0 21 * * 5'
+    # Daily midnight Israel (IDT = UTC+3 → 21:00 UTC; in winter IST runs at 23:00 Israel)
+    - cron: '0 21 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -40,15 +40,25 @@ jobs:
       - name: Install antiword for committee protocol self-parse
         run: sudo apt-get update && sudo apt-get install -y antiword
 
-      # Committees (Knesset 25): OData committees/sessions/docs + DOC self-parse.
+      # Committees for the current Knesset (OData IsCurrent, else knessets.is_active).
+      # One-off backfill of a specific term: add --knesset <number>.
       # No Hasadna by default (dumps are stale); memberships left as last synced.
       # Docs: session-scoped OData only (never full-scan DocumentCommitteeSession).
       # Transcripts: newest missing with a protocol DOC (limit 50/run).
       - name: Run knesset committees pipeline
-        run: python load_knesset_committees.py --knesset 25 --transcripts-mode missing --transcripts-limit 50
+        run: python load_knesset_committees.py --transcripts-mode missing --transcripts-limit 50
         working-directory: 'Layer 1 - Gathering Data/knesset'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PIPELINE_RUN_SOURCE: github-actions
+
+      - name: Check knesset data consistency
+        if: ${{ !cancelled() }}
+        run: python check_knesset_consistency.py
+        working-directory: 'Layer 1 - Gathering Data/knesset'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           PIPELINE_RUN_SOURCE: github-actions

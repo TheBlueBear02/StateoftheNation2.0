@@ -63,7 +63,7 @@ HASADNA_FIELD_ALIASES: dict[str, dict[str, str]] = {
 _HASADNA_CACHE: dict[str, list[dict[str, Any]]] = {}
 _ODATA_BLOCKED = False  # sticky for the process after a confirmed WAF/HTML block
 _EQ_RE = re.compile(
-    r"([A-Za-z_][A-Za-z0-9_]*)\s+eq\s+(?:'([^']*)'|([-+]?\d+(?:\.\d+)?))",
+    r"([A-Za-z_][A-Za-z0-9_]*)\s+eq\s+(?:'([^']*)'|([-+]?\d+(?:\.\d+)?)|(true|false))",
     re.IGNORECASE,
 )
 
@@ -216,14 +216,28 @@ def _parse_eq_clause(clause: str) -> tuple[str, Any] | None:
     match = _EQ_RE.fullmatch(clause.strip())
     if not match:
         return None
-    field, str_val, num_val = match.groups()
+    field, str_val, num_val, bool_val = match.groups()
     if str_val is not None:
         return field, str_val
+    if bool_val is not None:
+        return field, bool_val.lower() == "true"
     if num_val is not None:
         if "." in num_val:
             return field, float(num_val)
         return field, int(num_val)
     return None
+
+
+def _filter_values_equal(actual: Any, expected: Any) -> bool:
+    if actual == expected:
+        return True
+    if isinstance(expected, bool):
+        if isinstance(actual, str):
+            return actual.strip().lower() in (
+                ("true", "1", "yes") if expected else ("false", "0", "no")
+            )
+        return False
+    return str(actual) == str(expected)
 
 
 def apply_odata_filter(
@@ -244,12 +258,9 @@ def apply_odata_filter(
     for row in rows:
         ok = True
         for field, expected in parsed:
-            actual = row.get(field)
-            if actual != expected:
-                # Allow string/int soft match for CSV leftovers.
-                if str(actual) != str(expected):
-                    ok = False
-                    break
+            if not _filter_values_equal(row.get(field), expected):
+                ok = False
+                break
         if ok:
             out.append(row)
     return out

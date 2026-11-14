@@ -30,6 +30,8 @@ from dotenv import load_dotenv
 
 import fix_faction_links_all as faction_links
 import load_all_knesset_data as sync
+from current_knesset import database_active_knesset_number
+from knesset_term import knesset_image_folder_candidates
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from emit_site_updates import (  # noqa: E402
@@ -43,11 +45,23 @@ from record_pipeline_run import record_pipeline_run  # noqa: E402
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-IMAGES_ROOT = PROJECT_ROOT / "public" / "images" / "KM Images" / "הכנסת ה25"
-GITHUB_BASE = (
-    "https://raw.githubusercontent.com/TheBlueBear02/StateoftheNation2.0/main/"
-    "public/images/KM%20Images/%D7%94%D7%9B%D7%A0%D7%A1%D7%AA%20%D7%9425"
+IMAGES_PARENT = PROJECT_ROOT / "public" / "images" / "KM Images"
+GITHUB_RAW_ROOT = (
+    "https://raw.githubusercontent.com/TheBlueBear02/StateoftheNation2.0/main"
 )
+
+
+def resolve_knesset_image_dir(knesset_number: int) -> Path | None:
+    for folder_name in knesset_image_folder_candidates(knesset_number):
+        candidate = IMAGES_PARENT / folder_name
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def github_image_base(folder_name: str) -> str:
+    prefix = urllib.parse.quote("public/images/KM Images")
+    return f"{GITHUB_RAW_ROOT}/{prefix}/{urllib.parse.quote(folder_name)}"
 
 STAGE_LABELS: dict[int, str] = {
     1: "כנסות",
@@ -280,7 +294,6 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict, dict | None]:
     knesset_map = sync.load_id_map(sb, "knessets", "knesset_number")
     people_map = sync.load_id_map(sb, "people", "knesset_person_id")
     faction_map = sync.load_id_map(sb, "knesset_factions", "knesset_faction_id")
-    gov_map = sync.load_id_map(sb, "governments", "government_number")
     office_map = sync.load_id_map(sb, "offices", "knesset_category_id")
 
     if stage == 3:
@@ -298,25 +311,16 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict, dict | None]:
         return STAGE_LABELS[stage], "סנכרון משרדים הושלם", summary, None
 
     if stage == 5:
-        count = len(sync.sync_governments(sb))
+        positions = sync.fetch_odata("KNS_PersonToPosition")
+        _gov_map, stats = sync.sync_governments(sb, positions, knesset_map)
         summary = make_run_summary(
-            [
-                make_stage_summary(
-                    stage,
-                    STAGE_LABELS[stage],
-                    [],
-                    note=f"נטענו {count} ממשלות מהמסד (ללא OData)",
-                )
-            ]
+            [make_stage_summary(stage, STAGE_LABELS[stage], [stats])]
         )
-        return (
-            STAGE_LABELS[stage],
-            f"נטענו {count} ממשלות מהמסד (ללא OData)",
-            summary,
-            None,
-        )
+        return STAGE_LABELS[stage], "סנכרון ממשלות הושלם", summary, None
 
     if stage == 6:
+        positions = sync.fetch_odata("KNS_PersonToPosition")
+        gov_map, gov_stats = sync.sync_governments(sb, positions, knesset_map)
         before = snapshot_knesset_positions(sb)
         position_stats = sync.sync_positions(
             sb,
@@ -325,11 +329,13 @@ def run_stage(sb, stage: int) -> tuple[str, str, dict, dict | None]:
             faction_map,
             gov_map,
             office_map,
+            positions,
         )
         after = snapshot_knesset_positions(sb)
         changes = diff_knesset_positions(before, after)
         write_pending_site_update(changes)
         entries = [
+            gov_stats,
             position_stats["knesset_memberships"],
             position_stats["knesset_memberships_faction_id"],
             position_stats["minister_appointments"],
@@ -631,15 +637,26 @@ def cmd_faction_apply(sb, as_json: bool) -> None:
 
 
 def cmd_images(sb, as_json: bool) -> None:
-    if not IMAGES_ROOT.is_dir():
-        fail(f"תיקיית תמונות לא נמצאה: {IMAGES_ROOT}", as_json)
+    knesset_number = database_active_knesset_number(sb)
+    if knesset_number is None:
+        fail("לא נמצאה כנסת פעילה — לא ניתן לבחור תיקיית תמונות", as_json)
+    assert knesset_number is not None
+    images_root = resolve_knesset_image_dir(knesset_number)
+    if images_root is None:
+        expected = ", ".join(knesset_image_folder_candidates(knesset_number))
+        fail(
+            f"תיקיית תמונות לא נמצאה עבור הכנסת ה-{knesset_number} ({expected})",
+            as_json,
+        )
+    assert images_root is not None
+    github_base = github_image_base(images_root.name)
 
     matched: list[str] = []
     unmatched: list[str] = []
 
     try:
-        for party_folder in os.listdir(IMAGES_ROOT):
-            party_path = IMAGES_ROOT / party_folder
+        for party_folder in os.listdir(images_root):
+            party_path = images_root / party_folder
             if not party_path.is_dir():
                 continue
 
@@ -650,7 +667,7 @@ def cmd_images(sb, as_json: bool) -> None:
                 full_name = filename.replace(".jpeg", "")
                 encoded_party = urllib.parse.quote(party_folder)
                 encoded_name = urllib.parse.quote(filename)
-                image_url = f"{GITHUB_BASE}/{encoded_party}/{encoded_name}"
+                image_url = f"{github_base}/{encoded_party}/{encoded_name}"
 
                 result = (
                     sb.table("people")
