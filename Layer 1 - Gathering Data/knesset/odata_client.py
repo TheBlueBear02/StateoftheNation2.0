@@ -14,6 +14,7 @@ import io
 import logging
 import re
 import time
+from datetime import datetime, timezone
 from typing import Any
 from xml.etree import ElementTree as ET
 
@@ -62,8 +63,9 @@ HASADNA_FIELD_ALIASES: dict[str, dict[str, str]] = {
 
 _HASADNA_CACHE: dict[str, list[dict[str, Any]]] = {}
 _ODATA_BLOCKED = False  # sticky for the process after a confirmed WAF/HTML block
-_EQ_RE = re.compile(
-    r"([A-Za-z_][A-Za-z0-9_]*)\s+eq\s+(?:'([^']*)'|([-+]?\d+(?:\.\d+)?)|(true|false))",
+_CMP_RE = re.compile(
+    r"([A-Za-z_][A-Za-z0-9_]*)\s+(eq|gt|ge|lt|le)\s+"
+    r"(?:datetime'([^']*)'|'([^']*)'|([-+]?\d+(?:\.\d+)?)|(true|false))",
     re.IGNORECASE,
 )
 
@@ -212,20 +214,79 @@ def fetch_hasadna_entity(entity: str) -> list[dict[str, Any]]:
     return rows
 
 
-def _parse_eq_clause(clause: str) -> tuple[str, Any] | None:
-    match = _EQ_RE.fullmatch(clause.strip())
+def parse_odata_datetime(value: Any) -> datetime | None:
+    """Parse an OData / Hasadna timestamp into naive UTC."""
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.lower().startswith("datetime'") and text.endswith("'"):
+            text = text.split("'", 1)[1][:-1]
+        if " " in text and "T" not in text:
+            text = text.replace(" ", "T", 1)
+        text = text.replace("Z", "+00:00")
+        try:
+            dt = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _parse_cmp_clause(clause: str) -> tuple[str, str, Any] | None:
+    match = _CMP_RE.fullmatch(clause.strip())
     if not match:
         return None
-    field, str_val, num_val, bool_val = match.groups()
+    field, op, datetime_val, str_val, num_val, bool_val = match.groups()
+    op = op.lower()
+    if datetime_val is not None:
+        parsed = parse_odata_datetime(datetime_val)
+        return field, op, parsed if parsed is not None else datetime_val
     if str_val is not None:
-        return field, str_val
+        return field, op, str_val
     if bool_val is not None:
-        return field, bool_val.lower() == "true"
+        return field, op, bool_val.lower() == "true"
     if num_val is not None:
         if "." in num_val:
-            return field, float(num_val)
-        return field, int(num_val)
+            return field, op, float(num_val)
+        return field, op, int(num_val)
     return None
+
+
+def _ordered_filter_value(value: Any) -> Any:
+    parsed = parse_odata_datetime(value)
+    if parsed is not None:
+        return parsed
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    return str(value)
+
+
+def _filter_compare(actual: Any, expected: Any, op: str) -> bool:
+    if op == "eq":
+        return _filter_values_equal(actual, expected)
+    if actual is None:
+        return False
+    left = _ordered_filter_value(actual)
+    right = _ordered_filter_value(expected)
+    if isinstance(left, datetime) and isinstance(right, datetime):
+        pass
+    elif type(left) is not type(right):
+        left, right = str(left), str(right)
+    if op == "gt":
+        return left > right
+    if op == "ge":
+        return left >= right
+    if op == "lt":
+        return left < right
+    if op == "le":
+        return left <= right
+    return False
 
 
 def _filter_values_equal(actual: Any, expected: Any) -> bool:
@@ -243,13 +304,17 @@ def _filter_values_equal(actual: Any, expected: Any) -> bool:
 def apply_odata_filter(
     rows: list[dict[str, Any]], filter_expr: str | None
 ) -> list[dict[str, Any]]:
-    """Support simple `Field eq value` and `and`-joined filters only."""
+    """Support `eq` / `gt` / `ge` / `lt` / `le` clauses joined by `and`.
+
+    `gt datetime'...'` is what incremental sync sends for LastUpdatedDate.
+    The Hasadna CSV is a full dump, so the same filter has to apply client-side.
+    """
     if not filter_expr:
         return rows
     clauses = [c.strip() for c in re.split(r"\s+and\s+", filter_expr, flags=re.I)]
-    parsed: list[tuple[str, Any]] = []
+    parsed: list[tuple[str, str, Any]] = []
     for clause in clauses:
-        item = _parse_eq_clause(clause)
+        item = _parse_cmp_clause(clause)
         if item is None:
             raise ValueError(f"Unsupported OData filter for Hasadna fallback: {filter_expr!r}")
         parsed.append(item)
@@ -257,13 +322,18 @@ def apply_odata_filter(
     out = []
     for row in rows:
         ok = True
-        for field, expected in parsed:
-            if not _filter_values_equal(row.get(field), expected):
+        for field, op, expected in parsed:
+            if not _filter_compare(row.get(field), expected, op):
                 ok = False
                 break
         if ok:
             out.append(row)
     return out
+
+
+def _note_fetch(fetch_meta: dict[str, Any] | None, **fields: Any) -> None:
+    if fetch_meta is not None:
+        fetch_meta.update(fields)
 
 
 def fetch_odata(
@@ -272,6 +342,7 @@ def fetch_odata(
     *,
     keep_datetime: bool = False,
     allow_hasadna_fallback: bool = True,
+    fetch_meta: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Fetch all rows for a KNS_* entity.
@@ -296,6 +367,7 @@ def fetch_odata(
             len(rows),
             filter_expr or "none",
         )
+        _note_fetch(fetch_meta, source="hasadna", entity=entity, filter=filter_expr)
         return rows
 
     base_params: dict[str, Any] = {"$top": PAGE_SIZE}
@@ -358,6 +430,7 @@ def fetch_odata(
                     len(rows),
                     filter_expr or "none",
                 )
+                _note_fetch(fetch_meta, source="hasadna", entity=entity, filter=filter_expr)
                 return rows
             raise RuntimeError(
                 f"OData {entity} page {page} failed after {RETRY_MAX} attempts"
@@ -383,4 +456,5 @@ def fetch_odata(
         page += 1
         time.sleep(0.25)
 
+    _note_fetch(fetch_meta, source="odata", entity=entity, filter=filter_expr)
     return all_rows

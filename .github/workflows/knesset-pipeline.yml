@@ -2,9 +2,15 @@ name: knesset-pipeline
 
 on:
   schedule:
-    # Daily midnight Israel (IDT = UTC+3 → 21:00 UTC; in winter IST runs at 23:00 Israel)
+    # Daily midnight Israel (IDT = UTC+3 → 21:00 UTC; in winter IST runs at 23:00 Israel).
+    # The loader itself refetches in full on Fridays in Asia/Jerusalem.
     - cron: '0 21 * * *'
   workflow_dispatch:
+    inputs:
+      full:
+        description: 'Full OData refresh (ignore LastUpdatedDate watermarks)'
+        type: boolean
+        default: false
 
 concurrency:
   group: knesset-pipeline
@@ -27,8 +33,13 @@ jobs:
         run: pip install -r requirements.txt
         working-directory: 'Layer 1 - Gathering Data/knesset'
 
+      # Incremental LastUpdatedDate sync unless this dispatch sets full=true.
+      # Fridays (Asia/Jerusalem) are a full refresh even without the flag.
       - name: Run knesset pipeline
-        run: python load_all_knesset_data.py
+        run: |
+          args=()
+          [ "${{ inputs.full }}" = "true" ] && args+=(--full)
+          python load_all_knesset_data.py "${args[@]}"
         working-directory: 'Layer 1 - Gathering Data/knesset'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

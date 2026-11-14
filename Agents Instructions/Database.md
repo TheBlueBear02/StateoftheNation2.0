@@ -350,7 +350,7 @@ Government ministries (משרדי ממשלה).
 | `is_shown` | boolean | Whether to show on the dashboard |
 | `created_at` | timestamptz | Row creation timestamp |
 
-**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override set on insert. Changes to an existing row are `UPDATE`s, not a partial upsert: `name` is `NOT NULL`, and Postgres checks that on the speculative `INSERT` before `ON CONFLICT`. A ministry missing from a non-empty feed is closed (`is_active` false) the same way. An empty feed closes nothing. A new ministry with no OData name is skipped. Frontend prefers `knesset_category_name`, then `name`.
+**Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_GovMinistry`. Sync updates `knesset_category_name` + `is_active` only; `name` is a display override set on insert. Changes to an existing row are `UPDATE`s, not a partial upsert: `name` is `NOT NULL`, and Postgres checks that on the speculative `INSERT` before `ON CONFLICT`. A ministry missing from a non-empty full feed is closed (`is_active` false) the same way. An incremental batch closes only ministries it actually fetched (their own `IsActive`). An empty feed closes nothing. A new ministry with no OData name is skipped. Frontend prefers `knesset_category_name`, then `name`.
 
 ---
 
@@ -632,7 +632,7 @@ Homepage news-strip feed. Written by `emit_site_updates.py` at the end of succes
 
 ### `pipeline_sync_state`
 
-Revid cache for incremental Wikipedia fetches.
+Revid cache for incremental Wikipedia fetches, and the Knesset OData `LastUpdatedDate` watermark (`pipeline='knesset'`).
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -641,6 +641,7 @@ Revid cache for incremental Wikipedia fetches.
 | `last_revid` | bigint | Last successfully parsed revision |
 | `last_run_at` | timestamptz | Last run timestamp |
 | `last_success_at` | timestamptz | Last successful fetch |
+| `watermark` | timestamptz | Knesset OData `LastUpdatedDate` high-water mark for `pipeline='knesset'` (`person`, `faction`, `gov_ministry`, `person_to_position`). Null on polls rows. Apply `knesset/schema_knesset_sync_watermark.sql`. |
 
 ---
 
@@ -797,7 +798,7 @@ Descriptive pollster bias vs cross-pollster average. Display only — not applie
 
 | Script | Tables updated | Trigger |
 |--------|---------------|---------|
-| `load_all_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Daily midnight Israel (GitHub Actions: `.github/workflows/knesset-pipeline.yml`). `knessets.is_active` follows OData `IsCurrent`. `governments.is_active` follows the current `GovernmentNum` on ministerial positions; a new number is inserted and the previous active row is closed. Null `FactionID` on the active Knesset can be filled provisionally from election lists. |
+| `load_all_knesset_data.py` | `knessets` · `people` · `knesset_factions` · `knesset_memberships` · `offices` · `governments` · `minister_appointments` | Daily midnight Israel (GitHub Actions: `.github/workflows/knesset-pipeline.yml`). `KNS_Person`, `KNS_Faction`, `KNS_GovMinistry`, and `KNS_PersonToPosition` are incremental: `LastUpdatedDate` greater than the last successful watermark minus 6 hours. No watermark, `--full`, or Friday in Asia/Jerusalem fetches those entities in full. `KNS_KnessetDates` is always full. A row that was not in an incremental batch is left unchanged (offices close for absence only on a full fetch; a government closes only when a complete `IsCurrent` query names a successor). Watermarks live on `pipeline_sync_state.watermark` and are copied onto `pipeline_runs.summary.odata_watermarks`. `knessets.is_active` follows OData `IsCurrent`. `governments.is_active` follows the current `GovernmentNum` on ministerial positions; a new number is inserted and the previous active row is closed. Null `FactionID` on the active Knesset can be filled provisionally from election lists. |
 | `load_knesset_committees.py` | `knesset_committees` · `knesset_committee_sessions` · `knesset_committee_session_documents` · `knesset_committee_session_transcripts` · `knesset_committee_transcript_parts` (+ memberships only with `--use-hasadna`) | Same daily workflow (after main knesset sync). **Default Knesset: OData IsCurrent, else `knessets.is_active`.** **Default source: Knesset OData + DOC self-parse** (no Hasadna). CI installs `antiword`. Newest **50** missing transcripts/run. Targeted CLI: `--committee` + `--date YYYY-MM-DD`. One-off term: `--knesset <number>`. |
 | `check_knesset_consistency.py` | `pipeline_runs` (`pipeline=knesset`, `action=consistency-check`) | Same daily workflow, after committees. Fails the job on: OData current Knesset ≠ DB active knesset; current-Knesset memberships with null `faction_id`; OData current committees missing from the DB; committees marked current or last synced for a non-current Knesset; OData current government ≠ DB active government; active government with no open minister appointments. Provisional faction links are counted in the summary and are not themselves a failure. |
 | `seed_office_dashboard.py` | `offices.is_shown` / `info` · `indexes` · `index_data` | Manual — migrate curated KPI data from old sn.db |
