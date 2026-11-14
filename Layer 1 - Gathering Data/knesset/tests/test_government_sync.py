@@ -15,6 +15,7 @@ from government_sync import (  # noqa: E402
     current_government_numbers,
     plan_government_sync,
     plan_office_writes,
+    prepare_office_writes,
     select_current_government_number,
 )
 
@@ -299,6 +300,23 @@ class OfficeAndAppointmentTests(unittest.TestCase):
         )
         self.assertIn({"knesset_category_id": 5, "is_active": False}, closed)
         self.assertEqual(plan_office_writes([], existing), [])
+
+    def test_legacy_close_is_an_update_without_name_and_nameless_insert_is_skipped(self) -> None:
+        # OData ministry ids start at 490. A curated office id such as 33 is not
+        # in the feed, so the close payload must not be inserted without name.
+        writes = plan_office_writes(
+            [{"GovMinistryID": 490, "Name": "אין נתונים", "IsActive": False}],
+            {33: {"knesset_category_name": "ישן", "is_active": True}},
+        )
+        prepared, skipped = prepare_office_writes(writes, {33})
+        self.assertIn({"knesset_category_id": 33, "is_active": False}, prepared)
+        self.assertTrue(all("name" not in row or row["knesset_category_id"] != 33 for row in prepared))
+        nameless, skipped_name = prepare_office_writes(
+            [{"knesset_category_id": 900, "name": None, "knesset_category_name": None, "is_active": True}],
+            set(),
+        )
+        self.assertEqual(nameless, [])
+        self.assertEqual(skipped_name, [(900, "missing name")])
 
     def test_inactive_ministry_is_closed_without_renaming(self) -> None:
         writes = plan_office_writes(

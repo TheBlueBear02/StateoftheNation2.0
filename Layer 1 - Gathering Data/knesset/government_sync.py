@@ -354,6 +354,34 @@ def plan_office_writes(api_rows: list[dict], existing: dict[int, dict]) -> list[
     return writes
 
 
+def prepare_office_writes(
+    rows: list[dict],
+    existing_ids: set[int],
+) -> tuple[list[dict], list[tuple[int, str]]]:
+    """Drop nameless inserts and never send `name` on an existing office.
+
+    `name` is NOT NULL. A partial upsert of an existing ministry (is_active only)
+    is still an INSERT ... ON CONFLICT in Postgres, and the missing name fails
+    the statement before the conflict is applied.
+    """
+    prepared: list[dict] = []
+    skipped: list[tuple[int, str]] = []
+    for row in rows:
+        category_id = _as_int(row.get("knesset_category_id"))
+        if category_id is None:
+            continue
+        if category_id in existing_ids:
+            prepared.append(
+                {key: value for key, value in row.items() if key != "name"}
+            )
+            continue
+        if not _text(row.get("name")):
+            skipped.append((category_id, "missing name"))
+            continue
+        prepared.append(row)
+    return prepared, skipped
+
+
 def appointment_payload(
     row: dict,
     *,
