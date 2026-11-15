@@ -6,6 +6,8 @@ election-list fallback; callers must not overwrite a non-provisional faction_id.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 
 _NIKUD_AND_BIDI = {chr(code) for code in range(0x0591, 0x05C8)} | {
@@ -15,24 +17,38 @@ _NIKUD_AND_BIDI = {chr(code) for code in range(0x0591, 0x05C8)} | {
     "\u202b",
     "\u202c",
     "\ufeff",
+    "\u2060",
 }
-_QUOTE_CHARS = set("\"'`״׳„“”«»")
+_QUOTE_CHARS = set("\"'`״׳„“”«»‘’")
 _DASH_CHARS = set("-–—־")
+_PUNCT_CHARS = set("!?.,:;•·")
 _BOUNDARY_CHARS = set(" -–—־ו")
+_FINALS = str.maketrans("ךםןףץ", "כמנפצ")
+_LEADERSHIP_MARKERS = (" בראשות ", " בהנהגת ", " לראשות ")
+_PARENTHETICAL = re.compile(r"\([^)]*\)")
 
 
 def _strip_marks(value: str) -> str:
-    return "".join(ch for ch in value if ch not in _NIKUD_AND_BIDI)
+    kept: list[str] = []
+    for ch in value:
+        if ch in _NIKUD_AND_BIDI or unicodedata.category(ch) in {"Mn", "Cf"}:
+            continue
+        kept.append(ch)
+    return "".join(kept)
+
+
+def _fold_finals(value: str) -> str:
+    return value.translate(_FINALS)
 
 
 def loose_political_name(value: str | None) -> str:
     """Collapse quotes, dashes, and spacing but keep word boundaries."""
     if not value:
         return ""
-    text = _strip_marks(value).strip()
+    text = _fold_finals(_strip_marks(value)).strip()
     chars: list[str] = []
     for ch in text:
-        if ch in _QUOTE_CHARS or ch in _DASH_CHARS:
+        if ch in _QUOTE_CHARS or ch in _DASH_CHARS or ch in _PUNCT_CHARS:
             chars.append(" ")
         else:
             chars.append(ch)
@@ -45,17 +61,56 @@ def normalize_political_name(value: str | None) -> str:
     return loose.replace(" ", "")
 
 
+def _leadership_head(text: str) -> str:
+    head = text
+    for marker in _LEADERSHIP_MARKERS:
+        if marker in head:
+            head = head.split(marker, 1)[0].strip()
+    return head
+
+
 def _name_variants(value: str | None) -> list[str]:
     loose = loose_political_name(value)
     if not loose:
         return []
     variants = [loose]
-    for marker in (" בראשות ", " בהנהגת "):
-        if marker in loose:
-            head = loose.split(marker, 1)[0].strip()
-            if head:
-                variants.append(head)
-    return variants
+    head = _leadership_head(loose)
+    if head and head != loose:
+        variants.append(head)
+    # "הציונות הדתית … וזהות בראשות …" is two lists in one faction title.
+    # A bare "ו" without its own leadership phrase stays part of one name.
+    search_from = 0
+    while True:
+        idx = loose.find(" ו", search_from)
+        if idx < 0:
+            break
+        tail = loose[idx + 2 :].strip()
+        search_from = idx + 2
+        if not any(marker in f" {tail} " for marker in _LEADERSHIP_MARKERS):
+            continue
+        part = _leadership_head(tail)
+        if part:
+            variants.append(part)
+    return list(dict.fromkeys(variants))
+
+
+def _shared_leading_words(left: str, right: str, *, minimum: int = 2) -> bool:
+    """True when two titles share a leading phrase, then diverge.
+
+    ש"ס is filed as "התאחדות הספרדים שומרי תורה …" on the ballot and
+    "התאחדות הספרדים העולמית שומרי תורה" in OData. The first two words
+    are the same party; the rest is the legal formula.
+    """
+    left_words = left.split()
+    right_words = right.split()
+    if len(left_words) < minimum or len(right_words) < minimum:
+        return False
+    shared = 0
+    for a, b in zip(left_words, right_words):
+        if a != b:
+            break
+        shared += 1
+    return shared >= minimum
 
 
 def _boundary_prefix(shorter: str, longer: str) -> bool:
@@ -77,7 +132,59 @@ def names_refer_to_same_party(left: str | None, right: str | None) -> bool:
                 return True
             if _boundary_prefix(a, b) or _boundary_prefix(b, a):
                 return True
+            if _shared_leading_words(a, b):
+                return True
     return False
+
+
+def person_name_key(value: str | None) -> str:
+    """Key for "is this the same person" across the election list and OData.
+
+    Drops format characters (a word-joiner was sitting on some list names),
+    parenthetical nicknames, quotes, and final-letter spelling. Collapses
+    a double yud so עטייה and עטיה meet.
+    """
+    if not value:
+        return ""
+    text = _PARENTHETICAL.sub(" ", value)
+    text = _fold_finals(_strip_marks(text))
+    text = text.replace("יי", "י")
+    chars: list[str] = []
+    for ch in text:
+        if ch in _QUOTE_CHARS:
+            continue
+        if ch in _DASH_CHARS or ch in _PUNCT_CHARS:
+            chars.append(" ")
+        else:
+            chars.append(ch)
+    return " ".join("".join(chars).split())
+
+
+def _tokens_align(shorter: list[str], longer: list[str]) -> bool:
+    """Shorter name is an in-order part of the longer one (middle name added)."""
+    if len(shorter) < 2 or len(longer) <= len(shorter):
+        return False
+    index = 0
+    for token in longer:
+        if token == shorter[index]:
+            index += 1
+            if index == len(shorter):
+                return True
+    return False
+
+
+def person_names_match(left: str | None, right: str | None) -> bool:
+    left_key = person_name_key(left)
+    right_key = person_name_key(right)
+    if not left_key or not right_key:
+        return False
+    if left_key == right_key:
+        return True
+    left_tokens = left_key.split()
+    right_tokens = right_key.split()
+    return _tokens_align(left_tokens, right_tokens) or _tokens_align(
+        right_tokens, left_tokens
+    )
 
 
 def _is_current_flag(value: object) -> bool:
@@ -141,6 +248,80 @@ def knesset_numbers_to_deactivate(
 def knesset_image_folder_candidates(knesset_number: int) -> list[str]:
     """Directory names under public/images/KM Images for one Knesset term."""
     return [f"הכנסת ה{knesset_number}", f"הכנסת ה-{knesset_number}"]
+
+
+@dataclass(frozen=True)
+class PersonName:
+    person_id: int
+    full_name: str | None = None
+    knesset_person_id: int | None = None
+
+
+@dataclass(frozen=True)
+class PersonBridge:
+    """Membership person → election-list person, for the provisional lookup only.
+
+    This does not merge `people` rows. A pair whose `knesset_person_id` values
+    are both set and different is a different person (two אלי כהן), not a duplicate.
+    """
+
+    member_to_candidate: dict[int, int]
+    kpid_conflicts: int
+    ambiguous: int
+
+
+def _kpid_compatible(member: PersonName, candidate: PersonName) -> bool:
+    if member.knesset_person_id is None or candidate.knesset_person_id is None:
+        return True
+    return member.knesset_person_id == candidate.knesset_person_id
+
+
+def bridge_member_people(
+    members: list[PersonName],
+    candidates: list[PersonName],
+) -> PersonBridge:
+    """Point a Knesset person at the list row when the normalized name is unique.
+
+    The election import and the OData person sync often created two `people`
+    rows for one MK. The list row usually has no `knesset_person_id` yet.
+    """
+    candidate_ids = {person.person_id for person in candidates}
+    matches: dict[int, int] = {}
+    claimed: dict[int, list[int]] = {}
+    conflicts = 0
+    ambiguous = 0
+    for member in members:
+        if member.person_id in candidate_ids:
+            continue
+        hits: list[int] = []
+        saw_conflict = False
+        for candidate in candidates:
+            if not person_names_match(member.full_name, candidate.full_name):
+                continue
+            if not _kpid_compatible(member, candidate):
+                saw_conflict = True
+                continue
+            hits.append(candidate.person_id)
+        unique = list(dict.fromkeys(hits))
+        if len(unique) != 1:
+            if saw_conflict and not unique:
+                conflicts += 1
+            elif len(unique) > 1:
+                ambiguous += 1
+            continue
+        matches[member.person_id] = unique[0]
+        claimed.setdefault(unique[0], []).append(member.person_id)
+    kept = {
+        member_id: candidate_id
+        for member_id, candidate_id in matches.items()
+        if len(claimed[candidate_id]) == 1
+    }
+    ambiguous += sum(1 for ids in claimed.values() if len(ids) > 1)
+    return PersonBridge(
+        member_to_candidate=kept,
+        kpid_conflicts=conflicts,
+        ambiguous=ambiguous,
+    )
 
 
 @dataclass(frozen=True)

@@ -8,6 +8,7 @@ const ogImageUrl = `${getSiteUrl()}/images/Knesset%20Committees/knesset-commiett
 
 type PageProps = {
   searchParams: Promise<{
+    knesset?: string | string[]
     committee?: string | string[]
     session?: string | string[]
     message?: string | string[]

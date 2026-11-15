@@ -35,6 +35,7 @@ type CommitteeTranscriptChatProps = {
   session: CommitteeSession | null
   committeeName: string | null
   committeeId?: number | null
+  knessetNumber?: number | null
   shareUrl?: string | null
   activeOrdinal: number | null
   playing: boolean
@@ -561,6 +562,7 @@ export function CommitteeTranscriptChat({
   session,
   committeeName,
   committeeId = null,
+  knessetNumber = null,
   shareUrl = null,
   activeOrdinal,
   playing,
@@ -677,7 +679,12 @@ export function CommitteeTranscriptChat({
     if (committeeId == null || session?.id == null) {
       return null
     }
-    return buildCommitteesSharePath(committeeId, session.id, partId)
+    return buildCommitteesSharePath(
+      committeeId,
+      session.id,
+      partId,
+      knessetNumber,
+    )
   }
 
   async function handleShare() {

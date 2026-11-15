@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { SiteLayout } from '../components/SiteLayout'
 import { CommitteeChatPicker } from '../components/knesset/CommitteeChatPicker'
+import { CommitteeSelectMenu } from '../components/knesset/CommitteeSelectMenu'
 import { CommitteeTable } from '../components/knesset/CommitteeTable'
 import {
   CommitteeTranscriptChat,
@@ -14,6 +15,7 @@ import {
 import { useCommitteeAttendance } from '../hooks/useCommitteeAttendance'
 import { useCommitteeMemberships } from '../hooks/useCommitteeMemberships'
 import { useCommitteeSessions } from '../hooks/useCommitteeSessions'
+import { useCommitteeSessionKnessets } from '../hooks/useCommitteeSessionKnessets'
 import { useCommitteeTranscript } from '../hooks/useCommitteeTranscript'
 import { useKnessetCommittees } from '../hooks/useKnessetCommittees'
 import { usePersonFactions } from '../hooks/usePersonFactions'
@@ -21,6 +23,7 @@ import { usePersonTenures } from '../hooks/usePersonTenures'
 import type { CommitteeMember } from '../lib/committeeTypes'
 import type { KnessetCommittee } from '../lib/committeeTypes'
 import type { CommitteeSession } from '../lib/committeeTypes'
+import { resolveCommitteeKnesset } from '../lib/committeeKnessetOptions'
 import { buildCommitteesSharePath } from '../lib/committeeShare'
 import { layoutCommitteeSeats } from '../lib/committeeTableLayout'
 import {
@@ -49,8 +52,21 @@ function parsePositiveInt(raw: string | null): number | null {
 export function KnessetCommitteesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const {
+    options: knessetOptions,
+    loading: knessetsLoading,
+    error: knessetsError,
+  } = useCommitteeSessionKnessets()
+  const urlKnessetNumber = parsePositiveInt(searchParams.get('knesset'))
+  const selectedKnesset = useMemo(
+    () =>
+      knessetsLoading
+        ? null
+        : resolveCommitteeKnesset(urlKnessetNumber, knessetOptions),
+    [knessetsLoading, knessetOptions, urlKnessetNumber],
+  )
   const { committees, loading: committeesLoading, error: committeesError } =
-    useKnessetCommittees()
+    useKnessetCommittees(selectedKnesset?.id ?? null, !knessetsLoading)
 
   const [selectedCommittee, setSelectedCommittee] =
     useState<KnessetCommittee | null>(null)
@@ -61,6 +77,19 @@ export function KnessetCommitteesPage() {
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null)
   const [activeOrdinal, setActiveOrdinal] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
+  function committeesPath(
+    committeeId: number | null,
+    sessionId: number | null = null,
+    messageId: number | null = null,
+  ) {
+    return buildCommitteesSharePath(
+      committeeId,
+      sessionId,
+      messageId,
+      selectedKnesset?.knessetNumber ?? urlKnessetNumber,
+    )
+  }
+
   const urlCommitteeId = parsePositiveInt(searchParams.get('committee'))
   const urlSessionId = parsePositiveInt(searchParams.get('session'))
   const urlMessageId = parsePositiveInt(searchParams.get('message'))
@@ -430,6 +459,34 @@ export function KnessetCommitteesPage() {
     urlSessionId,
   ])
 
+  // Put the chosen Knesset in the URL. A missing or unknown number falls
+  // back to the current term, or the newest term that has sessions.
+  useEffect(() => {
+    if (knessetsLoading || selectedKnesset == null) {
+      return
+    }
+    if (urlKnessetNumber === selectedKnesset.knessetNumber) {
+      return
+    }
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('knesset', String(selectedKnesset.knessetNumber))
+    if (urlKnessetNumber != null) {
+      params.delete('committee')
+      params.delete('session')
+      params.delete('message')
+    }
+    const query = params.toString()
+    router.replace(query ? `/knesset/committees?${query}` : '/knesset/committees', {
+      scroll: false,
+    })
+  }, [
+    knessetsLoading,
+    router,
+    searchParams,
+    selectedKnesset,
+    urlKnessetNumber,
+  ])
+
   // Drop invalid ids from the address bar once lists have loaded.
   useEffect(() => {
     if (committeesLoading) {
@@ -440,7 +497,7 @@ export function KnessetCommitteesPage() {
       urlCommitteeId != null &&
       !committees.some((item) => item.id === urlCommitteeId)
     ) {
-      router.replace(buildCommitteesSharePath(null), { scroll: false })
+      router.replace(committeesPath(null), { scroll: false })
       return
     }
 
@@ -451,7 +508,7 @@ export function KnessetCommitteesPage() {
       !sessionsLoading &&
       !sessions.some((item) => item.id === urlSessionId)
     ) {
-      router.replace(buildCommitteesSharePath(urlCommitteeId, null), {
+      router.replace(committeesPath(urlCommitteeId, null), {
         scroll: false,
       })
     }
@@ -462,11 +519,27 @@ export function KnessetCommitteesPage() {
     selectedCommittee?.id,
     sessions,
     sessionsLoading,
+    selectedKnesset?.knessetNumber,
     urlCommitteeId,
+    urlKnessetNumber,
     urlSessionId,
   ])
 
+  function onKnessetChange(value: string) {
+    const knessetNumber = parsePositiveInt(value)
+    if (knessetNumber == null || knessetNumber === selectedKnesset?.knessetNumber) {
+      return
+    }
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('knesset', String(knessetNumber))
+    params.delete('committee')
+    params.delete('session')
+    params.delete('message')
+    router.replace(`/knesset/committees?${params.toString()}`, { scroll: false })
+  }
+
   const pageError =
+    knessetsError ||
     committeesError ||
     sessionsError ||
     membersError ||
@@ -521,7 +594,7 @@ export function KnessetCommitteesPage() {
   function openCommittee(committee: KnessetCommittee) {
     setPlaying(false)
     setSelectedPersonId(null)
-    router.replace(buildCommitteesSharePath(committee.id, null), {
+    router.replace(committeesPath(committee.id, null), {
       scroll: false,
     })
   }
@@ -533,7 +606,7 @@ export function KnessetCommitteesPage() {
     if (committeeId == null) {
       return
     }
-    router.replace(buildCommitteesSharePath(committeeId, session.id), {
+    router.replace(committeesPath(committeeId, session.id), {
       scroll: false,
     })
   }
@@ -543,23 +616,23 @@ export function KnessetCommitteesPage() {
     setPlaying(false)
     setSelectedPersonId(null)
     if (committeeId != null) {
-      router.replace(buildCommitteesSharePath(committeeId, null), {
+      router.replace(committeesPath(committeeId, null), {
         scroll: false,
       })
       return
     }
-    router.replace(buildCommitteesSharePath(null), { scroll: false })
+    router.replace(committeesPath(null), { scroll: false })
   }
 
   function backFromSessions() {
     setPlaying(false)
     setSelectedPersonId(null)
-    router.replace(buildCommitteesSharePath(null), { scroll: false })
+    router.replace(committeesPath(null), { scroll: false })
   }
 
   const sessionSharePath =
     selectedCommittee != null && selectedSession != null
-      ? buildCommitteesSharePath(selectedCommittee.id, selectedSession.id)
+      ? committeesPath(selectedCommittee.id, selectedSession.id)
       : null
 
   return (
@@ -573,6 +646,25 @@ export function KnessetCommitteesPage() {
                 { label: 'ועדות הכנסת' },
               ]}
             />
+
+            <div className="committees-page__controls" dir="rtl">
+              <CommitteeSelectMenu
+                label="כנסת"
+                ariaLabel="בחירת כנסת להצגת ישיבות הוועדות"
+                value={
+                  selectedKnesset != null
+                    ? String(selectedKnesset.knessetNumber)
+                    : ''
+                }
+                options={knessetOptions.map((option) => ({
+                  value: String(option.knessetNumber),
+                  label: option.label,
+                }))}
+                disabled={knessetsLoading || knessetOptions.length === 0}
+                placeholder={knessetsLoading ? 'טוען…' : 'אין ישיבות'}
+                onChange={onKnessetChange}
+              />
+            </div>
 
             {pageError ? (
               <p className="committees-page__error" role="alert">
@@ -647,6 +739,9 @@ export function KnessetCommitteesPage() {
                     session={selectedSession}
                     committeeName={selectedCommittee?.name ?? null}
                     committeeId={selectedCommittee?.id ?? null}
+                    knessetNumber={
+                      selectedKnesset?.knessetNumber ?? urlKnessetNumber
+                    }
                     shareUrl={sessionSharePath}
                     activeOrdinal={activeOrdinal}
                     playing={playing}

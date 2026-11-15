@@ -2,9 +2,23 @@ name: knesset-pipeline
 
 on:
   schedule:
-    # Daily midnight Israel (IDT = UTC+3 → 21:00 UTC; in winter IST runs at 23:00 Israel)
+    # Daily midnight Israel (IDT = UTC+3 → 21:00 UTC; in winter IST runs at 23:00 Israel).
+    # The loader itself refetches in full on Fridays in Asia/Jerusalem.
     - cron: '0 21 * * *'
   workflow_dispatch:
+    inputs:
+      full:
+        description: 'Full OData refresh (ignore LastUpdatedDate watermarks)'
+        type: boolean
+        default: false
+      committees_backfill:
+        description: 'Fill committee sessions without the LastUpdatedDate checkpoint. Does not re-download protocols already stored.'
+        type: boolean
+        default: false
+      knesset:
+        description: 'With committees_backfill, optional Knesset number (default: current term)'
+        type: string
+        required: false
 
 concurrency:
   group: knesset-pipeline
@@ -27,8 +41,13 @@ jobs:
         run: pip install -r requirements.txt
         working-directory: 'Layer 1 - Gathering Data/knesset'
 
+      # Incremental LastUpdatedDate sync unless this dispatch sets full=true.
+      # Fridays (Asia/Jerusalem) are a full refresh even without the flag.
       - name: Run knesset pipeline
-        run: python load_all_knesset_data.py
+        run: |
+          args=()
+          [ "${{ inputs.full }}" = "true" ] && args+=(--full)
+          python load_all_knesset_data.py "${args[@]}"
         working-directory: 'Layer 1 - Gathering Data/knesset'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -43,16 +62,25 @@ jobs:
         if: ${{ !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y antiword
 
-      # Committees for the current Knesset (OData IsCurrent, else knessets.is_active).
-      # One-off backfill of a specific term: add --knesset <number>.
-      # No Hasadna by default (dumps are stale); memberships left as last synced.
-      # Docs: session-scoped OData only (never full-scan DocumentCommitteeSession).
-      # Transcripts: newest missing with a protocol DOC (limit 50/run).
+      # Committees for the current Knesset only (OData IsCurrent, else knessets.is_active).
+      # Sessions use the LastUpdatedDate checkpoint. Protocols, transcripts, and
+      # attendance already stored are not downloaded again, so a cancelled run resumes.
+      # committees_backfill ignores the checkpoint. knesset is used only then.
       - name: Run knesset committees pipeline
         if: ${{ !cancelled() }}
-        run: python load_knesset_committees.py --transcripts-mode missing --transcripts-limit 50
+        run: |
+          args=(--transcripts-mode missing --transcripts-limit 50)
+          if [ "$COMMITTEES_BACKFILL" = "true" ]; then
+            args+=(--backfill)
+            if [[ "$KNESSET_NUM" =~ ^[0-9]+$ ]]; then
+              args+=(--knesset "$KNESSET_NUM")
+            fi
+          fi
+          python load_knesset_committees.py "${args[@]}"
         working-directory: 'Layer 1 - Gathering Data/knesset'
         env:
+          COMMITTEES_BACKFILL: ${{ inputs.committees_backfill }}
+          KNESSET_NUM: ${{ inputs.knesset }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

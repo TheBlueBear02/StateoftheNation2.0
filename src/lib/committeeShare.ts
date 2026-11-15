@@ -4,8 +4,12 @@ export function buildCommitteesSharePath(
   committeeId: number | null,
   sessionId: number | null = null,
   messageId: number | null = null,
+  knessetNumber: number | null = null,
 ): string {
   const params = new URLSearchParams()
+  if (knessetNumber != null) {
+    params.set('knesset', String(knessetNumber))
+  }
   if (committeeId != null) {
     params.set('committee', String(committeeId))
   }

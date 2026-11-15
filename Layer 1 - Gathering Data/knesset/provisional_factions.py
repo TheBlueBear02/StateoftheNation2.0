@@ -15,6 +15,8 @@ from knesset_term import (
     FactionWrite,
     MembershipFactionState,
     PartyRef,
+    PersonName,
+    bridge_member_people,
     match_party_to_faction,
     person_party_map,
     plan_provisional_faction_writes,
@@ -54,6 +56,33 @@ def _fetch_all(sb, table: str, columns: str, **filters: Any) -> list[dict]:
             break
         offset += page_size
     return rows
+
+
+def _load_people(sb, person_ids: set[int]) -> dict[int, PersonName]:
+    found: dict[int, PersonName] = {}
+    ids = [person_id for person_id in person_ids if person_id is not None]
+    for index in range(0, len(ids), 100):
+        chunk = ids[index : index + 100]
+        if not chunk:
+            continue
+        rows = (
+            sb.table("people")
+            .select("id, full_name, knesset_person_id")
+            .in_("id", chunk)
+            .execute()
+            .data
+            or []
+        )
+        for row in rows:
+            if row.get("id") is None:
+                continue
+            raw_kpid = row.get("knesset_person_id")
+            found[int(row["id"])] = PersonName(
+                person_id=int(row["id"]),
+                full_name=row.get("full_name"),
+                knesset_person_id=int(raw_kpid) if raw_kpid is not None else None,
+            )
+    return found
 
 
 def _election_for_knesset(sb, knesset_number: int) -> dict | None:
@@ -156,6 +185,41 @@ def build_provisional_plan(
         log.warning(
             "Provisional factions: %d people are on more than one election list — skipped",
             len(ambiguous),
+        )
+
+    people = _load_people(
+        sb,
+        {person_id for person_id, _party_id, _pos in candidates}
+        | {
+            int(row["person_id"])
+            for row in memberships
+            if row.get("person_id") is not None
+        },
+    )
+    bridge = bridge_member_people(
+        list(people.values()),
+        [people[person_id] for person_id, _party_id, _pos in candidates if person_id in people],
+    )
+    bridged = 0
+    for member_id, candidate_id in bridge.member_to_candidate.items():
+        if member_id in person_to_party:
+            continue
+        party_id = person_to_party.get(candidate_id)
+        if party_id is None:
+            continue
+        person_to_party[member_id] = party_id
+        bridged += 1
+    if bridged:
+        log.info(
+            "Provisional factions: %d membership people matched an election-list "
+            "person by name (separate people rows)",
+            bridged,
+        )
+    if bridge.kpid_conflicts:
+        log.warning(
+            "Provisional factions: %d membership people share a list name but "
+            "have a different knesset_person_id — left unmatched",
+            bridge.kpid_conflicts,
         )
     if parties_unmatched:
         log.warning(

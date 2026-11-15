@@ -253,6 +253,10 @@
     display: none;
   }
 
+  .committees-page__inner > .committees-page__controls {
+    padding: 12px var(--container-pad) 8px;
+  }
+
   .committees-page__inner > .committees-page__error {
     padding-inline: var(--container-pad);
   }

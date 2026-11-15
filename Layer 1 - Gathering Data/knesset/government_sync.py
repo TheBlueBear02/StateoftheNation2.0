@@ -180,37 +180,64 @@ def _close_date(
     *,
     odata_current: int | None,
     successor_start: str | None,
+    trust_end: bool = True,
 ) -> str | None:
-    """A date for a null end_date, or None when there is nothing official to write."""
+    """A date for a null end_date, or None when there is nothing official to write.
+
+    trust_end is false for an incremental position batch: a subset of FinishDate
+    values must not close a government, and a touched historical row must not
+    either. The previous active row can still close when a newer current number
+    is known, using that successor's start date.
+    """
     if odata_current is not None and aggregate.government_number == odata_current:
         return None
-    if not aggregate.is_current and aggregate.end_date is not None:
+    if trust_end and not aggregate.is_current and aggregate.end_date is not None:
         return aggregate.end_date
-    closing_previous = odata_current is not None and aggregate.government_number != odata_current and (
-        (existing is not None and existing.is_active) or aggregate.is_current
+    closing_previous = (
+        odata_current is not None
+        and aggregate.government_number != odata_current
+        and (
+            (existing is not None and existing.is_active)
+            or (trust_end and aggregate.is_current)
+        )
     )
     if closing_previous:
         return successor_start
     return None
 
 
+# Pass as odata_current to derive the current number from the aggregates.
+CURRENT_UNSET: object = object()
+
+
 def plan_government_sync(
     aggregates: dict[int, GovernmentAggregate],
     existing: dict[int, GovernmentExisting],
     knesset_id_by_number: dict[int, int],
+    *,
+    odata_current: int | None | object = CURRENT_UNSET,
+    trust_end: bool = True,
 ) -> GovernmentSyncPlan:
     """Insert missing governments and move is_active. Never overwrite curated dates.
 
     An empty aggregate (failed or empty feed) changes nothing, so a partial
     download cannot retire the sitting government.
+
+    Incremental sync passes the current number from a complete `IsCurrent eq true`
+    query and trust_end=False. Absent governments are still deactivated when that
+    number replaces the active one. Their end_date comes from the successor's
+    start, not from FinishDate values that happened to be in the batch.
     """
-    if not aggregates:
+    if not aggregates and odata_current is CURRENT_UNSET:
         return GovernmentSyncPlan(deactivate_rows=[], upsert_rows=[], skipped=[])
 
     current_numbers = sorted(
         number for number, aggregate in aggregates.items() if aggregate.is_current
     )
-    odata_current = select_current_government_number(current_numbers)
+    if odata_current is CURRENT_UNSET:
+        odata_current = select_current_government_number(current_numbers)
+    elif odata_current is not None:
+        odata_current = int(odata_current)
     successor_start = (
         aggregates[odata_current].start_date if odata_current in aggregates else None
     )
@@ -258,6 +285,7 @@ def plan_government_sync(
                     ex,
                     odata_current=odata_current,
                     successor_start=successor_start,
+                    trust_end=trust_end,
                 ),
                 start_ref,
             )
@@ -306,12 +334,19 @@ def _office_active(row: dict) -> bool:
     return _flag(row.get("IsActive"))
 
 
-def plan_office_writes(api_rows: list[dict], existing: dict[int, dict]) -> list[dict]:
+def plan_office_writes(
+    api_rows: list[dict],
+    existing: dict[int, dict],
+    *,
+    close_missing: bool = True,
+) -> list[dict]:
     """Mirror KNS_GovMinistry. `name` is set on insert only.
 
-    Offices missing from a non-empty feed are closed (is_active false). An empty
-    feed closes nothing. info, logo, news feed, is_shown, and name_en are absent
-    from every payload.
+    Offices missing from a non-empty feed are closed (is_active false) only when
+    close_missing is true (a full refresh). An incremental batch must not retire
+    a ministry that simply was not updated. An empty feed closes nothing either
+    way. A ministry that is in the batch with IsActive false is still closed.
+    info, logo, news feed, is_shown, and name_en are absent from every payload.
     """
     by_id: dict[int, dict] = {}
     for row in api_rows:
@@ -343,7 +378,7 @@ def plan_office_writes(api_rows: list[dict], existing: dict[int, dict]) -> list[
         if len(payload) > 1:
             writes.append(payload)
 
-    if by_id:
+    if by_id and close_missing:
         for category_id, current in existing.items():
             if category_id in by_id:
                 continue

@@ -2,10 +2,10 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure and [Database.md](./Database.md) for the Committees group schema.
 
-Visualization of committee sittings for the **active Knesset** (`knessets.is_active`): pick a committee and session from a WhatsApp-style group list, see MKs around a hollow committee table, and play the transcript as a chat beside the table.
+Visualization of committee sittings: pick a committee and session from a WhatsApp-style group list, see MKs around a hollow committee table, and play the transcript as a chat beside the table. A Hebrew dropdown chooses the Knesset. Options are only terms that have committee sessions (distinct knesset from `knesset_committee_sessions`, joined to `knessets`), newest first. Default is the current Knesset when it has sessions, otherwise the newest term that does.
 
 Route: `/knesset/committees`  
-Shareable deep links: `/knesset/committees?committee=<id>` (sessions list), `/knesset/committees?committee=<id>&session=<id>` (transcript + table), and `/knesset/committees?committee=<id>&session=<id>&message=<partId>` (same session, jumps to that speech bubble). Ids are the internal Supabase PKs (`knesset_committees.id`, `knesset_committee_sessions.id`, `knesset_committee_transcript_parts.id`). Browser back/forward follows the query. Open Graph / Twitter metadata is generated from those query params (committee name, session number/date, agenda when available), and `og:url` keeps the full deep link so WhatsApp/Facebook do not strip `session` / `message`. The transcript chat header has a **share** button for the session; each MK speech bubble has a small **message share** button (native share sheet, else copy URL).
+Shareable deep links: `/knesset/committees?knesset=<number>` (that term's committees), `/knesset/committees?knesset=<number>&committee=<id>` (sessions list), `/knesset/committees?knesset=<number>&committee=<id>&session=<id>` (transcript + table), and the same with `&message=<partId>` (jumps to that speech bubble). `knesset` is `knessets.knesset_number`. Committee, session, and message ids are the internal Supabase PKs. Browser back/forward follows the query. Open Graph / Twitter metadata is generated from those query params (committee name, session number/date, agenda when available), and `og:url` keeps the full deep link so WhatsApp/Facebook do not strip `session` / `message`. The transcript chat header has a **share** button for the session; each MK speech bubble has a small **message share** button (native share sheet, else copy URL).
 
 Status: **frontend MVP live** (schema + ingest + page). Full membership roster around the table; when protocol attendance exists, absentees render gray. Keyword search not built yet.
 
@@ -43,7 +43,9 @@ Mobile: no breadcrumb; chat/list flush under the site header (no top padding/gap
 | `src/lib/committeeTypes.ts` | Shared TS types |
 | `src/lib/committeeTableLayout.ts` | Seat placement around the table |
 | `src/lib/committeeSpeakerMatch.ts` | Match parts → seated MKs by person_id / header |
-| `src/hooks/useKnessetCommittees.ts` | Active-Knesset committees that have at least one ready transcript |
+| `src/hooks/useCommitteeSessionKnessets.ts` | Knessets that have committee sessions, for the term dropdown |
+| `src/lib/committeeKnessetOptions.ts` | Distinct knessets from session rows, default term |
+| `src/hooks/useKnessetCommittees.ts` | Committees for the selected Knesset that have at least one ready transcript |
 | `src/hooks/useCommitteeSessions.ts` | Sessions (+ transcript filter) |
 | `src/hooks/useCommitteeMemberships.ts` | Active members for session date |
 | `src/hooks/useCommitteeAttendance.ts` | Session attendees from `נכחו` parse |
@@ -67,7 +69,7 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 - Click session → **transcript chat** + committee table; chat header has **back** to sessions and a **share** button for the session deep link. URL updates to `?committee=<id>&session=<id>`.
 - Opening a shared URL restores the matching committee list / sessions list / transcript view once data loads. Session deep links stay on the transcript shell while sessions load (do not flash the picker). `useCommitteeSessions` reports `loading` until data for the requested committee arrives — avoids a race that used to strip `session` from the URL when `sessions=[]` and `loading=false` on the first render after selecting a committee.
 - Chat header subtitle on desktop: **day · time · date · פרוטוקול ישיבה N** (RTL — datetime on the right). On mobile: **day · time · date** only.
-- No top-of-page ועדה/ישיבה dropdowns.
+- A **כנסת** dropdown above the stage picks the term (`?knesset=<number>`). Changing it clears the committee, session, and message. There is no ועדה/ישיבה dropdown; those stay in the chat lists.
 
 ### Table
 - Always visible on desktop (empty wood ring when no session is selected, with hint above: בחרו ישיבת וועדה על מנת להראות את המשתתפים מסביב לשולחן). Table is vertically centered with the chat box, then nudged slightly up (`translateY(-28px)`) so the **ועוד N חברי ועדה…** overflow note still sits within the chat column height. Hint is absolutely positioned above the ring so selecting a session does not shift the table. On mobile, shown only while a session transcript is open.

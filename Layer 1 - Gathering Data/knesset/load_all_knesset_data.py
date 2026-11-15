@@ -10,10 +10,20 @@ Tables updated:
   offices  · governments · minister_appointments
 
 Usage:
-  python load_all_knesset_data.py                        # full sync
+  python load_all_knesset_data.py                        # incremental since last watermark
+  python load_all_knesset_data.py --full                 # ignore watermarks
   python load_all_knesset_data.py --discover             # all known entities
   python load_all_knesset_data.py --discover KNS_Position  # one entity only
   python load_all_knesset_data.py --table people         # sync one table only
+
+Incremental entities (KNS_Person, KNS_Faction, KNS_GovMinistry,
+KNS_PersonToPosition) request LastUpdatedDate greater than the last successful
+watermark minus a 6-hour overlap. The first run with no watermark is a full
+fetch. Fridays in Asia/Jerusalem are a full refresh, and so is --full.
+KNS_KnessetDates is always full. Rows that were not in an incremental batch
+are left as they are: offices are closed for absence only on a full fetch,
+and a government is closed only when a complete IsCurrent query names a
+successor. A Hasadna fallback does not advance the watermark.
 
 Requirements:
   pip install -r requirements.txt
@@ -36,7 +46,8 @@ import os
 import sys
 import logging
 import argparse
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -67,6 +78,7 @@ from provisional_factions import (  # noqa: E402
     provisional_column_ready,
 )
 from government_sync import (  # noqa: E402
+    CURRENT_UNSET,
     GovernmentExisting,
     aggregate_governments,
     appointment_payload,
@@ -75,6 +87,20 @@ from government_sync import (  # noqa: E402
     plan_office_writes,
     prepare_office_writes,
     select_current_government_number,
+)
+from incremental_sync import (  # noqa: E402
+    FetchPlan,
+    GovernmentFeed,
+    INCREMENTAL_RESOURCES,
+    format_watermark,
+    government_feed,
+    normalize_odata_dates,
+    plan_entity_fetch,
+    resolve_watermarks,
+    run_full_reason,
+    summary_watermarks,
+    sync_mode_name,
+    watermark_after_fetch,
 )
 
 from odata_client import (  # noqa: E402
@@ -479,15 +505,18 @@ def sync_knessets(sb: Client) -> dict[int, int]:
     return load_id_map(sb, "knessets", "knesset_number"), stats
 
 
-def sync_people(sb: Client) -> dict[int, int]:
+def sync_people(sb: Client, rows: list[dict] | None = None) -> dict[int, int]:
     """
     Source:   KNS_Person
     Verified: PersonID · LastName · FirstName · GenderDesc · Email · IsCurrent
     Note:     BirthDate not seen in discovery — kept but may be absent.
               GenderDesc already contains "נקבה"/"זכר" — used directly.
+
+    Pass `rows` for an incremental batch. Omitting it pulls the full entity
+    (UI stages). People absent from a batch are not marked inactive.
     """
     log.info("── syncing people ──")
-    raw = fetch_odata("KNS_Person")
+    raw = fetch_odata("KNS_Person") if rows is None else rows
 
     rows = [
         {
@@ -507,16 +536,23 @@ def sync_people(sb: Client) -> dict[int, int]:
     return load_id_map(sb, "people", "knesset_person_id"), stats
 
 
-def sync_factions(sb: Client, knesset_map: dict[int, int]) -> dict[int, int]:
+def sync_factions(
+    sb: Client,
+    knesset_map: dict[int, int],
+    rows: list[dict] | None = None,
+) -> dict[int, int]:
     """
     Source:   KNS_Faction
     Verified: FactionID · Name · KnessetNum · StartDate · FinishDate · IsCurrent
 
     Fields NOT included in the upsert (manually curated, never overwritten):
       color · logo_url · short_name · is_coalition
+
+    Pass `rows` for an incremental batch. is_current is taken from rows that
+    were fetched, never cleared because a faction was absent.
     """
     log.info("── syncing knesset_factions ──")
-    raw = fetch_odata("KNS_Faction")
+    raw = fetch_odata("KNS_Faction") if rows is None else rows
 
     rows, skipped = [], 0
     for r in raw:
@@ -541,7 +577,12 @@ def sync_factions(sb: Client, knesset_map: dict[int, int]) -> dict[int, int]:
     return load_id_map(sb, "knesset_factions", "knesset_faction_id"), stats
 
 
-def sync_offices(sb: Client) -> tuple[dict[int, int], dict]:
+def sync_offices(
+    sb: Client,
+    rows: list[dict] | None = None,
+    *,
+    close_missing: bool = True,
+) -> tuple[dict[int, int], dict]:
     """
     Source:   KNS_GovMinistry
     Verified: GovMinistryID · Name · IsActive
@@ -550,11 +591,12 @@ def sync_offices(sb: Client) -> tuple[dict[int, int], dict]:
     Ownership:
       knesset_category_name — mirrored from OData Name
       name — display override; set on insert only, never overwritten by sync
-      is_active — mirrored from OData; a ministry missing from a non-empty feed is closed
+      is_active — mirrored from OData; a ministry missing from a non-empty full
+        feed is closed. An incremental batch leaves ministries it did not see.
       info, logo_url, news_feed_id, is_shown, name_en — never written
     """
     log.info("── syncing offices ──")
-    raw = fetch_odata("KNS_GovMinistry")
+    raw = fetch_odata("KNS_GovMinistry") if rows is None else rows
     existing_rows = load_existing_rows(
         sb,
         "offices",
@@ -566,7 +608,10 @@ def sync_offices(sb: Client) -> tuple[dict[int, int], dict]:
         for category_id, row in existing_rows.items()
         if category_id is not None
     }
-    rows, skipped = prepare_office_writes(plan_office_writes(raw, existing), set(existing))
+    rows, skipped = prepare_office_writes(
+        plan_office_writes(raw, existing, close_missing=close_missing),
+        set(existing),
+    )
     for category_id, reason in skipped:
         log.warning("  office %s skipped (%s)", category_id, reason)
     stats = upsert(sb, "offices", rows, "knesset_category_id", set(existing))
@@ -582,6 +627,8 @@ def sync_governments(
     sb: Client,
     positions: list[dict],
     knesset_map: dict,
+    *,
+    feed: GovernmentFeed | None = None,
 ) -> tuple[dict[int, int], dict]:
     """
     There is no KNS_Government entity. Government numbers come from ministerial
@@ -596,12 +643,31 @@ def sync_governments(
     knesset_id, start_date, and end_date already stored on a row are curated
     and are not overwritten. Nulls may be filled. An empty position feed
     changes nothing.
+
+    An incremental `feed` does not treat FinishDate on the batch as the end of
+    a whole government. is_active moves only when that feed names a current
+    government from the complete IsCurrent query.
     """
     log.info("── syncing governments from KNS_PersonToPosition ──")
+    trust_end = True
+    explicit: object = CURRENT_UNSET
+    if feed is not None:
+        positions = feed.rows
+        trust_end = feed.trust_end
+        if feed.use_explicit_current:
+            explicit = feed.odata_current
     aggregates = aggregate_governments(positions)
     current_numbers = current_government_numbers(positions)
-    odata_current = select_current_government_number(current_numbers)
-    if len(current_numbers) > 1:
+    if explicit is CURRENT_UNSET:
+        odata_current = select_current_government_number(current_numbers)
+    else:
+        odata_current = None if explicit is None else int(explicit)
+    if not trust_end:
+        log.info(
+            "  incremental government sync — IsCurrent query says %s",
+            odata_current,
+        )
+    if explicit is CURRENT_UNSET and len(current_numbers) > 1:
         log.warning(
             "  OData IsCurrent on multiple governments %s — using %s",
             current_numbers,
@@ -636,7 +702,10 @@ def sync_governments(
         for number, knesset_id in knesset_map.items()
         if number is not None and knesset_id is not None
     }
-    plan = plan_government_sync(aggregates, existing, knesset_ids)
+    plan_kwargs: dict = {"trust_end": trust_end}
+    if explicit is not CURRENT_UNSET:
+        plan_kwargs["odata_current"] = odata_current
+    plan = plan_government_sync(aggregates, existing, knesset_ids, **plan_kwargs)
     for number, reason in plan.skipped:
         log.warning("  government %s skipped (%s)", number, reason)
 
@@ -754,6 +823,8 @@ def sync_positions(
     gov_map: dict,
     office_map: dict,
     positions: list[dict] | None = None,
+    *,
+    expect_members: bool = True,
 ) -> dict:
     """
     Writes KNS_PersonToPosition to both:
@@ -766,6 +837,9 @@ def sync_positions(
 
     Pass `positions` when the caller already downloaded the entity (governments
     are derived from the same rows). is_acting is written only on insert.
+    Memberships and appointments that are not in `positions` are left unchanged,
+    including end_date and is_current. An ended position is closed only when
+    its own row is in the batch.
     """
     if positions is None:
         log.info("── fetching KNS_PersonToPosition (shared for memberships + appointments) ──")
@@ -777,13 +851,15 @@ def sync_positions(
     mk_positions = [r for r in positions if r.get("PositionID") in MK_POSITION_IDS]
     log.info("  MK positions (PositionID in %s): %d", MK_POSITION_IDS, len(mk_positions))
 
-    if not mk_positions:
+    if not mk_positions and expect_members:
         log.warning(
             "  ⚠ Zero MK rows found! MK_POSITION_IDS %s may be wrong.\n"
             "    Run: python load_all_knesset_data.py --discover\n"
             "    and check KNS_Position output for the correct PositionID for חבר כנסת.",
             MK_POSITION_IDS,
         )
+    elif not mk_positions:
+        log.info("  no MK rows in this incremental batch — existing memberships left as they are")
 
     membership_rows, skipped = [], 0
     # position id → official faction pk, only when OData FactionID resolved.
@@ -976,19 +1052,249 @@ def sync_positions(
     }
 
 
+# ── Incremental fetch ─────────────────────────────────────────────────────────
+
+@dataclass
+class _FetchRecord:
+    plan: FetchPlan
+    source: str
+    row_count: int
+    next_watermark: datetime | None
+
+
+@dataclass
+class SyncRun:
+    full_reason: str | None
+    watermarks: dict[str, datetime]
+    records: list[_FetchRecord] = field(default_factory=list)
+    committed: set[str] = field(default_factory=set)
+
+    def commit(self, resource: str | None) -> None:
+        if resource:
+            self.committed.add(resource)
+
+
+def load_stored_watermarks(sb: Client) -> dict[str, datetime]:
+    """Last successful LastUpdatedDate per resource.
+
+    pipeline_sync_state.watermark is preferred. pipeline_runs.summary
+    odata_watermarks fills gaps when the column is not there yet. A success
+    row that never stored the key is ignored, so a full sync from the previous
+    loader does not become a watermark.
+    """
+    state_rows = None
+    try:
+        state_rows = (
+            sb.table("pipeline_sync_state")
+            .select("resource, watermark")
+            .eq("pipeline", "knesset")
+            .execute()
+            .data
+            or []
+        )
+    except Exception as exc:
+        log.warning(
+            "Could not read pipeline_sync_state watermarks (%s); using pipeline_runs",
+            exc,
+        )
+        state_rows = None
+    run_rows: list = []
+    try:
+        run_rows = (
+            sb.table("pipeline_runs")
+            .select("action, status, summary")
+            .eq("pipeline", "knesset")
+            .eq("status", "success")
+            .order("finished_at", desc=True)
+            .limit(40)
+            .execute()
+            .data
+            or []
+        )
+    except Exception as exc:
+        log.warning("Could not read pipeline_runs watermarks (%s)", exc)
+    found = resolve_watermarks(state_rows, run_rows)
+    if found:
+        log.info(
+            "OData watermarks: %s",
+            {key: format_watermark(value) for key, value in sorted(found.items())},
+        )
+    else:
+        log.info("No OData watermark stored — incremental entities will do a full refresh")
+    return found
+
+
+def pull_entity(entity: str, run: SyncRun) -> tuple[list[dict], FetchPlan]:
+    resource = INCREMENTAL_RESOURCES.get(entity)
+    plan = plan_entity_fetch(
+        entity,
+        run.watermarks.get(resource) if resource else None,
+        full_reason=run.full_reason,
+    )
+    meta: dict = {}
+    if plan.mode == "incremental":
+        log.info(
+            "── %s incremental since %s ──",
+            entity,
+            format_watermark(plan.since) if plan.since else "?",
+        )
+        rows = fetch_odata(
+            entity,
+            plan.filter_expr,
+            keep_datetime=True,
+            fetch_meta=meta,
+        )
+    elif resource:
+        log.info("── %s full refresh (%s) ──", entity, plan.reason)
+        rows = fetch_odata(entity, keep_datetime=True, fetch_meta=meta)
+    else:
+        rows = fetch_odata(entity, fetch_meta=meta)
+    if resource:
+        normalize_odata_dates(rows)
+    source = str(meta.get("source") or "odata")
+    nxt = None
+    if resource:
+        nxt = watermark_after_fetch(
+            run.watermarks.get(resource),
+            rows,
+            source=source,
+        )
+        if source != "odata":
+            log.warning(
+                "  %s came from %s — LastUpdatedDate watermark will not move forward",
+                entity,
+                source,
+            )
+    run.records.append(_FetchRecord(plan, source, len(rows), nxt))
+    log.info("  %s: %d rows via %s (%s)", entity, len(rows), source, plan.mode)
+    return rows, plan
+
+
+def positions_government_feed(rows: list[dict], plan: FetchPlan) -> GovernmentFeed:
+    """Full feeds plan governments from every row. Incremental feeds do not.
+
+    The complete `IsCurrent eq true` query is what may close the previous
+    active government. Positions missing from the incremental batch stay put.
+    """
+    if plan.mode != "incremental":
+        return government_feed(rows, incremental=False, current_rows=[])
+    log.info("── current positions for government activation (IsCurrent eq true) ──")
+    meta: dict = {}
+    current_rows = fetch_odata(
+        "KNS_PersonToPosition",
+        "IsCurrent eq true",
+        keep_datetime=True,
+        fetch_meta=meta,
+    )
+    normalize_odata_dates(current_rows)
+    log.info(
+        "  IsCurrent positions: %d via %s",
+        len(current_rows),
+        meta.get("source") or "odata",
+    )
+    return government_feed(rows, incremental=True, current_rows=current_rows)
+
+
+def committed_watermarks(run: SyncRun, *, succeeded: bool) -> dict[str, datetime]:
+    if not succeeded:
+        return {}
+    committed: dict[str, datetime] = {}
+    for rec in run.records:
+        resource = rec.plan.resource
+        if resource and resource in run.committed and rec.next_watermark is not None:
+            committed[resource] = rec.next_watermark
+    return committed
+
+
+def save_watermarks(sb: Client, committed: dict[str, datetime], when: datetime) -> None:
+    for resource, stamp in sorted(committed.items()):
+        payload = {
+            "pipeline": "knesset",
+            "resource": resource,
+            "watermark": format_watermark(stamp),
+            "last_run_at": when.isoformat(),
+            "last_success_at": when.isoformat(),
+        }
+        try:
+            existing = (
+                sb.table("pipeline_sync_state")
+                .select("id")
+                .eq("pipeline", "knesset")
+                .eq("resource", resource)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            if existing:
+                (
+                    sb.table("pipeline_sync_state")
+                    .update(payload)
+                    .eq("id", existing[0]["id"])
+                    .execute()
+                )
+            else:
+                sb.table("pipeline_sync_state").insert(payload).execute()
+            log.info("  watermark %s = %s", resource, payload["watermark"])
+        except Exception as exc:
+            log.warning(
+                "Could not store %s watermark in pipeline_sync_state (%s). "
+                "It is still on this run's pipeline_runs summary.",
+                resource,
+                exc,
+            )
+
+
+def fetch_summary(run: SyncRun, committed: dict[str, datetime]) -> dict:
+    modes = {rec.plan.mode for rec in run.records if rec.plan.resource}
+    summary = {
+        "sync_mode": sync_mode_name(run.full_reason, modes),
+        "full_refresh_reason": run.full_reason,
+        "fetches": [
+            {
+                "entity": rec.plan.entity,
+                "resource": rec.plan.resource,
+                "mode": rec.plan.mode,
+                "reason": rec.plan.reason,
+                "rows": rec.row_count,
+                "since": format_watermark(rec.plan.since) if rec.plan.since else None,
+                "source": rec.source,
+            }
+            for rec in run.records
+        ],
+    }
+    if committed or run.watermarks:
+        summary["odata_watermarks"] = summary_watermarks(run.watermarks, committed)
+    return summary
+
+
 # ── Full sync ─────────────────────────────────────────────────────────────────
 
-def sync_all(sb: Client) -> dict:
+def sync_all(sb: Client, run: SyncRun) -> dict:
     start = datetime.now()
-    log.info("═══ Knesset OData full sync — %s ═══", start.strftime("%Y-%m-%d %H:%M"))
+    log.info(
+        "═══ Knesset OData sync — %s (%s) ═══",
+        start.strftime("%Y-%m-%d %H:%M"),
+        run.full_reason or "incremental",
+    )
 
     knesset_map, knesset_stats = sync_knessets(sb)
-    people_map, people_stats = sync_people(sb)
-    faction_map, faction_stats = sync_factions(sb, knesset_map)
-    office_map, office_stats = sync_offices(sb)
-    log.info("── fetching KNS_PersonToPosition (governments + memberships + appointments) ──")
-    positions = fetch_odata("KNS_PersonToPosition")
-    gov_map, gov_stats = sync_governments(sb, positions, knesset_map)
+    people_rows, people_plan = pull_entity("KNS_Person", run)
+    people_map, people_stats = sync_people(sb, people_rows)
+    run.commit(people_plan.resource)
+    faction_rows, faction_plan = pull_entity("KNS_Faction", run)
+    faction_map, faction_stats = sync_factions(sb, knesset_map, faction_rows)
+    run.commit(faction_plan.resource)
+    office_rows, office_plan = pull_entity("KNS_GovMinistry", run)
+    office_map, office_stats = sync_offices(
+        sb,
+        office_rows,
+        close_missing=office_plan.mode == "full",
+    )
+    run.commit(office_plan.resource)
+    positions, pos_plan = pull_entity("KNS_PersonToPosition", run)
+    feed = positions_government_feed(positions, pos_plan)
+    gov_map, gov_stats = sync_governments(sb, positions, knesset_map, feed=feed)
     before = snapshot_knesset_positions(sb)
     position_stats = sync_positions(
         sb,
@@ -998,7 +1304,9 @@ def sync_all(sb: Client) -> dict:
         gov_map,
         office_map,
         positions,
+        expect_members=pos_plan.mode == "full",
     )
+    run.commit(pos_plan.resource)
     after = snapshot_knesset_positions(sb)
     changes = diff_knesset_positions(before, after)
     site_update = None
@@ -1061,6 +1369,15 @@ def main():
                  "minister_appointments"],
         help="Sync a single table only",
     )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help=(
+            "Refetch every incremental OData entity. "
+            "Without this flag, a missing watermark or a Friday in Jerusalem "
+            "also does a full refresh."
+        ),
+    )
     args = parser.parse_args()
 
     if args.discover:
@@ -1072,11 +1389,14 @@ def main():
         return
 
     sb = get_supabase()
-    start = datetime.now()
+    start = datetime.now(timezone.utc)
+    run = SyncRun(
+        full_reason=run_full_reason(args.full, start),
+        watermarks=load_stored_watermarks(sb),
+    )
     run_error: str | None = None
     exit_code = 0
     summary: dict | None = None
-    action = f"table-{args.table}" if args.table else "sync-full"
     site_update_emitted = False
 
     try:
@@ -1089,13 +1409,28 @@ def main():
             def sync_positions_with_emit() -> dict:
                 # Offices and governments first so a new ministry or GovernmentNum
                 # is in place before appointments are written.
-                positions = fetch_odata("KNS_PersonToPosition")
-                office_map, office_stats = sync_offices(sb)
-                gov_map, gov_stats = sync_governments(sb, positions, km)
+                office_rows, office_plan = pull_entity("KNS_GovMinistry", run)
+                office_map, office_stats = sync_offices(
+                    sb,
+                    office_rows,
+                    close_missing=office_plan.mode == "full",
+                )
+                positions, pos_plan = pull_entity("KNS_PersonToPosition", run)
+                feed = positions_government_feed(positions, pos_plan)
+                gov_map, gov_stats = sync_governments(sb, positions, km, feed=feed)
                 before = snapshot_knesset_positions(sb)
                 position_stats = sync_positions(
-                    sb, pm, km, fm, gov_map, office_map, positions
+                    sb,
+                    pm,
+                    km,
+                    fm,
+                    gov_map,
+                    office_map,
+                    positions,
+                    expect_members=pos_plan.mode == "full",
                 )
+                run.commit(office_plan.resource)
+                run.commit(pos_plan.resource)
                 after = snapshot_knesset_positions(sb)
                 changes = diff_knesset_positions(before, after)
                 emitted = False
@@ -1129,18 +1464,41 @@ def main():
                     "site_update_emitted": emitted,
                 }
 
+            def sync_people_only() -> dict:
+                rows, plan = pull_entity("KNS_Person", run)
+                stats = sync_people(sb, rows)[1]
+                run.commit(plan.resource)
+                return {"stages": [stats]}
+
+            def sync_factions_only() -> dict:
+                rows, plan = pull_entity("KNS_Faction", run)
+                stats = sync_factions(sb, km, rows)[1]
+                run.commit(plan.resource)
+                return {"stages": [stats]}
+
+            def sync_offices_only() -> dict:
+                rows, plan = pull_entity("KNS_GovMinistry", run)
+                stats = sync_offices(
+                    sb,
+                    rows,
+                    close_missing=plan.mode == "full",
+                )[1]
+                run.commit(plan.resource)
+                return {"stages": [stats]}
+
             def sync_governments_only() -> dict:
-                positions = fetch_odata("KNS_PersonToPosition")
-                _gov_map, gov_stats = sync_governments(sb, positions, km)
+                # Memberships and appointments are not written here, so the
+                # position watermark stays where it was.
+                positions, plan = pull_entity("KNS_PersonToPosition", run)
+                feed = positions_government_feed(positions, plan)
+                _gov_map, gov_stats = sync_governments(sb, positions, km, feed=feed)
                 return {"stages": [gov_stats]}
 
             runners = {
                 "knessets":              lambda: {"stages": [sync_knessets(sb)[1]]},
-                "people":                lambda: {"stages": [sync_people(sb)[1]]},
-                "knesset_factions":      lambda: {
-                    "stages": [sync_factions(sb, km)[1]]
-                },
-                "offices":               lambda: {"stages": [sync_offices(sb)[1]]},
+                "people":                sync_people_only,
+                "knesset_factions":      sync_factions_only,
+                "offices":               sync_offices_only,
                 "governments":           sync_governments_only,
                 "knesset_memberships":   sync_positions_with_emit,
                 "minister_appointments": sync_positions_with_emit,
@@ -1148,14 +1506,29 @@ def main():
             summary = runners[args.table]()
             site_update_emitted = bool(summary.get("site_update_emitted"))
         else:
-            summary = sync_all(sb)
+            summary = sync_all(sb, run)
             site_update_emitted = bool(summary.get("site_update_emitted"))
     except Exception as exc:
         exit_code = 1
         run_error = str(exc)
         log.exception("Knesset sync failed: %s", exc)
 
-    elapsed = (datetime.now() - start).seconds
+    elapsed = int((datetime.now(timezone.utc) - start).total_seconds())
+    committed = committed_watermarks(run, succeeded=exit_code == 0)
+    if exit_code == 0 and committed:
+        save_watermarks(sb, committed, start)
+    fetch_meta = fetch_summary(run, committed if exit_code == 0 else {})
+    if summary is None:
+        summary = fetch_meta
+    else:
+        summary = {**fetch_meta, **summary}
+    mode = summary.get("sync_mode") or ("full" if run.full_reason else "incremental")
+    if args.table:
+        action = f"table-{args.table}"
+    elif mode == "full":
+        action = "sync-full"
+    else:
+        action = "sync-incremental"
     source = os.environ.get("PIPELINE_RUN_SOURCE", "cli")
     status = "success" if exit_code == 0 else "error"
     if site_update_emitted:

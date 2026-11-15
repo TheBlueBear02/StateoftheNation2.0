@@ -49,14 +49,21 @@ function compactAgenda(body: string | null | undefined): string | null {
 
 /** Build Open Graph / page metadata for a committee or session deep link. */
 export async function loadCommitteeShareMeta(searchParams: {
+  knesset?: string | string[]
   committee?: string | string[]
   session?: string | string[]
   message?: string | string[]
 }): Promise<CommitteeShareMeta> {
+  const knessetNumber = parsePositiveInt(searchParams.knesset)
   const committeeId = parsePositiveInt(searchParams.committee)
   const sessionId = parsePositiveInt(searchParams.session)
   const messageId = parsePositiveInt(searchParams.message)
-  const path = buildCommitteesSharePath(committeeId, sessionId, messageId)
+  const path = buildCommitteesSharePath(
+    committeeId,
+    sessionId,
+    messageId,
+    knessetNumber,
+  )
 
   if (committeeId == null) {
     return {
@@ -85,7 +92,7 @@ export async function loadCommitteeShareMeta(searchParams: {
     return {
       title: DEFAULT_TITLE,
       description: DEFAULT_DESCRIPTION,
-      path: '/knesset/committees',
+      path: buildCommitteesSharePath(null, null, null, knessetNumber),
     }
   }
 
@@ -110,7 +117,7 @@ export async function loadCommitteeShareMeta(searchParams: {
     return {
       title: committeeName,
       description: `ישיבות ועדת ${committeeName} עם תמלילים מלאים בצאט.`,
-      path: buildCommitteesSharePath(committeeId, null),
+      path: buildCommitteesSharePath(committeeId, null, null, knessetNumber),
     }
   }
 
