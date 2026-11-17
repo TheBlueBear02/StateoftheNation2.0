@@ -6,9 +6,12 @@ election-list fallback; callers must not overwrite a non-provisional faction_id.
 
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 from dataclasses import dataclass
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 _NIKUD_AND_BIDI = {chr(code) for code in range(0x0591, 0x05C8)} | {
     "\u200e",
@@ -475,6 +478,64 @@ def plan_provisional_faction_writes(
     return writes
 
 
+# Null faction_id on a brand-new Knesset is a warning until this many days
+# after knessets.start_date. Override with NULL_FACTION_GRACE_DAYS.
+# NULL_FACTION_WARN_ONLY=true keeps the warning after the grace ends.
+NULL_FACTION_GRACE_DAYS = 14
+_ISRAEL_TZ = ZoneInfo("Asia/Jerusalem")
+
+
+def null_faction_grace_days() -> int:
+    raw = os.environ.get("NULL_FACTION_GRACE_DAYS", "").strip()
+    if not raw:
+        return NULL_FACTION_GRACE_DAYS
+    try:
+        days = int(raw)
+    except ValueError:
+        return NULL_FACTION_GRACE_DAYS
+    if days < 0:
+        return NULL_FACTION_GRACE_DAYS
+    return days
+
+
+def null_faction_warn_only() -> bool:
+    return os.environ.get("NULL_FACTION_WARN_ONLY", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def null_factions_are_warning(
+    start: date | None,
+    *,
+    today: date,
+    grace_days: int,
+    warn_only: bool,
+) -> bool:
+    """True while a null faction_id should not fail the consistency job.
+
+    The grace is the current Knesset's start date being less than `grace_days`
+    ago. A missing start date does not get the grace. warn_only extends it.
+    """
+    if warn_only:
+        return True
+    if start is None:
+        return False
+    return (today - start).days < grace_days
+
+
+def israel_today(now: datetime | None = None) -> date:
+    if now is None:
+        now = datetime.now(_ISRAEL_TZ)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=_ISRAEL_TZ)
+    else:
+        now = now.astimezone(_ISRAEL_TZ)
+    return now.date()
+
+
 @dataclass(frozen=True)
 class ConsistencyFacts:
     odata_knesset_lookup_ok: bool
@@ -491,11 +552,30 @@ class ConsistencyFacts:
     odata_current_government: int | None
     db_active_government: int | None
     active_government_open_appointments: int | None
+    current_knesset_start: date | None = None
 
 
-def evaluate_consistency(facts: ConsistencyFacts) -> dict:
-    """Return ok/issues for the knesset pipeline consistency step."""
+def evaluate_consistency(
+    facts: ConsistencyFacts,
+    *,
+    today: date | None = None,
+    grace_days: int | None = None,
+    warn_only: bool | None = None,
+) -> dict:
+    """Return ok/issues/warnings for the knesset pipeline consistency step.
+
+    `ok` ignores warnings. A null faction_id is a warning during the grace
+    window (or while NULL_FACTION_WARN_ONLY is set) and a failure after that.
+    Every other check stays a failure.
+    """
     issues: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+    if today is None:
+        today = israel_today()
+    if grace_days is None:
+        grace_days = null_faction_grace_days()
+    if warn_only is None:
+        warn_only = null_faction_warn_only()
 
     def add(code: str, message: str) -> None:
         issues.append({"code": code, "message": message})
@@ -529,13 +609,31 @@ def evaluate_consistency(facts: ConsistencyFacts) -> dict:
     current = facts.odata_current_knesset or facts.db_active_knesset
 
     if facts.null_faction_memberships > 0:
-        add(
-            "null_faction_memberships",
-            (
-                f"{facts.null_faction_memberships} current-Knesset memberships "
-                "have null faction_id"
-            ),
+        in_grace = null_factions_are_warning(
+            facts.current_knesset_start,
+            today=today,
+            grace_days=grace_days,
+            warn_only=warn_only,
         )
+        if facts.current_knesset_start is None:
+            when = "start date unknown"
+        else:
+            age = (today - facts.current_knesset_start).days
+            when = (
+                f"Knesset started {facts.current_knesset_start.isoformat()} "
+                f"({age} days ago; grace {grace_days})"
+            )
+        if warn_only:
+            when = f"{when}; NULL_FACTION_WARN_ONLY"
+        message = (
+            f"{facts.null_faction_memberships} current-Knesset memberships "
+            f"have null faction_id ({when})"
+        )
+        finding = {"code": "null_faction_memberships", "message": message}
+        if in_grace:
+            warnings.append(finding)
+        else:
+            issues.append(finding)
 
     if facts.odata_current_committee_ids is None:
         add(
@@ -618,6 +716,7 @@ def evaluate_consistency(facts: ConsistencyFacts) -> dict:
     return {
         "ok": not issues,
         "issues": issues,
+        "warnings": warnings,
         "current_knesset": current,
         "odata_current_knesset": facts.odata_current_knesset,
         "db_active_knesset": facts.db_active_knesset,

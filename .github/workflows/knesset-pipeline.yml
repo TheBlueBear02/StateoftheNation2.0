@@ -19,6 +19,10 @@ on:
         description: 'With committees_backfill, optional Knesset number (default: current term)'
         type: string
         required: false
+      null_faction_warn_only:
+        description: 'Keep null faction_id as a warning after the 14-day grace (NULL_FACTION_WARN_ONLY)'
+        type: boolean
+        default: false
 
 concurrency:
   group: knesset-pipeline
@@ -91,6 +95,10 @@ jobs:
         run: python check_knesset_consistency.py
         working-directory: 'Layer 1 - Gathering Data/knesset'
         env:
+          # Scheduled runs stay a hard failure once the Knesset start date is
+          # 14 days old. A manual run can check this input, or set the repo
+          # variable NULL_FACTION_WARN_ONLY=true so the nightly job stays a warning.
+          NULL_FACTION_WARN_ONLY: ${{ inputs.null_faction_warn_only == true && 'true' || vars.NULL_FACTION_WARN_ONLY || '' }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           PIPELINE_RUN_SOURCE: github-actions
