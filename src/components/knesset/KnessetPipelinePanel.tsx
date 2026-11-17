@@ -406,6 +406,7 @@ export function KnessetPipelinePanel({
         <p className="party-pipeline-panel__intro">
           קישורי סיעות: ממלא <code>faction_id</code> חסרים מ-Open Knesset.
           תמונות: מקשר JPEG מקומיים מתיקיית הכנסת הפעילה לשדה <code>image_url</code>.
+          תמונה שנקבעה ידנית לא נדרסת. סיעה ידנית לא נדרסת עד ש-OData מפרסם FactionID.
         </p>
         <div className="party-pipeline-panel__actions">
           <button

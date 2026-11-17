@@ -1,4 +1,4 @@
-import { isDev, getKnessetEditSecret } from './runtimeEnv'
+import { knessetEditSecretHeaders } from './knessetEditSession'
 
 export type KnessetFactionEditInput = {
   factionId: number
@@ -15,20 +15,11 @@ export type UpdateKnessetFactionResult =
 export async function updateKnessetFaction(
   input: KnessetFactionEditInput,
 ): Promise<UpdateKnessetFactionResult> {
-  if (!isDev) {
-    return {
-      ok: false,
-      error: 'זמין רק בסביבת פיתוח (npm run dev)',
-    }
-  }
-
-  const secret = getKnessetEditSecret()
-
   const response = await fetch('/api/knesset/update-faction', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(secret ? { 'X-Knesset-Edit-Secret': secret } : {}),
+      ...knessetEditSecretHeaders(),
     },
     body: JSON.stringify(input),
   })

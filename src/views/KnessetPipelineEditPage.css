@@ -248,3 +248,48 @@
   width: 18px;
   height: 18px;
 }
+
+.mk-edit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.mk-edit-toolbar__search {
+  flex: 1 1 220px;
+  margin: 0;
+}
+
+.mk-edit-toolbar__filter--on {
+  background: rgba(72, 144, 253, 0.16);
+  border-color: var(--color-blue);
+}
+
+.mk-edit-card__photo {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #eee;
+}
+
+.mk-edit-card__photo--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.mk-edit-card__badge--missing {
+  background: rgba(255, 120, 0, 0.18);
+}
+
+.mk-edit-card__hint {
+  margin: 0 0 8px;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}

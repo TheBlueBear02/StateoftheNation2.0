@@ -18,7 +18,7 @@ The schema is split into these logical groups:
 | **Polls** | `polls` · `poll_results` · `poll_aggregates` · `poll_party_aliases` · `party_lineage` · `raw_poll_rows` · `pipeline_sync_state` · `pipeline_runs` · `pollster_house_effects` · `poll_publishers` · `pollsters` | Live — `/elections/polls`, `/piplines` |
 | **Site** | `site_updates` | Live — homepage news strip |
 
-All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/delete-candidate`, `/api/elections/unlink-candidate-person`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE. Dream-government pick upserts use a **public** service-role API (`/api/elections/dream-government/submit`) with an anonymous `client_id` (no edit secret).
+All data is populated and kept current by Python scripts in `Layer 1 - Gathering Data/` using `SUPABASE_SERVICE_KEY` (bypasses RLS). The public site reads via the anon key (SELECT only). The password-gated editor at `/elections/edit` writes through Next Route Handlers (`/api/elections/update-candidate`, `/api/elections/delete-candidate`, `/api/elections/unlink-candidate-person`, `/api/elections/update-party`) that use the service key server-side and require `x-elections-edit-secret` / `x-pipeline-edit-secret` — not through anon UPDATE. `/knesset/edit` writes the same way through `/api/knesset/update-member`, `/api/knesset/upload-member-image`, and `/api/knesset/update-faction`, authorized by server-only `KNESSET_EDIT_SECRET` (`x-knesset-edit-secret`). Dream-government pick upserts use a **public** service-role API (`/api/elections/dream-government/submit`) with an anonymous `client_id` (no edit secret).
 
 ---
 
@@ -69,12 +69,13 @@ The central person record. Every MK, minister, and election candidate across all
 | `knesset_person_id` | integer | Official ID from the Knesset OData API (`KNS_Person.PersonID`). UNIQUE. Used as the stable cross-reference key. |
 | `birth_date` | date | May be null — not all persons have it in the Knesset API |
 | `gender` | text | `"זכר"` or `"נקבה"` — sourced directly from `KNS_Person.GenderDesc` |
-| `image_url` | text | Photo URL — local path or Wikidata image |
+| `image_url` | text | Photo URL. Static KM Images sync writes a GitHub raw URL. A photo uploaded on `/knesset/edit` is a public `mk-images` Storage URL. The site renders this column as-is. |
 | `email` | text | From Knesset OData |
 | `twitter_handle` | text | Manual / Wikidata enrichment |
 | `wikipedia_url` | text | `fetch_candidate_wiki_urls.py` (Stage 6) / manual |
 | `wikidata_id` | text | Wikidata Q-id (e.g. `Q12345`) — UNIQUE when set. Filled by `enrich_wikidata.py` (Stage 2) when null; never overwritten. |
 | `is_current` | boolean | Whether the person is a current MK — from `KNS_Person.IsCurrent` (OData mirror). Public pages do **not** rely on this; they use membership/appointment date ranges. |
+| `manual_fields` | text[] | Columns edited on `/knesset/edit`. The person sync leaves those columns unchanged. `image_url` in the list is also skipped by the static KM Images matcher. Migration: `knesset/schema_knesset_member_edits.sql`. |
 | `created_at` | timestamptz | Row creation timestamp |
 
 **Data source:** `load_all_knesset_data.py` → Knesset OData `KNS_Person`. Enriched by `enrich_wikidata.py` for election candidates (including `wikidata_id`). Upserted on `knesset_person_id`.
@@ -146,6 +147,7 @@ Records each person's membership as an MK in a specific Knesset, within a specif
 | `knesset_id` | bigint | FK → `knessets.id` |
 | `faction_id` | bigint | FK → `knesset_factions.id`. Official OData `FactionID` when present. When OData leaves it null, the sync may fill it from the election list and set `faction_id_provisional`. |
 | `faction_id_provisional` | boolean | Default `false`. `true` only for an election-list fallback. Cleared when OData provides a `FactionID`. A `false` value is never overwritten by the fallback. Migration: `knesset/schema_knesset_membership_faction_provisional.sql`. |
+| `faction_id_manual` | boolean | Default `false`. Set by `/knesset/edit` when Amir picks a faction (including a deliberate null). The election-list fallback and the Open Knesset faction apply skip the row. A published OData `FactionID` overwrites `faction_id` and clears the flag. Migration: `knesset/schema_knesset_member_edits.sql`. |
 | `start_date` | date | When this membership started |
 | `end_date` | date | When it ended — null if current |
 | `duty_desc` | text | Role description from OData |

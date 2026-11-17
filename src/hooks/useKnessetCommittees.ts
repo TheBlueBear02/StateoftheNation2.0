@@ -284,18 +284,16 @@ export function useKnessetCommittees(
           return
         }
 
-        const filteredIds = ((data ?? []) as KnessetCommitteeRow[])
-          .map((row) => row.id)
-          .filter((id) => statsByCommittee.has(id))
-
-        const chairsByCommittee = await fetchChairsByCommitteeIds(filteredIds)
+        const committeeRows = (data ?? []) as KnessetCommitteeRow[]
+        const chairsByCommittee = await fetchChairsByCommitteeIds(
+          committeeRows.map((row) => row.id),
+        )
 
         if (cancelled) {
           return
         }
 
-        const normalized = ((data ?? []) as KnessetCommitteeRow[])
-          .filter((row) => statsByCommittee.has(row.id))
+        const normalized = committeeRows
           .map((row) =>
             normalizeCommittee(
               row,

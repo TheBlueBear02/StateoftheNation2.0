@@ -2,7 +2,7 @@
 
 > See [ProjectOverview.md](./ProjectOverview.md) for repo structure and [Database.md](./Database.md) for the Committees group schema.
 
-Visualization of committee sittings: pick a committee and session from a WhatsApp-style group list, see MKs around a hollow committee table, and play the transcript as a chat beside the table. A Hebrew dropdown chooses the Knesset. Options are only terms that have committee sessions (distinct knesset from `knesset_committee_sessions`, joined to `knessets`), newest first. Default is the current Knesset when it has sessions, otherwise the newest term that does.
+Visualization of committee sittings: pick a committee and session from a WhatsApp-style group list, see MKs around a hollow committee table, and play the transcript as a chat beside the table. A Hebrew dropdown chooses the Knesset. Options are terms that have rows in `knesset_committees` (joined to `knessets`), newest first, including a term whose committees have no sessions yet. Default is the current Knesset when it has committees, otherwise the newest term that does.
 
 Route: `/knesset/committees`  
 Shareable deep links: `/knesset/committees?knesset=<number>` (that term's committees), `/knesset/committees?knesset=<number>&committee=<id>` (sessions list), `/knesset/committees?knesset=<number>&committee=<id>&session=<id>` (transcript + table), and the same with `&message=<partId>` (jumps to that speech bubble). `knesset` is `knessets.knesset_number`. Committee, session, and message ids are the internal Supabase PKs. Browser back/forward follows the query. Open Graph / Twitter metadata is generated from those query params (committee name, session number/date, agenda when available), and `og:url` keeps the full deep link so WhatsApp/Facebook do not strip `session` / `message`. The transcript chat header has a **share** button for the session; each MK speech bubble has a small **message share** button (native share sheet, else copy URL).
@@ -43,9 +43,9 @@ Mobile: no breadcrumb; chat/list flush under the site header (no top padding/gap
 | `src/lib/committeeTypes.ts` | Shared TS types |
 | `src/lib/committeeTableLayout.ts` | Seat placement around the table |
 | `src/lib/committeeSpeakerMatch.ts` | Match parts → seated MKs by person_id / header |
-| `src/hooks/useCommitteeSessionKnessets.ts` | Knessets that have committee sessions, for the term dropdown |
-| `src/lib/committeeKnessetOptions.ts` | Distinct knessets from session rows, default term |
-| `src/hooks/useKnessetCommittees.ts` | Committees for the selected Knesset that have at least one ready transcript |
+| `src/hooks/useCommitteeSessionKnessets.ts` | Knessets that have committees, for the term dropdown |
+| `src/lib/committeeKnessetOptions.ts` | Distinct knessets from committee rows, default term |
+| `src/hooks/useKnessetCommittees.ts` | Every committee of the selected Knesset, with ready-transcript counts when any exist |
 | `src/hooks/useCommitteeSessions.ts` | Sessions (+ transcript filter) |
 | `src/hooks/useCommitteeMemberships.ts` | Active members for session date |
 | `src/hooks/useCommitteeAttendance.ts` | Session attendees from `נכחו` parse |
@@ -59,12 +59,12 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 ## Behavior
 
 ### Chat navigation (WhatsApp groups)
-- **Committees list** (default): rows with avatar initials + committee name; only committees with a ready transcript. Sorted **ועדה ראשית first**, then other types; within a type by **latest ready-transcript session** (newest first). Each row shows:
+- **Committees list** (default): every `knesset_committees` row for the selected Knesset, including committees with no sessions or transcripts. Sorted **ועדה ראשית first**, then other types; within a type by **latest ready-transcript session** (newest first; committees with none sort last, then by Hebrew name). Each row shows:
   - top-left: blue circle badge with ready-transcript **session count** (white number)
-  - under title: **ישיבה אחרונה:** + date only
+  - under title: **ישיבה אחרונה:** + date only when a ready transcript exists; otherwise **אין עדיין פרוטוקולים**. The count badge is hidden at zero.
   - avatar: **chair photo** when available (else committee initials); no יו״ר name line
   - committee type (**ועדה ראשית** / **משנית**) sits beside the committee name
-- Click committee → **sessions list** for that committee (ready transcripts only), with header **back** to committees. URL updates to `?committee=<id>`.
+- Click committee → **sessions list** for that committee (ready transcripts only), with header **back** to committees. URL updates to `?committee=<id>`. If that list is empty, the panel says **אין עדיין פרוטוקולים לוועדה זו** and, when memberships exist, lists the current members (chair marked יו״ר).
   - Session row title = **סדר היום** when available (up to 2 lines, then ellipsis); otherwise **ישיבה N**. Datetime (**day · time · date**) under the title; **message count** (transcript parts) as a muted badge at the bottom-left of the row. Avatar still shows the session number.
 - Click session → **transcript chat** + committee table; chat header has **back** to sessions and a **share** button for the session deep link. URL updates to `?committee=<id>&session=<id>`.
 - Opening a shared URL restores the matching committee list / sessions list / transcript view once data loads. Session deep links stay on the transcript shell while sessions load (do not flash the picker). `useCommitteeSessions` reports `loading` until data for the requested committee arrives — avoids a race that used to strip `session` from the URL when `sessions=[]` and `loading=false` on the first render after selecting a committee.
@@ -99,7 +99,7 @@ Link into the page from `/knesset` (“ועדות הכנסת”). Sitemap includ
 
 ## Data queries
 
-1. Resolve `knessets.id` where `is_active = true` → `knesset_committees`, then keep only committees that appear on a ready `knesset_committee_session_transcripts` row (via session). Aggregate per committee: ready-session **count** + **latest `start_at`**, and load current **chair** (name + photo) from memberships (`seat_role = chair`). Sort **ועדה ראשית** first, then by latest session descending. If no active knesset row exists, the page shows `לא נמצאה כנסת פעילה`.
+1. The Knesset dropdown reads distinct `knessets` joined from `knesset_committees` (not from sessions). The committee list is every `knesset_committees` row for that `knesset_id`. Ready transcripts still supply the session **count** and **latest `start_at`**; committees with none stay in the list with count 0. Current **chair** (name + photo) comes from memberships (`seat_role = chair`) for every listed committee. Sort **ועדה ראשית** first, then by latest session descending. If the selected term has no committee rows, the list says `אין ועדות לכנסת זו`.
 2. Sessions for `committee_id`; mark `hasTranscript` via ready transcripts for those session ids (chunked `.in`). Fetch first `סדר היום` part body per session for the sessions list subtitle, and exact `knesset_committee_transcript_parts` counts per session for the message badge.
 3. Memberships for committee, filtered to session date; join `people`. Enrich with factions (`usePersonFactions` — when several memberships cover the session date, the highest Knesset number wins) and tenure (`usePersonTenures` from `knesset_memberships`).
 4. Attendance for `session_id` (when present, absentees are grayed; guests may be added).

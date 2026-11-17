@@ -22,7 +22,7 @@ Central reference for agents working on this repository. Use this file to unders
 | ממשלת החלומות — Dream government | `/elections/dream-government` | Live |
 | עדכון סקרים (dev) | `/elections/polls/edit` | Live (password-gated, noindex) |
 | עריכת מועמדים (dev) | `/elections/edit` | Live (password-gated, noindex) |
-| סנכרון כנסת (dev) | `/knesset/edit` | Live (password-gated, noindex) |
+| עריכת כנסת | `/knesset/edit` | Live (password-gated MK and faction edits; OData pipeline dev-only, noindex) |
 | ציר זמן — Timeline | `#timeline` | Planned |
 
 Live pages fetch data from **Supabase**. Static homepage content (news ticker, hero copy) is hard-coded until APIs are wired.
@@ -93,7 +93,7 @@ StateoftheNation2.0/
 | `/api/elections/dream-government/submit` | Public dream-gov pick upsert (service role) |
 | `/api/elections/dream-government/stats` | Public dream-gov pick aggregates |
 | `/api/elections/dream-government/dashboard` | Dev-only dream-gov dashboard aggregates |
-| `/api/knesset/[...path]` | Local-dev pipeline / faction API |
+| `/api/knesset/[...path]` | MK, photo, and faction-metadata edits in production (server secret); Python pipeline routes dev-only |
 | `/api/polls/[...path]` | Local-dev polls pipeline API |
 | `/sitemap.xml` | `src/app/sitemap.ts` |
 | `/robots.txt` | `src/app/robots.ts` |
@@ -145,15 +145,15 @@ These scripts use `SUPABASE_SERVICE_KEY`. The public site uses the anon key. Loc
 NEXT_PUBLIC_SUPABASE_URL=...          # or VITE_SUPABASE_URL / SUPABASE_URL (mapped in next.config)
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...     # or VITE_SUPABASE_ANON_KEY
 NEXT_PUBLIC_SITE_URL=https://www.stateofthenation.co.il      # canonical / OG / sitemap base (use www; apex 308s)
-NEXT_PUBLIC_PIPELINE_EDIT_SECRET=...  # shared unlock for /piplines + all /edit pages
+NEXT_PUBLIC_PIPELINE_EDIT_SECRET=...  # shared unlock for /piplines + edit pages that still compare the password in the browser
 NEXT_PUBLIC_ELECTIONS_EDIT_SECRET=... # fallback alias (or VITE_ / ELECTIONS_EDIT_SECRET)
-NEXT_PUBLIC_KNESSET_EDIT_SECRET=...   # fallback alias (or VITE_ / KNESSET_EDIT_SECRET)
-SUPABASE_SERVICE_KEY=...              # pipelines + local edit APIs
+KNESSET_EDIT_SECRET=...               # server-only password for /knesset/edit writes. Do not set NEXT_PUBLIC_KNESSET_EDIT_SECRET
+SUPABASE_SERVICE_KEY=...              # pipelines + edit APIs (server only)
 OPENAI_API_KEY=...                    # elections enrichment + homepage site_updates + committee session AI summary
 ENABLE_PIPELINE_API=1                 # optional: allow Python APIs outside development
 ```
 
-`next.config.ts` maps legacy `VITE_*` names into `NEXT_PUBLIC_*` for the client bundle.
+`next.config.ts` maps legacy `VITE_SUPABASE_*` and the elections edit secret into `NEXT_PUBLIC_*` for the client bundle. `KNESSET_EDIT_SECRET` is not mapped; `/knesset/edit` checks it only on the server.
 
 ## Design Conventions
 

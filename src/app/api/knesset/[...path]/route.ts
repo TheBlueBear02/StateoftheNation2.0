@@ -7,9 +7,13 @@ import {
   getServiceEnv,
   jsonError,
   jsonOk,
-  requireKnessetSecret,
   runPythonScript,
 } from '@/server/apiCommon'
+import { authorizeKnessetEdit } from '@/server/knessetEditAuth'
+import {
+  updateKnessetMemberWithClient,
+  uploadMemberImageWithClient,
+} from '@/server/updateKnessetMember'
 
 export const maxDuration = 300
 
@@ -93,8 +97,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const gated = assertPipelineEnabled()
   if (gated) return gated
 
-  const auth = requireKnessetSecret(request)
-  if (auth.error) return auth.error
+  const auth = await authorizeKnessetEdit(request)
+  if (!auth.ok) return jsonError(auth.error, auth.status)
 
   const { path: segments } = await context.params
   const route = segments.join('/')
@@ -115,17 +119,32 @@ export async function GET(request: NextRequest, context: RouteContext) {
   return jsonError('Not found', 404)
 }
 
+/** Person, photo, and faction-metadata edits run in every environment.
+ *  Python pipeline routes stay behind assertPipelineEnabled (dev / opt-in). */
+const DATA_EDIT_ROUTES = new Set([
+  'verify-edit-access',
+  'update-faction',
+  'update-member',
+  'upload-member-image',
+])
+
 export async function POST(request: NextRequest, context: RouteContext) {
-  const gated = assertPipelineEnabled()
-  if (gated) return gated
-
-  const auth = requireKnessetSecret(request)
-  if (auth.error) return auth.error
-
   const { path: segments } = await context.params
   const route = segments.join('/')
 
+  if (!DATA_EDIT_ROUTES.has(route)) {
+    const gated = assertPipelineEnabled()
+    if (gated) return gated
+  }
+
+  const auth = await authorizeKnessetEdit(request)
+  if (!auth.ok) return jsonError(auth.error, auth.status)
+
   try {
+    if (route === 'verify-edit-access') {
+      return jsonOk({ ok: true })
+    }
+
     if (route === 'pipeline/stage') {
       const body = (await request.json()) as { stage?: number }
       const stage = Number(body?.stage)
@@ -227,6 +246,35 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const result = await updateFactionWithClient(admin, body)
       return jsonOk(result, result.ok ? 200 : 400)
     }
+
+    if (route === 'update-member') {
+      const admin = getAdminClient()
+      if (!admin) {
+        return jsonError('חסר SUPABASE_SERVICE_KEY או SUPABASE_URL', 503)
+      }
+      const body = await request.json()
+      const result = await updateKnessetMemberWithClient(admin, body)
+      return jsonOk(result, result.ok ? 200 : 400)
+    }
+
+    if (route === 'upload-member-image') {
+      const admin = getAdminClient()
+      if (!admin) {
+        return jsonError('חסר SUPABASE_SERVICE_KEY או SUPABASE_URL', 503)
+      }
+      const form = await request.formData()
+      const personId = Number(form.get('personId'))
+      const file = form.get('file')
+      if (!(file instanceof File)) {
+        return jsonError('חסרה תמונה', 400)
+      }
+      const bytes = Buffer.from(await file.arrayBuffer())
+      const result = await uploadMemberImageWithClient(admin, personId, {
+        bytes,
+        contentType: file.type,
+      })
+      return jsonOk(result, result.ok ? 200 : 400)
+    }
   } catch {
     if (route === 'pipeline/stage') {
       return jsonError('שגיאת שרת בעת הרצת שלב', 500)
@@ -246,8 +294,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (route === 'images') {
       return jsonError('שגיאת שרת בעת עדכון תמונות', 500)
     }
-    if (route === 'update-faction') {
+    if (route === 'update-faction' || route === 'update-member') {
       return jsonError('שגיאת שרת בעת השמירה', 500)
+    }
+    if (route === 'upload-member-image') {
+      return jsonError('שגיאת שרת בעת העלאת התמונה', 500)
     }
     return jsonError('שגיאת שרת', 500)
   }

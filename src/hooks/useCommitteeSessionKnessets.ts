@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
-  committeeKnessetsFromSessionRows,
+  committeeKnessetsFromCommitteeRows,
   type CommitteeKnessetOption,
-  type SessionKnessetRow,
+  type CommitteeKnessetRow,
 } from '../lib/committeeKnessetOptions'
 import { supabase, supabaseConfigError } from '../lib/supabase'
 
@@ -12,7 +12,7 @@ export type UseCommitteeSessionKnessetsResult = {
   error: string | null
 }
 
-/** Knessets that have at least one committee session, newest first. */
+/** Knessets that have at least one committee row, newest first. */
 export function useCommitteeSessionKnessets(): UseCommitteeSessionKnessetsResult {
   const [options, setOptions] = useState<CommitteeKnessetOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,14 +33,14 @@ export function useCommitteeSessionKnessets(): UseCommitteeSessionKnessetsResult
       }
 
       try {
-        const rows: SessionKnessetRow[] = []
+        const rows: CommitteeKnessetRow[] = []
         const pageSize = 1000
         let offset = 0
         while (true) {
           const { data, error: queryError } = await supabase
-            .from('knesset_committee_sessions')
+            .from('knesset_committees')
             .select(
-              'committee:knesset_committees!inner(knesset:knessets!inner(id, knesset_number, knesset_name, is_active))',
+              'knesset:knessets!inner(id, knesset_number, knesset_name, is_active, end_date)',
             )
             .order('id', { ascending: true })
             .range(offset, offset + pageSize - 1)
@@ -49,7 +49,7 @@ export function useCommitteeSessionKnessets(): UseCommitteeSessionKnessetsResult
             throw new Error(queryError.message)
           }
 
-          const page = (data ?? []) as SessionKnessetRow[]
+          const page = (data ?? []) as CommitteeKnessetRow[]
           rows.push(...page)
           if (page.length < pageSize) {
             break
@@ -61,14 +61,14 @@ export function useCommitteeSessionKnessets(): UseCommitteeSessionKnessetsResult
           return
         }
 
-        setOptions(committeeKnessetsFromSessionRows(rows))
+        setOptions(committeeKnessetsFromCommitteeRows(rows))
         setLoading(false)
       } catch (err) {
         if (cancelled) {
           return
         }
         setError(
-          err instanceof Error ? err.message : 'שגיאה בטעינת כנסות עם ישיבות',
+          err instanceof Error ? err.message : 'שגיאה בטעינת כנסות עם ועדות',
         )
         setOptions([])
         setLoading(false)

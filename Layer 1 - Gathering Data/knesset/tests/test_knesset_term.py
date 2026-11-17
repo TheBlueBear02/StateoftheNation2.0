@@ -31,6 +31,7 @@ from knesset_term import (  # noqa: E402
     person_names_match,
     person_party_map,
     plan_official_faction_writes,
+    strip_locked_person_fields,
     plan_provisional_faction_writes,
     select_current_knesset_number,
 )
@@ -225,6 +226,56 @@ class FactionPlanTests(unittest.TestCase):
         # position 4 had an OData FactionID (even if unmapped) — skipped
         # position 5 is another knesset
         # position 6 has no party→faction match
+
+    def test_manual_faction_is_not_replaced_by_the_fallback(self) -> None:
+        states = [
+            MembershipFactionState(1, 10, 5, None, False, faction_id_manual=True),
+            MembershipFactionState(2, 11, 5, 8, False, faction_id_manual=True),
+        ]
+        writes = plan_provisional_faction_writes(
+            states,
+            current_knesset_id=5,
+            person_to_party={10: 100, 11: 100},
+            party_to_faction={100: 4},
+            official_position_ids=set(),
+        )
+        self.assertEqual(writes, [])
+
+    def test_official_faction_replaces_a_manual_link(self) -> None:
+        state = MembershipFactionState(
+            knesset_position_id=7,
+            person_id=1,
+            knesset_id=26,
+            faction_id=3,
+            faction_id_provisional=False,
+            faction_id_manual=True,
+        )
+        replaced = plan_official_faction_writes({7: state}, {7: 9})
+        self.assertEqual(replaced[0].faction_id, 9)
+        self.assertFalse(replaced[0].faction_id_manual)
+        self.assertTrue(replaced[0].previous_manual)
+
+        confirmed = plan_official_faction_writes({7: state}, {7: 3})
+        self.assertEqual(confirmed[0].faction_id, 3)
+        self.assertFalse(confirmed[0].faction_id_manual)
+
+    def test_locked_person_fields_stay_out_of_the_sync_payload(self) -> None:
+        row = {
+            "knesset_person_id": 10,
+            "full_name": "א ב",
+            "gender": "זכר",
+            "birth_date": "1970-01-01",
+            "email": "a@example.com",
+            "is_current": True,
+        }
+        locked = strip_locked_person_fields(
+            row, {"full_name", "email", "image_url"}
+        )
+        self.assertNotIn("full_name", locked)
+        self.assertNotIn("email", locked)
+        self.assertEqual(locked["knesset_person_id"], 10)
+        self.assertEqual(locked["gender"], "זכר")
+        self.assertTrue(locked["is_current"])
 
     def test_person_on_two_lists_is_ambiguous(self) -> None:
         chosen, ambiguous = person_party_map([(1, 10, 1), (1, 11, 4), (2, 10, 2)])
