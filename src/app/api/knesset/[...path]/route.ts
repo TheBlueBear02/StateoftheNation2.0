@@ -10,6 +10,10 @@ import {
   requireKnessetSecret,
   runPythonScript,
 } from '@/server/apiCommon'
+import {
+  updateKnessetMemberWithClient,
+  uploadMemberImageWithClient,
+} from '@/server/updateKnessetMember'
 
 export const maxDuration = 300
 
@@ -227,6 +231,35 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const result = await updateFactionWithClient(admin, body)
       return jsonOk(result, result.ok ? 200 : 400)
     }
+
+    if (route === 'update-member') {
+      const admin = getAdminClient()
+      if (!admin) {
+        return jsonError('חסר SUPABASE_SERVICE_KEY או SUPABASE_URL', 503)
+      }
+      const body = await request.json()
+      const result = await updateKnessetMemberWithClient(admin, body)
+      return jsonOk(result, result.ok ? 200 : 400)
+    }
+
+    if (route === 'upload-member-image') {
+      const admin = getAdminClient()
+      if (!admin) {
+        return jsonError('חסר SUPABASE_SERVICE_KEY או SUPABASE_URL', 503)
+      }
+      const form = await request.formData()
+      const personId = Number(form.get('personId'))
+      const file = form.get('file')
+      if (!(file instanceof File)) {
+        return jsonError('חסרה תמונה', 400)
+      }
+      const bytes = Buffer.from(await file.arrayBuffer())
+      const result = await uploadMemberImageWithClient(admin, personId, {
+        bytes,
+        contentType: file.type,
+      })
+      return jsonOk(result, result.ok ? 200 : 400)
+    }
   } catch {
     if (route === 'pipeline/stage') {
       return jsonError('שגיאת שרת בעת הרצת שלב', 500)
@@ -246,8 +279,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (route === 'images') {
       return jsonError('שגיאת שרת בעת עדכון תמונות', 500)
     }
-    if (route === 'update-faction') {
+    if (route === 'update-faction' || route === 'update-member') {
       return jsonError('שגיאת שרת בעת השמירה', 500)
+    }
+    if (route === 'upload-member-image') {
+      return jsonError('שגיאת שרת בעת העלאת התמונה', 500)
     }
     return jsonError('שגיאת שרת', 500)
   }

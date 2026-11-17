@@ -8,6 +8,7 @@ from supabase import create_client
 
 from current_knesset import database_active_knesset_number
 from knesset_term import knesset_image_folder_candidates
+from manual_overrides import PERSON_MANUAL_COLUMN, apply_static_mk_image, column_ready
 
 load_dotenv()
 
@@ -44,6 +45,7 @@ GITHUB_BASE = (
 
 matched = []
 unmatched = []
+manual_images = column_ready(supabase, "people", PERSON_MANUAL_COLUMN)
 
 for party_folder in os.listdir(IMAGES_ROOT):
     party_path = os.path.join(IMAGES_ROOT, party_folder)
@@ -59,9 +61,12 @@ for party_folder in os.listdir(IMAGES_ROOT):
         encoded_name = urllib.parse.quote(filename)
         image_url = f"{GITHUB_BASE}/{encoded_party}/{encoded_name}"
 
-        result = supabase.table("people").update({"image_url": image_url}).eq("full_name", full_name).execute()
-
-        if result.data:
+        if apply_static_mk_image(
+            supabase,
+            full_name,
+            image_url,
+            manual_column_ready=manual_images,
+        ):
             matched.append(full_name)
             print(f"✓ {full_name}")
         else:

@@ -32,6 +32,11 @@ import fix_faction_links_all as faction_links
 import load_all_knesset_data as sync
 from current_knesset import database_active_knesset_number
 from knesset_term import knesset_image_folder_candidates
+from manual_overrides import (
+    PERSON_MANUAL_COLUMN,
+    apply_static_mk_image,
+    column_ready,
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from emit_site_updates import (  # noqa: E402
@@ -519,10 +524,13 @@ def load_faction_plan(sb) -> tuple[list[faction_links.PlannedUpdate], Counter[st
         "knesset_factions",
         "id,knesset_faction_id,knesset_id,name,short_name",
     )
+    membership_columns = "id,knesset_id,person_id,faction_id,start_date,end_date"
+    if column_ready(sb, "knesset_memberships", "faction_id_manual"):
+        membership_columns += ",faction_id_manual"
     memberships = faction_links.fetch_all(
         sb,
         "knesset_memberships",
-        "id,knesset_id,person_id,faction_id,start_date,end_date",
+        membership_columns,
     )
     return faction_links.plan_updates(
         people,
@@ -653,6 +661,7 @@ def cmd_images(sb, as_json: bool) -> None:
 
     matched: list[str] = []
     unmatched: list[str] = []
+    manual_images = column_ready(sb, "people", PERSON_MANUAL_COLUMN)
 
     try:
         for party_folder in os.listdir(images_root):
@@ -669,14 +678,12 @@ def cmd_images(sb, as_json: bool) -> None:
                 encoded_name = urllib.parse.quote(filename)
                 image_url = f"{github_base}/{encoded_party}/{encoded_name}"
 
-                result = (
-                    sb.table("people")
-                    .update({"image_url": image_url})
-                    .eq("full_name", full_name)
-                    .execute()
-                )
-
-                if result.data:
+                if apply_static_mk_image(
+                    sb,
+                    full_name,
+                    image_url,
+                    manual_column_ready=manual_images,
+                ):
                     matched.append(full_name)
                 else:
                     unmatched.append(full_name)

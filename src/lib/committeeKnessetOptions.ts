@@ -1,10 +1,11 @@
-/** Knessets that have committee sessions, for the committees-page picker. */
+/** Knessets that have committees, for the committees-page picker. */
 
 export type CommitteeKnessetOption = {
   id: number
   knessetNumber: number
   label: string
   isCurrent: boolean
+  endDate: string | null
 }
 
 export type SessionKnessetJoin = {
@@ -12,6 +13,7 @@ export type SessionKnessetJoin = {
   knesset_number: number
   knesset_name?: string | null
   is_active?: boolean | null
+  end_date?: string | null
 }
 
 export type SessionCommitteeJoin = {
@@ -20,6 +22,10 @@ export type SessionCommitteeJoin = {
 
 export type SessionKnessetRow = {
   committee: SessionCommitteeJoin | SessionCommitteeJoin[] | null
+}
+
+export type CommitteeKnessetRow = {
+  knesset: SessionKnessetJoin | SessionKnessetJoin[] | null
 }
 
 function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -40,36 +46,56 @@ export function committeeKnessetLabel(
   return `הכנסת ה-${knessetNumber}`
 }
 
-/** Distinct knessets from session rows, newest number first. */
-export function committeeKnessetsFromSessionRows(
-  rows: SessionKnessetRow[],
+function optionFromKnesset(
+  knesset: SessionKnessetJoin | null,
+): CommitteeKnessetOption | null {
+  if (knesset?.id == null || knesset.knesset_number == null) {
+    return null
+  }
+  return {
+    id: knesset.id,
+    knessetNumber: knesset.knesset_number,
+    label: committeeKnessetLabel(knesset.knesset_number, knesset.knesset_name),
+    isCurrent: knesset.is_active === true,
+    endDate: knesset.end_date ?? null,
+  }
+}
+
+function distinctKnessetOptions(
+  knessets: Array<SessionKnessetJoin | null>,
 ): CommitteeKnessetOption[] {
   const byId = new Map<number, CommitteeKnessetOption>()
-  for (const row of rows) {
-    const committee = unwrapRelation(row.committee)
-    const knesset = unwrapRelation(committee?.knesset)
-    if (knesset?.id == null || knesset.knesset_number == null) {
+  for (const knesset of knessets) {
+    const option = optionFromKnesset(knesset)
+    if (!option || byId.has(option.id)) {
       continue
     }
-    if (byId.has(knesset.id)) {
-      continue
-    }
-    byId.set(knesset.id, {
-      id: knesset.id,
-      knessetNumber: knesset.knesset_number,
-      label: committeeKnessetLabel(
-        knesset.knesset_number,
-        knesset.knesset_name,
-      ),
-      isCurrent: knesset.is_active === true,
-    })
+    byId.set(option.id, option)
   }
   return [...byId.values()].sort((a, b) => b.knessetNumber - a.knessetNumber)
 }
 
+/** Distinct knessets from session rows, newest number first. */
+export function committeeKnessetsFromSessionRows(
+  rows: SessionKnessetRow[],
+): CommitteeKnessetOption[] {
+  return distinctKnessetOptions(
+    rows.map((row) => unwrapRelation(unwrapRelation(row.committee)?.knesset)),
+  )
+}
+
+/** Distinct knessets from committee rows, newest number first. */
+export function committeeKnessetsFromCommitteeRows(
+  rows: CommitteeKnessetRow[],
+): CommitteeKnessetOption[] {
+  return distinctKnessetOptions(
+    rows.map((row) => unwrapRelation(row.knesset)),
+  )
+}
+
 /**
- * The requested Knesset when it has sessions; otherwise the current Knesset
- * if it has sessions; otherwise the newest Knesset that has sessions.
+ * The requested Knesset when it has committees; otherwise the current Knesset
+ * if it has committees; otherwise the newest Knesset that has committees.
  */
 export function resolveCommitteeKnesset(
   requestedNumber: number | null,

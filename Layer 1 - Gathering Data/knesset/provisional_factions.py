@@ -236,6 +236,7 @@ def build_provisional_plan(
                 int(row["faction_id"]) if row.get("faction_id") is not None else None
             ),
             faction_id_provisional=bool(row.get(PROVISIONAL_COLUMN)),
+            faction_id_manual=bool(row.get("faction_id_manual")),
         )
         for row in memberships
         if row.get("knesset_position_id") is not None and row.get("person_id") is not None
@@ -253,6 +254,8 @@ def build_provisional_plan(
         if state.knesset_id != current_knesset_id:
             continue
         if state.knesset_position_id in official_position_ids:
+            continue
+        if state.faction_id_manual:
             continue
         if state.faction_id is not None and not state.faction_id_provisional:
             continue

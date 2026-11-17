@@ -70,6 +70,12 @@ from knesset_term import (  # noqa: E402
     official_conflicts,
     plan_official_faction_writes,
     select_current_knesset_number,
+    strip_locked_person_fields,
+)
+from manual_overrides import (  # noqa: E402
+    FACTION_MANUAL_COLUMN,
+    load_person_field_locks,
+    column_ready as manual_column_ready,
 )
 from provisional_factions import (  # noqa: E402
     PROVISIONAL_COLUMN,
@@ -518,18 +524,25 @@ def sync_people(sb: Client, rows: list[dict] | None = None) -> dict[int, int]:
     log.info("── syncing people ──")
     raw = fetch_odata("KNS_Person") if rows is None else rows
 
-    rows = [
-        {
-            "knesset_person_id": r["PersonID"],
-            "full_name":  f'{r.get("FirstName") or ""} {r.get("LastName") or ""}'.strip(),
-            "gender":     r.get("GenderDesc"),          # "נקבה" or "זכר" directly
-            "birth_date": r.get("BirthDate"),            # may be absent — handled as None
-            "email":      r.get("Email"),
-            "is_current": bool(r.get("IsCurrent", False)),
-        }
-        for r in raw
-        if r.get("PersonID") is not None
-    ]
+    locks = load_person_field_locks(sb)
+    rows = []
+    for r in raw:
+        if r.get("PersonID") is None:
+            continue
+        person_key = int(r["PersonID"])
+        rows.append(
+            strip_locked_person_fields(
+                {
+                    "knesset_person_id": person_key,
+                    "full_name": f'{r.get("FirstName") or ""} {r.get("LastName") or ""}'.strip(),
+                    "gender": r.get("GenderDesc"),  # "נקבה" or "זכר" directly
+                    "birth_date": r.get("BirthDate"),  # may be absent — handled as None
+                    "email": r.get("Email"),
+                    "is_current": bool(r.get("IsCurrent", False)),
+                },
+                locks.get(person_key, set()),
+            )
+        )
 
     existing_keys = set(load_id_map(sb, "people", "knesset_person_id").keys())
     stats = upsert(sb, "people", rows, "knesset_person_id", existing_keys)
@@ -738,6 +751,7 @@ def _apply_provisional_factions(
     *,
     knesset_map: dict,
     has_provisional_col: bool,
+    has_manual_col: bool,
     official_position_ids: set[int],
     states_by_position: dict[int, MembershipFactionState],
     official_writes: list,
@@ -774,6 +788,7 @@ def _apply_provisional_factions(
             knesset_id=previous.knesset_id if previous else active_id,
             faction_id=write.faction_id,
             faction_id_provisional=False,
+            faction_id_manual=False,
         )
 
     memberships = [
@@ -783,6 +798,7 @@ def _apply_provisional_factions(
             "knesset_id": state.knesset_id,
             "faction_id": state.faction_id,
             PROVISIONAL_COLUMN: state.faction_id_provisional,
+            FACTION_MANUAL_COLUMN: state.faction_id_manual,
         }
         for state in merged.values()
         if state.knesset_id == active_id and state.person_id
@@ -794,7 +810,12 @@ def _apply_provisional_factions(
         memberships=memberships,
         official_position_ids=official_position_ids,
     )
-    payloads = [faction_write_payload(write) for write in plan["writes"]]
+    payloads = []
+    for write in plan["writes"]:
+        payload = faction_write_payload(write)
+        if has_manual_col:
+            payload[FACTION_MANUAL_COLUMN] = False
+        payloads.append(payload)
     if payloads:
         written = upsert(
             sb,
@@ -922,9 +943,14 @@ def sync_positions(
     # Pass 2: official FactionID only. Clears faction_id_provisional.
     # A null OData FactionID never overwrites an existing link.
     has_provisional_col = provisional_column_ready(sb)
+    has_manual_col = manual_column_ready(
+        sb, "knesset_memberships", FACTION_MANUAL_COLUMN
+    )
     state_columns = ["faction_id", "person_id", "knesset_id"]
     if has_provisional_col:
         state_columns.append(PROVISIONAL_COLUMN)
+    if has_manual_col:
+        state_columns.append(FACTION_MANUAL_COLUMN)
     existing_state = load_existing_rows(
         sb, "knesset_memberships", "knesset_position_id", state_columns
     )
@@ -936,6 +962,9 @@ def sync_positions(
             faction_id=int(row["faction_id"]) if row.get("faction_id") is not None else None,
             faction_id_provisional=bool(row.get(PROVISIONAL_COLUMN))
             if has_provisional_col
+            else False,
+            faction_id_manual=bool(row.get(FACTION_MANUAL_COLUMN))
+            if has_manual_col
             else False,
         )
         for position_id, row in existing_state.items()
@@ -951,6 +980,15 @@ def sync_positions(
             conflict.previous_faction_id,
             conflict.faction_id,
         )
+    for write in official_writes:
+        if write.previous_manual and write.previous_faction_id != write.faction_id:
+            log.warning(
+                "  official FactionID replaces a manual faction for position %s: "
+                "%s → %s",
+                write.knesset_position_id,
+                write.previous_faction_id,
+                write.faction_id,
+            )
     faction_updates = []
     for write in official_writes:
         payload = {
@@ -959,6 +997,8 @@ def sync_positions(
         }
         if has_provisional_col:
             payload[PROVISIONAL_COLUMN] = False
+        if has_manual_col:
+            payload[FACTION_MANUAL_COLUMN] = False
         faction_updates.append(payload)
 
     faction_stats = {
@@ -1003,6 +1043,7 @@ def sync_positions(
         sb,
         knesset_map=knesset_map,
         has_provisional_col=has_provisional_col,
+        has_manual_col=has_manual_col,
         official_position_ids=official_position_ids,
         states_by_position=states_by_position,
         official_writes=official_writes,

@@ -29,6 +29,7 @@ import {
   type KnessetTableCounts,
   type PipelineRunSummary,
 } from '../lib/runKnessetPipeline'
+import { KnessetMemberEditor } from '../components/knesset/KnessetMemberEditor'
 import { updateKnessetFaction } from '../lib/updateKnessetFaction'
 import './ElectionPartyPage.css'
 import './ElectionCandidatesEditPage.css'
@@ -389,7 +390,7 @@ export function KnessetPipelineEditPage() {
             <p className="election-edit-page__eyebrow">עדכון נתונים</p>
             <h1 className="election-edit-page__title">עדכון נתוני הכנסת</h1>
             <p className="election-edit-page__subtitle">
-              הרצת צינור הסנכרון ועריכת מטא-דאטה של סיעות (צבע, קואליציה, שם קצר).
+              הרצת צינור הסנכרון, עריכת חברי כנסת ועריכת מטא-דאטה של סיעות.
             </p>
           </div>
         </header>
@@ -474,6 +475,8 @@ export function KnessetPipelineEditPage() {
                 {isDev ? (
                   <KnessetPipelinePanel onComplete={handlePipelineComplete} />
                 ) : null}
+
+                <KnessetMemberEditor />
 
                 <section
                   className="party-detail-card"

@@ -15,10 +15,19 @@ type CommitteeListProps = {
   onSelectCommittee: (committee: KnessetCommittee) => void
 }
 
+type SessionMember = {
+  personId: number
+  fullName: string
+  imageUrl: string | null
+  roleLabel: string | null
+}
+
 type SessionListProps = {
   mode: 'sessions'
   committeeName: string
   sessions: CommitteeSession[]
+  members?: SessionMember[]
+  membersLoading?: boolean
   loading?: boolean
   onSelectSession: (session: CommitteeSession) => void
   onBack: () => void
@@ -79,9 +88,44 @@ export function CommitteeChatPicker(props: CommitteeChatPickerProps) {
           <p className="committee-chat-picker__empty">טוען…</p>
         ) : isSessions ? (
           props.sessions.length === 0 ? (
-            <p className="committee-chat-picker__empty">
-              אין ישיבות עם תמליל לוועדה זו
-            </p>
+            <div className="committee-chat-picker__empty-block">
+              <p className="committee-chat-picker__empty">
+                אין עדיין פרוטוקולים לוועדה זו
+              </p>
+              {props.membersLoading ? (
+                <p className="committee-chat-picker__empty">טוען חברים…</p>
+              ) : props.members && props.members.length > 0 ? (
+                <ul className="committee-chat-picker__members">
+                  {props.members.map((member) => (
+                    <li key={member.personId} className="committee-chat-picker__member">
+                      {member.imageUrl ? (
+                        <img
+                          className="committee-chat-picker__member-photo"
+                          src={member.imageUrl}
+                          alt=""
+                        />
+                      ) : (
+                        <span
+                          className="committee-chat-picker__member-photo committee-chat-picker__member-photo--empty"
+                          aria-hidden
+                        >
+                          {member.fullName.slice(0, 1)}
+                        </span>
+                      )}
+                      <span className="committee-chat-picker__member-name">
+                        {member.fullName}
+                        {member.roleLabel ? (
+                          <span className="committee-chat-picker__member-role">
+                            {' '}
+                            · {member.roleLabel}
+                          </span>
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           ) : (
             props.sessions.map((session) => {
               const sessionLabel =
@@ -133,7 +177,7 @@ export function CommitteeChatPicker(props: CommitteeChatPickerProps) {
             })
           )
         ) : props.committees.length === 0 ? (
-          <p className="committee-chat-picker__empty">אין ועדות עם תמליל</p>
+          <p className="committee-chat-picker__empty">אין ועדות לכנסת זו</p>
         ) : (
           props.committees.map((committee) => (
             <button
@@ -166,21 +210,25 @@ export function CommitteeChatPicker(props: CommitteeChatPickerProps) {
                       </span>
                     ) : null}
                   </span>
-                  <span
-                    className="committee-chat-picker__count-badge"
-                    aria-label={
-                      committee.sessionCount === 1
-                        ? 'ישיבה אחת עם תמליל'
-                        : `${committee.sessionCount} ישיבות עם תמליל`
-                    }
-                  >
-                    <span className="committee-chat-picker__count-badge-num">
-                      {committee.sessionCount}
+                  {committee.sessionCount > 0 ? (
+                    <span
+                      className="committee-chat-picker__count-badge"
+                      aria-label={
+                        committee.sessionCount === 1
+                          ? 'ישיבה אחת עם תמליל'
+                          : `${committee.sessionCount} ישיבות עם תמליל`
+                      }
+                    >
+                      <span className="committee-chat-picker__count-badge-num">
+                        {committee.sessionCount}
+                      </span>
                     </span>
-                  </span>
+                  ) : null}
                 </span>
                 <span className="committee-chat-picker__when">
-                  {`ישיבה אחרונה: ${formatCommitteeDateOnly(committee.latestSessionAt)}`}
+                  {committee.sessionCount > 0
+                    ? `ישיבה אחרונה: ${formatCommitteeDateOnly(committee.latestSessionAt)}`
+                    : 'אין עדיין פרוטוקולים'}
                 </span>
               </span>
             </button>

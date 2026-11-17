@@ -26,6 +26,8 @@ import pandas as pd
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+from manual_overrides import column_ready
+
 
 OPEN_KNESSET_FACTIONS_CSV = (
     "https://production.oknesset.org/pipelines/data/members/"
@@ -251,6 +253,10 @@ def plan_updates(
 
         target_faction_id = int(target_faction["id"])
         current_faction_id = membership.get("faction_id")
+        if membership.get("faction_id_manual"):
+            skipped["manual_faction"] += 1
+            continue
+
         if current_faction_id == target_faction_id:
             skipped["unchanged"] += 1
             continue
@@ -373,10 +379,13 @@ def main() -> None:
         "knesset_factions",
         "id,knesset_faction_id,knesset_id,name,short_name",
     )
+    membership_columns = "id,knesset_id,person_id,faction_id,start_date,end_date"
+    if column_ready(supabase, "knesset_memberships", "faction_id_manual"):
+        membership_columns += ",faction_id_manual"
     memberships = fetch_all(
         supabase,
         "knesset_memberships",
-        "id,knesset_id,person_id,faction_id,start_date,end_date",
+        membership_columns,
     )
 
     print(

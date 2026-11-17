@@ -106,7 +106,7 @@ export function KnessetCommitteesPage() {
     error: membersError,
   } = useCommitteeMemberships(
     selectedCommittee?.id ?? null,
-    selectedSession?.startAt ?? null,
+    selectedSession?.startAt ?? selectedKnesset?.endDate ?? null,
   )
 
   const {
@@ -661,7 +661,7 @@ export function KnessetCommitteesPage() {
                   label: option.label,
                 }))}
                 disabled={knessetsLoading || knessetOptions.length === 0}
-                placeholder={knessetsLoading ? 'טוען…' : 'אין ישיבות'}
+                placeholder={knessetsLoading ? 'טוען…' : 'אין ועדות'}
                 onChange={onKnessetChange}
               />
             </div>
@@ -726,6 +726,16 @@ export function KnessetCommitteesPage() {
                     mode="sessions"
                     committeeName={selectedCommittee.name}
                     sessions={sessions}
+                    members={members.map((member) => ({
+                      personId: member.personId,
+                      fullName: member.fullName,
+                      imageUrl: member.imageUrl,
+                      roleLabel:
+                        member.seatRole === 'chair'
+                          ? 'יו״ר'
+                          : member.roleDesc,
+                    }))}
+                    membersLoading={membersLoading}
                     loading={sessionsLoading}
                     onSelectSession={openSession}
                     onBack={backFromSessions}

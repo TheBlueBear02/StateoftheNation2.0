@@ -349,6 +349,7 @@ class MembershipFactionState:
     knesset_id: int
     faction_id: int | None
     faction_id_provisional: bool
+    faction_id_manual: bool = False
 
 
 @dataclass(frozen=True)
@@ -358,6 +359,40 @@ class FactionWrite:
     faction_id_provisional: bool
     previous_faction_id: int | None
     previous_provisional: bool
+    faction_id_manual: bool = False
+    previous_manual: bool = False
+
+
+# People columns the /knesset/edit MK form can lock against the OData person sync.
+PERSON_LOCKABLE_FIELDS = frozenset(
+    {
+        "full_name",
+        "gender",
+        "birth_date",
+        "email",
+        "image_url",
+        "wikipedia_url",
+        "twitter_handle",
+    }
+)
+
+
+def strip_locked_person_fields(row: dict, locked: set[str]) -> dict:
+    """Drop hand-edited person columns from an OData upsert payload.
+
+    `knesset_person_id` and `is_current` are never removed. A locked image or
+    link is omitted even though the person sync does not send those columns.
+    """
+    blocked = locked & PERSON_LOCKABLE_FIELDS
+    if not blocked:
+        return dict(row)
+    return {key: value for key, value in row.items() if key not in blocked}
+
+
+def person_image_is_manual(manual_fields: object) -> bool:
+    if isinstance(manual_fields, (list, tuple, set)):
+        return "image_url" in manual_fields
+    return False
 
 
 def match_party_to_faction(party: PartyRef, factions: list[FactionRef]) -> int | None:
@@ -407,21 +442,29 @@ def plan_official_faction_writes(
     states_by_position: dict[int, MembershipFactionState],
     official_by_position: dict[int, int],
 ) -> list[FactionWrite]:
-    """OData FactionID writes. Always clears the provisional flag."""
+    """OData FactionID writes. Clears the provisional flag and any manual lock.
+
+    A published FactionID wins over a faction Amir set on /knesset/edit.
+    When it matches the manual value, the write still runs so the manual lock
+    is released. A later null FactionID does not clear the stored link.
+    """
     writes: list[FactionWrite] = []
     for position_id, faction_id in official_by_position.items():
         state = states_by_position.get(position_id)
         previous = state.faction_id if state else None
         previous_flag = state.faction_id_provisional if state else False
-        if previous == faction_id and not previous_flag:
+        manual = state.faction_id_manual if state else False
+        if previous == faction_id and not previous_flag and not manual:
             continue
         writes.append(
             FactionWrite(
                 knesset_position_id=position_id,
                 faction_id=faction_id,
                 faction_id_provisional=False,
+                faction_id_manual=False,
                 previous_faction_id=previous,
                 previous_provisional=previous_flag,
+                previous_manual=manual,
             )
         )
     return writes
@@ -448,13 +491,16 @@ def plan_provisional_faction_writes(
 
     `official_position_ids` includes every OData row that carried a FactionID,
     even when that id did not match a knesset_factions row. Those stay untouched
-    so a fallback cannot replace official data we failed to resolve.
+    so a fallback cannot replace official data we failed to resolve. A membership
+    with faction_id_manual is also left untouched, including a deliberate null.
     """
     writes: list[FactionWrite] = []
     for state in states:
         if state.knesset_id != current_knesset_id:
             continue
         if state.knesset_position_id in official_position_ids:
+            continue
+        if state.faction_id_manual:
             continue
         if state.faction_id is not None and not state.faction_id_provisional:
             continue

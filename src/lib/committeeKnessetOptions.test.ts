@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   committeeKnessetLabel,
+  committeeKnessetsFromCommitteeRows,
   committeeKnessetsFromSessionRows,
   resolveCommitteeKnesset,
   type CommitteeKnessetOption,
@@ -18,6 +19,7 @@ function option(
     knessetNumber,
     label: `הכנסת ה-${knessetNumber}`,
     isCurrent,
+    endDate: null,
   }
 }
 
@@ -67,6 +69,34 @@ describe('committee knesset options', () => {
     assert.equal(options[0]?.label, 'הכנסת ה-26')
     assert.equal(options[0]?.isCurrent, true)
     assert.equal(options[1]?.label, 'הכנסת ה-25')
+  })
+
+  it('lists a knesset from committee rows even without sessions', () => {
+    const options = committeeKnessetsFromCommitteeRows([
+      {
+        knesset: {
+          id: 30,
+          knesset_number: 26,
+          knesset_name: 'הכנסת ה-26',
+          is_active: true,
+        },
+      },
+      {
+        knesset: [
+          {
+            id: 30,
+            knesset_number: 26,
+            is_active: true,
+          },
+        ],
+      },
+      { knesset: null },
+    ])
+    assert.deepEqual(
+      options.map((item) => item.knessetNumber),
+      [26],
+    )
+    assert.equal(options[0]?.isCurrent, true)
   })
 
   it('uses the stored knesset name when it is present', () => {
