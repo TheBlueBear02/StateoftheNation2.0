@@ -10,7 +10,13 @@ Checks (recorded in pipeline_runs, action=consistency-check):
     != governments.is_active
   - the active government has no open minister_appointments (end_date null)
 
-Exit 0 when every check passes. Exit 1 on any issue or on a lookup failure.
+A null faction_id is a warning, not a failure, while knessets.start_date is
+less than NULL_FACTION_GRACE_DAYS (default 14) ago, and whenever
+NULL_FACTION_WARN_ONLY is true. The warning is still logged and stored on
+the pipeline_runs row. After the grace it fails the job again. Every other
+check is always a failure.
+
+Exit 0 when there is no hard issue. Exit 1 on any hard issue or on a crash.
 Provisional election-list faction links are reported but are not a failure.
 """
 
@@ -19,7 +25,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from current_knesset import (
@@ -46,12 +52,12 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def _knesset_id(sb, knesset_number: int | None) -> int | None:
+def _knesset_row(sb, knesset_number: int | None) -> tuple[int | None, date | None]:
     if knesset_number is None:
-        return None
+        return None, None
     rows = (
         sb.table("knessets")
-        .select("id")
+        .select("id, start_date")
         .eq("knesset_number", knesset_number)
         .limit(1)
         .execute()
@@ -59,8 +65,12 @@ def _knesset_id(sb, knesset_number: int | None) -> int | None:
         or []
     )
     if not rows:
-        return None
-    return int(rows[0]["id"])
+        return None, None
+    raw_start = rows[0].get("start_date")
+    start: date | None = None
+    if isinstance(raw_start, str) and raw_start:
+        start = date.fromisoformat(raw_start[:10])
+    return int(rows[0]["id"]), start
 
 
 def _count(sb, table: str, build) -> int:
@@ -210,7 +220,7 @@ def load_facts(sb) -> ConsistencyFacts:
 
     db_number = database_active_knesset_number(sb)
     target_number = odata_number if odata_number is not None else db_number
-    target_id = _knesset_id(sb, target_number)
+    target_id, knesset_start = _knesset_row(sb, target_number)
     column_ready = provisional_column_ready(sb)
 
     null_factions = 0
@@ -274,6 +284,7 @@ def load_facts(sb) -> ConsistencyFacts:
         odata_current_government=odata_government,
         db_active_government=db_government,
         active_government_open_appointments=open_appointments,
+        current_knesset_start=knesset_start,
     )
 
 
@@ -298,13 +309,20 @@ def main() -> None:
         sys.exit(1)
 
     issues = report["issues"]
+    warnings = report.get("warnings") or []
+    for warning in warnings:
+        log.warning("CONSISTENCY %s — %s", warning["code"], warning["message"])
     if issues:
         for issue in issues:
             log.error("CONSISTENCY %s — %s", issue["code"], issue["message"])
-        message = "Knesset consistency failed: " + "; ".join(
-            issue["code"] for issue in issues
+        codes = [issue["code"] for issue in issues]
+        if warnings:
+            codes.extend(f"{warning['code']} (warning)" for warning in warnings)
+        message = "Knesset consistency failed: " + "; ".join(codes)
+        error = "\n".join(
+            [issue["message"] for issue in issues]
+            + [warning["message"] for warning in warnings]
         )
-        error = "\n".join(issue["message"] for issue in issues)
         status = "warning"
         exit_code = 1
     else:
@@ -314,8 +332,14 @@ def main() -> None:
             f"government {report['odata_current_government']}, "
             f"provisional faction links: {report['provisional_faction_memberships']})"
         )
-        error = None
-        status = "success"
+        if warnings:
+            message += " — warning: " + "; ".join(
+                warning["message"] for warning in warnings
+            )
+            status = "warning"
+        else:
+            status = "success"
+        error = "\n".join(warning["message"] for warning in warnings) or None
         exit_code = 0
         log.info(message)
 

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from datetime import date
 
 from knesset_term import (  # noqa: E402
     ConsistencyFacts,
@@ -22,6 +25,8 @@ from knesset_term import (  # noqa: E402
     knesset_numbers_to_deactivate,
     match_party_to_faction,
     names_refer_to_same_party,
+    null_faction_grace_days,
+    null_factions_are_warning,
     official_conflicts,
     person_names_match,
     person_party_map,
@@ -259,8 +264,14 @@ class ConsistencyTests(unittest.TestCase):
         self.assertFalse(mismatch["ok"])
         self.assertEqual(mismatch["issues"][0]["code"], "odata_db_knesset_mismatch")
 
-        nulls = evaluate_consistency(self._facts(null_faction_memberships=120))
+        nulls = evaluate_consistency(
+            self._facts(null_faction_memberships=120),
+            today=date(2026, 11, 24),
+            grace_days=14,
+            warn_only=False,
+        )
         self.assertEqual(nulls["issues"][0]["code"], "null_faction_memberships")
+        self.assertEqual(nulls["warnings"], [])
 
         missing = evaluate_consistency(
             self._facts(db_committee_ids_for_current=frozenset({1}))
@@ -287,6 +298,74 @@ class ConsistencyTests(unittest.TestCase):
         )
         self.assertEqual(
             empty["issues"][0]["code"], "active_government_without_ministers"
+        )
+
+    def test_null_factions_warn_during_grace_and_fail_after(self) -> None:
+        start = date(2026, 11, 10)
+        facts = self._facts(
+            null_faction_memberships=14,
+            current_knesset_start=start,
+        )
+        # 13 days after swearing-in: still inside the 14-day grace.
+        during = evaluate_consistency(
+            facts, today=date(2026, 11, 23), grace_days=14, warn_only=False
+        )
+        self.assertTrue(during["ok"])
+        self.assertEqual(during["issues"], [])
+        self.assertEqual(during["warnings"][0]["code"], "null_faction_memberships")
+
+        # Day 14 is no longer "less than 14 days ago".
+        after = evaluate_consistency(
+            facts, today=date(2026, 11, 24), grace_days=14, warn_only=False
+        )
+        self.assertFalse(after["ok"])
+        self.assertEqual(after["warnings"], [])
+        self.assertEqual(after["issues"][0]["code"], "null_faction_memberships")
+
+        held = evaluate_consistency(
+            facts, today=date(2026, 11, 24), grace_days=14, warn_only=True
+        )
+        self.assertTrue(held["ok"])
+        self.assertEqual(held["warnings"][0]["code"], "null_faction_memberships")
+        self.assertIn("NULL_FACTION_WARN_ONLY", held["warnings"][0]["message"])
+
+    def test_null_faction_warning_does_not_hide_other_failures(self) -> None:
+        report = evaluate_consistency(
+            self._facts(
+                null_faction_memberships=14,
+                current_knesset_start=date(2026, 11, 10),
+                db_active_government=36,
+            ),
+            today=date(2026, 11, 17),
+            grace_days=14,
+            warn_only=False,
+        )
+        self.assertFalse(report["ok"])
+        self.assertEqual(
+            [issue["code"] for issue in report["issues"]],
+            ["odata_db_government_mismatch"],
+        )
+        self.assertEqual(report["warnings"][0]["code"], "null_faction_memberships")
+
+    def test_null_faction_grace_days_env(self) -> None:
+        previous = os.environ.get("NULL_FACTION_GRACE_DAYS")
+        try:
+            os.environ["NULL_FACTION_GRACE_DAYS"] = "21"
+            self.assertEqual(null_faction_grace_days(), 21)
+            os.environ["NULL_FACTION_GRACE_DAYS"] = "nope"
+            self.assertEqual(null_faction_grace_days(), 14)
+        finally:
+            if previous is None:
+                os.environ.pop("NULL_FACTION_GRACE_DAYS", None)
+            else:
+                os.environ["NULL_FACTION_GRACE_DAYS"] = previous
+        self.assertFalse(
+            null_factions_are_warning(
+                None,
+                today=date(2026, 11, 17),
+                grace_days=14,
+                warn_only=False,
+            )
         )
 
     def test_boolean_odata_filter(self) -> None:
