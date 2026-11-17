@@ -214,23 +214,30 @@ Password-gated private tool for running the Knesset OData sync pipeline, editing
 | `/knesset/edit` | `src/views/KnessetPipelineEditPage.tsx` | Password gate, status panel, pipeline runner, MK editor, faction editor |
 | | `src/views/KnessetPipelineEditPage.css` | Status grid, pipeline stage rows, faction edit styles |
 | | `src/app/knesset/edit/page.tsx` | App Router wrapper + metadata |
+| | `src/components/knesset/KnessetEditGate.tsx` | Password form; checks the typed password on the server |
 | | `src/components/knesset/KnessetPipelinePanel.tsx` | Dev-only sync stages 1–6 + post-sync scripts |
 | | `src/hooks/useKnessetFactions.ts` | Faction list for selected Knesset term |
 | | `src/lib/runKnessetPipeline.ts` | Dev API client for status, stages, faction links, images |
+| | `src/lib/knessetEditSession.ts` | Stores the typed password in `sessionStorage` and sends it as a header. Does not read env |
 | | `src/components/knesset/KnessetMemberEditor.tsx` | MK list, search, no-faction filter, person + faction form |
 | | `src/hooks/useKnessetMembershipEdits.ts` | Memberships + person fields for the selected term |
-| | `src/lib/updateKnessetMember.ts` | Dev API client for MK saves and photo upload |
-| | `src/lib/updateKnessetFaction.ts` | Dev API client for faction metadata saves |
-| | `src/app/api/knesset/[...path]/route.ts` | Next.js App Router handlers spawning Python in `Layer 1 - Gathering Data/knesset/` (gated by `assertPipelineEnabled`) |
-| | `src/server/apiCommon.ts` | Shared pipeline API helpers (auth, Python spawn, JSON responses) |
+| | `src/lib/updateKnessetMember.ts` | API client for MK saves and photo upload (dev and production) |
+| | `src/lib/updateKnessetFaction.ts` | API client for faction metadata saves (dev and production) |
+| | `src/server/knessetEditAuth.ts` | Server-only secret check (`timingSafeEqual` on SHA-256 digests, delay on failure) |
+| | `src/app/api/knesset/[...path]/route.ts` | Data edits in every environment; Python handlers in `Layer 1 - Gathering Data/knesset/` stay behind `assertPipelineEnabled` |
+| | `src/server/apiCommon.ts` | Shared pipeline API helpers (Python spawn, JSON responses) |
 | | `Layer 1 - Gathering Data/knesset/run_knesset_pipeline_api.py` | JSON API for pipeline subcommands |
 
 ### Auth
 
-- Env: `KNESSET_EDIT_SECRET` / `NEXT_PUBLIC_KNESSET_EDIT_SECRET` (legacy `VITE_KNESSET_EDIT_SECRET` still read)
-- Client compares password in-browser; unlock stored in `sessionStorage` under `knesset-edit-unlocked`
-- API calls send header `x-knesset-edit-secret`
-- Lightweight private-tool gate — not production auth; routes require `pipelineApisEnabled()` (dev or `ENABLE_PIPELINE_API`)
+Writes from this page are allowed in production. The password is not compared in the browser and is not read from `NEXT_PUBLIC_*`.
+
+- Server env, first non-empty wins: `KNESSET_EDIT_SECRET`, then `PIPELINE_EDIT_SECRET`, then `ELECTIONS_EDIT_SECRET`, then legacy `VITE_KNESSET_EDIT_SECRET`. Set `KNESSET_EDIT_SECRET` in Vercel Production to the password Amir types. Do not set `NEXT_PUBLIC_KNESSET_EDIT_SECRET` — `next.config.ts` no longer copies the knesset password into the client bundle, and the write check ignores `NEXT_PUBLIC_*`.
+- If none of those server-only names are set, every write returns 503 `חסר KNESSET_EDIT_SECRET בשרת`.
+- The form posts `POST /api/knesset/verify-edit-access` with header `x-knesset-edit-secret`. A match stores the typed password in `sessionStorage` under `knesset-edit-secret` (not the shared `pipeline-unlocked` flag). Later saves send that same header.
+- Comparison hashes both strings with SHA-256 and uses `crypto.timingSafeEqual`. A wrong password waits 500ms before 401 `אין הרשאה לערוך`.
+- `SUPABASE_SERVICE_KEY` is read only on the server (`getServiceEnv`). The browser bundle does not receive it.
+- Person, photo, and faction-metadata routes (`verify-edit-access`, `update-member`, `upload-member-image`, `update-faction`) skip `assertPipelineEnabled`. Python routes (status, sync stages, site-update, faction link preview/apply, static image sync) still require `pipelineApisEnabled()` (`NODE_ENV=development` or `ENABLE_PIPELINE_API=1`).
 
 ### Status panel
 
@@ -259,7 +266,7 @@ When `isDev` is true, the **צינור נתונים** panel runs OData sync:
 - Post-sync: **בדוק קישורי סיעות** / **החל קישורי סיעות** (`fix_faction_links_all` logic)
 - **עדכן תמונות** runs `km_images` logic for the active Knesset folder `public/images/KM Images/הכנסת ה{n}` (also accepts `הכנסת ה-{n}`)
 
-Requires `npm run dev`, `SUPABASE_SERVICE_KEY`, and `KNESSET_EDIT_SECRET` / `NEXT_PUBLIC_KNESSET_EDIT_SECRET` in `.env`.
+Requires `npm run dev` (or `ENABLE_PIPELINE_API=1`), `SUPABASE_SERVICE_KEY`, and a server-only edit secret (`KNESSET_EDIT_SECRET`, or one of the fallbacks above). The pipeline panel is not rendered when `isDev` is false, and its routes stay closed in production.
 
 ### MK editor
 
@@ -273,7 +280,7 @@ Saving a faction sets `faction_id`, `faction_id_provisional=false`, and `faction
 
 Apply `schema_knesset_member_edits.sql` before the first save or photo upload. Without it the list still loads and the save returns that instruction.
 
-Saves use the same gate as faction edits: password in `PipelineUnlockGate`, header `x-knesset-edit-secret`, and `POST /api/knesset/update-member` / `upload-member-image` with the service key. The client allows this in `npm run dev` only, same as `updateKnessetFaction`.
+Saves use the same gate as faction edits: password in `KnessetEditGate`, header `x-knesset-edit-secret`, and `POST /api/knesset/update-member` / `upload-member-image` with the service key. These routes run in production as well as `npm run dev`. The client does not refuse them based on `NODE_ENV`. An official OData `FactionID` still overwrites a faction chosen here and clears `faction_id_manual`. `manual_fields` still lists only the person columns this form changed.
 
 ### Faction editor
 
@@ -281,7 +288,7 @@ After unlock, pick a Knesset term (same `<select>` as public page). Each faction
 
 - `short_name`, `color`, `is_coalition`, `logo_url`
 
-OData-synced `name` and dates are display-only. Saves via `POST /api/knesset/update-faction` (service key). Active term cards highlight missing `color` or `is_coalition`.
+OData-synced `name` and dates are display-only. Saves via `POST /api/knesset/update-faction` (service key) in production and in dev, with the same server secret as MK saves. Active term cards highlight missing `color` or `is_coalition`.
 
 ## Verification
 
@@ -289,7 +296,10 @@ OData-synced `name` and dates are display-only. Saves via `POST /api/knesset/upd
 npm run lint
 npm run build
 npm run dev   # visit /knesset — switch Knesset terms in the header dropdown
-npm run dev   # visit /knesset/edit — pipeline + faction editing (dev + secret)
+npm run dev   # visit /knesset/edit — pipeline (dev) + MK and faction editing
+npm run build && npm run start
+# production server: POST /api/knesset/update-member without x-knesset-edit-secret → 401
+# with the secret and a bad body → 400 (or 503 if SUPABASE_SERVICE_KEY is unset), not the dev-only error
 ```
 
-Ensure `NEXT_PUBLIC_SUPABASE_ANON_KEY` is set in `.env` before testing live data (legacy `VITE_SUPABASE_ANON_KEY` still mapped in `next.config`). For `/knesset/edit`, also set `KNESSET_EDIT_SECRET` / `NEXT_PUBLIC_KNESSET_EDIT_SECRET` and `SUPABASE_SERVICE_KEY`.
+Ensure `NEXT_PUBLIC_SUPABASE_ANON_KEY` is set in `.env` before testing live data (legacy `VITE_SUPABASE_ANON_KEY` still mapped in `next.config`). For `/knesset/edit`, set server-only `KNESSET_EDIT_SECRET` and `SUPABASE_SERVICE_KEY`. Do not set `NEXT_PUBLIC_KNESSET_EDIT_SECRET`. `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL` must be set for writes.

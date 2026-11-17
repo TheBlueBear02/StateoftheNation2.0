@@ -1,8 +1,9 @@
 import type { NextConfig } from 'next'
 
 /**
- * Expose existing Vite-style env names to the client bundle so .env
- * does not need to be rewritten during the migration.
+ * Expose existing Vite-style public env names to the client bundle.
+ * The Knesset edit password is not mapped here: KNESSET_EDIT_SECRET stays
+ * server-only and is checked on /api/knesset/* (see knessetEditAuth.ts).
  */
 const nextConfig: NextConfig = {
   // Allow phone / LAN access to Next.js dev HMR and assets.
@@ -22,11 +23,6 @@ const nextConfig: NextConfig = {
       process.env.NEXT_PUBLIC_ELECTIONS_EDIT_SECRET ||
       process.env.ELECTIONS_EDIT_SECRET ||
       process.env.VITE_ELECTIONS_EDIT_SECRET ||
-      '',
-    NEXT_PUBLIC_KNESSET_EDIT_SECRET:
-      process.env.NEXT_PUBLIC_KNESSET_EDIT_SECRET ||
-      process.env.KNESSET_EDIT_SECRET ||
-      process.env.VITE_KNESSET_EDIT_SECRET ||
       '',
     NEXT_PUBLIC_SITE_URL:
       process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',

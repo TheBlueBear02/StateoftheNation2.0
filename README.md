@@ -22,14 +22,14 @@ SUPABASE_ANON_KEY=...          # or VITE_ / NEXT_PUBLIC_ equivalents
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-`next.config.ts` maps legacy `VITE_SUPABASE_*` / `VITE_*_EDIT_SECRET` into the client bundle, so existing Vite-style `.env` keys still work.
+`next.config.ts` maps legacy `VITE_SUPABASE_*` and `VITE_ELECTIONS_EDIT_SECRET` into the client bundle. The Knesset edit password is not mapped.
 
 For local pipeline / edit APIs also set:
 
 ```
 SUPABASE_SERVICE_KEY=...
 VITE_ELECTIONS_EDIT_SECRET=...   # or NEXT_PUBLIC_ELECTIONS_EDIT_SECRET
-VITE_KNESSET_EDIT_SECRET=...
+KNESSET_EDIT_SECRET=...          # server-only; do not prefix with NEXT_PUBLIC_
 OPENAI_API_KEY=...               # elections enrichment
 ```
 
@@ -48,4 +48,4 @@ Start at [`Agents Instructions/ProjectOverview.md`](./Agents%20Instructions/Proj
 
 ## Note on edit APIs
 
-`/api/elections/*`, `/api/knesset/*`, and `/api/polls/*` spawn local Python and are enabled in development (or with `ENABLE_PIPELINE_API=1`). Production data updates should use Layer 1 scripts / GitHub Actions, not serverless Python spawn.
+`/api/elections/*`, `/api/knesset/*`, and `/api/polls/*` spawn local Python and are enabled in development (or with `ENABLE_PIPELINE_API=1`). Production data updates for those Python routes should use Layer 1 scripts / GitHub Actions, not serverless Python spawn. `/api/knesset/update-member`, `/api/knesset/upload-member-image`, and `/api/knesset/update-faction` are the exception: they write with the service key in production after `KNESSET_EDIT_SECRET` matches `x-knesset-edit-secret`.

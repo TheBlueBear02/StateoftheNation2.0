@@ -4,13 +4,14 @@ import { isDev } from '../lib/runtimeEnv'
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type FormEvent,
 } from 'react'
 import Link from 'next/link'
 import { SiteLayout } from '../components/SiteLayout'
-import { PipelineUnlockGate } from '../components/pipelines/PipelineUnlockGate'
+import { KnessetEditGate } from '../components/knesset/KnessetEditGate'
 import { KnessetPipelinePanel } from '../components/knesset/KnessetPipelinePanel'
 import { KnessetRunSummary } from '../components/knesset/KnessetRunSummary'
 import {
@@ -93,6 +94,15 @@ function factionToDraft(faction: KnessetFactionOption): FactionDraft {
     logoUrl: faction.logoUrl ?? '',
     isCoalition: faction.isCoalition,
   }
+}
+
+function RefreshKnessetStatus({ onReady }: { onReady: () => void }) {
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
+  useEffect(() => {
+    void onReadyRef.current()
+  }, [])
+  return null
 }
 
 function draftsEqual(a: FactionDraft, b: FactionDraft): boolean {
@@ -368,10 +378,6 @@ export function KnessetPipelineEditPage() {
     setStatusLoading(false)
   }
 
-  useEffect(() => {
-    void loadStatus()
-  }, [])
-
   async function handlePipelineComplete() {
     await loadStatus()
     await refetchFactions()
@@ -397,8 +403,9 @@ export function KnessetPipelineEditPage() {
 
         <section className="election-edit-page__content">
           <div className="election-edit-page__inner container">
-            <PipelineUnlockGate>
+            <KnessetEditGate>
               <>
+                <RefreshKnessetStatus onReady={loadStatus} />
                 <section
                   className="party-detail-card knesset-status-panel"
                   aria-labelledby="knesset-status-title"
@@ -541,7 +548,7 @@ export function KnessetPipelineEditPage() {
                   </ul>
                 </section>
               </>
-            </PipelineUnlockGate>
+            </KnessetEditGate>
           </div>
         </section>
       </main>

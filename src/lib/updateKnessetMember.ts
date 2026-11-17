@@ -1,5 +1,5 @@
-import { isDev, getKnessetEditSecret } from './runtimeEnv'
 import type { ParsedMemberEdit } from './knessetMemberEdit'
+import { knessetEditSecretHeaders } from './knessetEditSession'
 
 export type MemberEditPayload = ParsedMemberEdit
 
@@ -7,19 +7,8 @@ export type UpdateKnessetMemberResult =
   | { ok: true; imageUrl?: string }
   | { ok: false; error: string }
 
-function devOnly(): UpdateKnessetMemberResult | null {
-  if (!isDev) {
-    return {
-      ok: false,
-      error: 'זמין רק בסביבת פיתוח (npm run dev)',
-    }
-  }
-  return null
-}
-
 function secretHeaders(): HeadersInit {
-  const secret = getKnessetEditSecret()
-  return secret ? { 'X-Knesset-Edit-Secret': secret } : {}
+  return knessetEditSecretHeaders()
 }
 
 async function readResult(response: Response): Promise<UpdateKnessetMemberResult> {
@@ -33,11 +22,6 @@ async function readResult(response: Response): Promise<UpdateKnessetMemberResult
 export async function updateKnessetMember(
   input: MemberEditPayload,
 ): Promise<UpdateKnessetMemberResult> {
-  const blocked = devOnly()
-  if (blocked) {
-    return blocked
-  }
-
   const response = await fetch('/api/knesset/update-member', {
     method: 'POST',
     headers: {
@@ -53,11 +37,6 @@ export async function uploadKnessetMemberImage(
   personId: number,
   file: File,
 ): Promise<UpdateKnessetMemberResult> {
-  const blocked = devOnly()
-  if (blocked) {
-    return blocked
-  }
-
   const body = new FormData()
   body.set('personId', String(personId))
   body.set('file', file)

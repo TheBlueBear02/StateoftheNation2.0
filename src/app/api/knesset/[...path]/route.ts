@@ -7,9 +7,9 @@ import {
   getServiceEnv,
   jsonError,
   jsonOk,
-  requireKnessetSecret,
   runPythonScript,
 } from '@/server/apiCommon'
+import { authorizeKnessetEdit } from '@/server/knessetEditAuth'
 import {
   updateKnessetMemberWithClient,
   uploadMemberImageWithClient,
@@ -97,8 +97,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const gated = assertPipelineEnabled()
   if (gated) return gated
 
-  const auth = requireKnessetSecret(request)
-  if (auth.error) return auth.error
+  const auth = await authorizeKnessetEdit(request)
+  if (!auth.ok) return jsonError(auth.error, auth.status)
 
   const { path: segments } = await context.params
   const route = segments.join('/')
@@ -119,17 +119,32 @@ export async function GET(request: NextRequest, context: RouteContext) {
   return jsonError('Not found', 404)
 }
 
+/** Person, photo, and faction-metadata edits run in every environment.
+ *  Python pipeline routes stay behind assertPipelineEnabled (dev / opt-in). */
+const DATA_EDIT_ROUTES = new Set([
+  'verify-edit-access',
+  'update-faction',
+  'update-member',
+  'upload-member-image',
+])
+
 export async function POST(request: NextRequest, context: RouteContext) {
-  const gated = assertPipelineEnabled()
-  if (gated) return gated
-
-  const auth = requireKnessetSecret(request)
-  if (auth.error) return auth.error
-
   const { path: segments } = await context.params
   const route = segments.join('/')
 
+  if (!DATA_EDIT_ROUTES.has(route)) {
+    const gated = assertPipelineEnabled()
+    if (gated) return gated
+  }
+
+  const auth = await authorizeKnessetEdit(request)
+  if (!auth.ok) return jsonError(auth.error, auth.status)
+
   try {
+    if (route === 'verify-edit-access') {
+      return jsonOk({ ok: true })
+    }
+
     if (route === 'pipeline/stage') {
       const body = (await request.json()) as { stage?: number }
       const stage = Number(body?.stage)
