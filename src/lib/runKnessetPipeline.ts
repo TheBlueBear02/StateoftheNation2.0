@@ -1,4 +1,5 @@
-import { isDev, getKnessetEditSecret } from './runtimeEnv'
+import { knessetEditSecretHeaders } from './knessetEditSession'
+import { isDev } from './runtimeEnv'
 
 type PipelineError = { ok: false; error: string }
 
@@ -133,10 +134,9 @@ export type KmImagesResult =
   | PipelineError
 
 function getEditHeaders(): Record<string, string> {
-  const secret = getKnessetEditSecret()
   return {
     'Content-Type': 'application/json',
-    ...(secret ? { 'X-Knesset-Edit-Secret': secret } : {}),
+    ...knessetEditSecretHeaders(),
   }
 }
 

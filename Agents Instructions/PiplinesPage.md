@@ -17,10 +17,11 @@ Docs pages are `noindex` but **not** password-gated. The dashboard and all `/edi
 ## Shared password
 
 - Env: `NEXT_PUBLIC_PIPELINE_EDIT_SECRET` / `PIPELINE_EDIT_SECRET`
-- Fallbacks: existing `ELECTIONS_EDIT_SECRET` / `KNESSET_EDIT_SECRET` (and `VITE_` / `NEXT_PUBLIC_` variants)
-- Session key: `pipeline-unlocked` (shared across dashboard + `/elections/edit`, `/elections/polls/edit`, `/knesset/edit`)
+- Fallbacks for the shared client gate: existing `ELECTIONS_EDIT_SECRET` / `KNESSET_EDIT_SECRET` (and `VITE_` / `NEXT_PUBLIC_` variants) when that code path still runs in the browser
+- Session key: `pipeline-unlocked` (shared across dashboard + `/elections/edit`, `/elections/polls/edit`)
+- `/knesset/edit` does not use this client gate. It checks `KNESSET_EDIT_SECRET` on the server (see [KnessetPage.md](./KnessetPage.md)) and stores the typed password under `knesset-edit-secret`
 - Helpers: `src/lib/pipelineAuth.ts`, `src/components/pipelines/PipelineUnlockGate.tsx`
-- API: `requirePipelineSecret` in `src/server/apiCommon.ts` (accepts `x-pipeline-edit-secret`, `x-elections-edit-secret`, or `x-knesset-edit-secret`)
+- API: `requirePipelineSecret` in `src/server/apiCommon.ts` (accepts `x-pipeline-edit-secret`, `x-elections-edit-secret`, or `x-knesset-edit-secret`) for pipeline routes that still use it. Knesset data edits use `authorizeKnessetEdit` in `src/server/knessetEditAuth.ts` instead
 
 ## File Map
 
